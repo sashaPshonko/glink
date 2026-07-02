@@ -648,7 +648,6 @@
     let msgMenuTargetId = null;
     let msgPressTimer = null;
     let msgPressRow = null;
-    let msgPressXY = null;
     let msgMenuDelayTimer = null;
     let appErrTimer = null;
     let lastMsgTap = { id: null, at: 0 };
@@ -969,7 +968,6 @@
       clearTimeout(msgPressTimer);
       msgPressTimer = null;
       msgPressRow = null;
-      msgPressXY = null;
     }
 
     function messageCopyText(m) {
@@ -1024,8 +1022,11 @@
       if (sel?.removeAllRanges) sel.removeAllRanges();
     }
 
-    function openMsgMenu(m, x, y) {
+    function openMsgMenu(m, rowEl) {
       if (!m || m._pending || !canOpenMsgMenuNow()) return;
+      const row = rowEl || $('messages').querySelector('.msg-row[data-id="' + m.id + '"]');
+      const stack = row?.querySelector('.msg-stack');
+      if (!stack) return;
       msgMenuTargetId = m.id;
       const menu = $('msgMenu');
       const reactions = m.reactions || {};
@@ -1036,13 +1037,16 @@
       $('msgMenuCopy').classList.toggle('hidden', !messageCopyText(m));
       menu.classList.remove('hidden');
       const pad = 8;
-      const rect = menu.getBoundingClientRect();
-      let left = x;
-      let top = y;
-      if (left + rect.width > window.innerWidth - pad) left = window.innerWidth - rect.width - pad;
-      if (top + rect.height > window.innerHeight - pad) top = window.innerHeight - rect.height - pad;
-      menu.style.left = Math.max(pad, left) + 'px';
-      menu.style.top = Math.max(pad, top) + 'px';
+      const gap = 6;
+      const stackRect = stack.getBoundingClientRect();
+      const menuRect = menu.getBoundingClientRect();
+      let left = stackRect.left + (stackRect.width - menuRect.width) / 2;
+      let top = stackRect.top - menuRect.height - gap;
+      if (top < pad) top = stackRect.bottom + gap;
+      left = Math.max(pad, Math.min(left, window.innerWidth - menuRect.width - pad));
+      top = Math.max(pad, Math.min(top, window.innerHeight - menuRect.height - pad));
+      menu.style.left = left + 'px';
+      menu.style.top = top + 'px';
     }
 
     function isMsgInteractiveTarget(el) {
@@ -1081,21 +1085,30 @@
       }
     }
 
+    function applyReactionToggle(msg, reaction) {
+      const reactions = { ...(msg.reactions || {}) };
+      if (reactions[user.id] === reaction) delete reactions[user.id];
+      else reactions[user.id] = reaction;
+      return { ...msg, reactions };
+    }
+
     async function toggleReaction(messageId, reaction) {
       if (!activeChat) return;
+      const prev = getMessage(messageId);
+      if (!prev || prev._pending) return;
+      const optimistic = applyReactionToggle(prev, reaction);
+      replaceMessage(messageId, optimistic);
+      upsertActiveMessage(optimistic);
       try {
         const data = await api('/chats/' + activeChat.id + '/messages/' + messageId + '/reactions', {
           method: 'POST',
           body: JSON.stringify({ reaction }),
         });
         replaceMessage(messageId, data.message);
-        const m = data.message;
-        if (msgMenuTargetId === messageId) {
-          $('msgMenu').querySelectorAll('.msg-menu-reactions button').forEach((btn) => {
-            btn.classList.toggle('sel', (m.reactions || {})[user.id] === btn.dataset.reaction);
-          });
-        }
+        upsertActiveMessage(data.message);
       } catch (e) {
+        replaceMessage(messageId, prev);
+        upsertActiveMessage(prev);
         showAppErr(e.message || 'не удалось поставить реакцию');
       }
     }
@@ -2568,11 +2581,10 @@
       const m = getMessage(row.dataset.id);
       if (!m || m._pending) return;
       msgPressRow = row;
-      msgPressXY = { x: e.clientX, y: e.clientY };
       msgPressTimer = setTimeout(() => {
         if (msgPressRow !== row) return;
         if (!canOpenMsgMenuNow()) return;
-        openMsgMenu(m, e.clientX, e.clientY);
+        openMsgMenu(m, row);
         clearMsgPress();
       }, MSG_PRESS_MS);
     });
@@ -2580,7 +2592,6 @@
       const hit = e.target.closest('.msg-hit');
       if (!hit) return;
       const row = hit.closest('.msg-row');
-      const xy = msgPressXY;
       const wasTimer = msgPressTimer;
       const sameRow = msgPressRow === row;
       clearMsgPress();
@@ -2594,7 +2605,7 @@
         if (lastMsgTap.id === rid && Date.now() - lastMsgTap.at < DBL_TAP_MS) return;
         if (!canOpenMsgMenuNow()) return;
         const m = getMessage(rid);
-        if (m) openMsgMenu(m, xy?.x ?? e.clientX, xy?.y ?? e.clientY);
+        if (m) openMsgMenu(m, row);
       }, DBL_TAP_MS);
     });
     $('messages').addEventListener('pointercancel', clearMsgPress);
@@ -2628,14 +2639,17 @@
         return;
       }
       const m = getMessage(row.dataset.id);
-      if (m) openMsgMenu(m, e.clientX, e.clientY);
+      if (m) openMsgMenu(m, row);
     });
 
     $('msgMenu').querySelectorAll('.msg-menu-reactions button').forEach((btn) => {
       btn.onclick = (e) => {
         e.stopPropagation();
-        if (!msgMenuTargetId) return;
-        toggleReaction(msgMenuTargetId, btn.dataset.reaction);
+        const id = msgMenuTargetId;
+        const reaction = btn.dataset.reaction;
+        if (!id || !reaction) return;
+        closeMsgMenu();
+        toggleReaction(id, reaction);
       };
     });
     $('msgMenuCopy').onclick = async (e) => {
