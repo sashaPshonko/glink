@@ -140,6 +140,7 @@
     #messages {
       flex: 1; overflow: auto; padding: 16px;
       display: flex; flex-direction: column; gap: 8px;
+      align-items: flex-start;
       -webkit-overflow-scrolling: touch;
     }
     #composer {
@@ -175,16 +176,17 @@
       max-width: 82%; padding: 10px 14px; border-radius: 16px;
       line-height: 1.4; word-break: break-word;
     }
-    .mine { align-self: flex-end; background: rgba(249, 197, 223, 0.95); }
-    .theirs { align-self: flex-start; background: rgba(255, 255, 255, 0.92); border: 1px solid rgba(252, 231, 243, 0.95); }
+    .mine { align-self: flex-end; margin-left: auto; background: rgba(249, 197, 223, 0.95); }
+    .theirs { align-self: flex-start; margin-right: auto; background: rgba(255, 255, 255, 0.92); border: 1px solid rgba(252, 231, 243, 0.95); }
     .sender { font-size: 0.75rem; color: #db2777; font-weight: 600; margin-bottom: 4px; }
     .bubble a { color: #be185d; text-decoration: underline; }
     .bubble img {
       max-width: min(280px, 100%); border-radius: 14px; display: block;
-      margin-top: 4px; cursor: pointer; border: none; outline: none;
+      margin: 4px 0 0; cursor: pointer; border: none; outline: none;
     }
     .bubble.has-image {
       padding: 0; background: transparent !important; border: none !important;
+      width: fit-content; max-width: min(280px, 88%);
     }
     .bubble.has-image img {
       margin-top: 0; border-radius: 16px;
@@ -315,15 +317,20 @@
       font-size: 2.2rem; pointer-events: none;
     }
     .video-note.playing .vid-badge { opacity: 0; }
-    .bubble.has-video { padding: 4px; background: transparent !important; border: none !important; }
-    .bubble.has-media-video { padding: 6px 8px; }
+    .bubble.has-video {
+      padding: 4px; background: transparent !important; border: none !important;
+      width: fit-content; max-width: min(200px, 88%);
+    }
+    .bubble.has-media-video {
+      padding: 6px 8px; width: fit-content; max-width: min(320px, 88%);
+    }
     .bubble.has-media-audio { padding: 8px 10px; }
     .media-video {
-      max-width: min(320px, 100%); margin-top: 2px;
+      max-width: min(320px, 100%); margin-top: 2px; width: 100%;
     }
     .media-video video {
       width: 100%; max-height: 240px; border-radius: 12px;
-      background: #1a1a1a; display: block;
+      background: #1a1a1a; display: block; margin: 0;
     }
     .media-video-name, .media-audio-name {
       font-size: 0.72rem; color: #b07a94; margin-top: 4px;
