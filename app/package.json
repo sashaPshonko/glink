@@ -5,7 +5,10 @@
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
-    "ios": "expo run:ios"
+    "ios": "expo run:ios",
+    "cert": "bash scripts/fetch-cert.sh",
+    "build:apk": "bash scripts/fetch-cert.sh && eas build --platform android --profile preview",
+    "build:apk:local": "bash scripts/fetch-cert.sh && eas build --platform android --profile preview --local"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -21,11 +24,13 @@
     "react": "^19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
-    "react-native-web": "^0.21.0"
+    "react-native-web": "^0.21.0",
+    "react-native-webview": "13.15.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
-    "@expo/ngrok": "^4.1.0"
+    "@expo/ngrok": "^4.1.0",
+    "eas-cli": "^16.28.0"
   },
   "private": true
 }

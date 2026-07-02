@@ -191,20 +191,20 @@
       box-shadow: 0 2px 14px rgba(92, 51, 71, 0.1);
     }
     .voice-msg {
-      display: flex; align-items: center; gap: 10px;
-      min-width: 200px; max-width: min(280px, 100%); margin-top: 2px;
+      display: flex; align-items: center; gap: 7px;
+      min-width: 118px; max-width: min(168px, 72vw); margin-top: 2px;
     }
     .voice-play {
-      width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
+      width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
       background: rgba(255, 255, 255, 0.55); border: none;
-      font-size: 1rem; cursor: pointer; color: #9d174d;
+      font-size: 0.85rem; cursor: pointer; color: #9d174d;
       display: flex; align-items: center; justify-content: center;
     }
     .bubble.theirs .voice-play { background: #ffecf4; }
-    .voice-body { flex: 1; min-width: 0; }
+    .voice-body { flex: 1; min-width: 0; max-width: 118px; }
     .voice-wave {
       position: relative;
-      height: 40px; cursor: pointer; touch-action: manipulation;
+      height: 32px; cursor: pointer; touch-action: manipulation;
       --pct: 0%;
     }
     .voice-wave::before {
@@ -225,10 +225,10 @@
     .bubble.theirs .voice-wave::after { background: #db2777; }
     .voice-bars {
       position: relative; z-index: 0;
-      display: flex; align-items: center; gap: 2px; height: 100%;
+      display: flex; align-items: center; gap: 1px; height: 100%;
     }
     .voice-bars i {
-      flex: 1; min-width: 2px; max-width: 5px; border-radius: 2px;
+      flex: 1; min-width: 1px; max-width: 3px; border-radius: 1px;
       background: rgba(157, 23, 77, 0.22); display: block; align-self: center;
     }
     .voice-bars i.on { background: rgba(157, 23, 77, 0.88); }
@@ -316,6 +316,7 @@
     }
     .video-note.playing .vid-badge { opacity: 0; }
     .bubble.has-video { padding: 4px; background: transparent !important; border: none !important; }
+    .bubble.pending { opacity: 0.7; }
     #videoRecOverlay {
       position: fixed; inset: 0; z-index: 200;
       background: rgba(92, 51, 71, 0.94);
@@ -581,9 +582,11 @@
       const parts = [];
       const kind = m.kind || 'text';
 
-      if (kind === 'image' && m.fileUrl) {
+      if (kind === 'image' && m.fileUrl && !m._pending) {
         parts.push(`<img src="${fileUrl(m.fileUrl)}" alt="фото" onclick="window.open(this.src,'_blank')" />`);
-      } else if (kind === 'voice' && m.fileUrl) {
+      } else if (kind === 'image' && m._pending) {
+        parts.push('<div>📷 …</div>');
+      } else if (kind === 'voice' && m.fileUrl && !m._pending) {
         const src = escapeHtml(fileUrl(m.fileUrl));
         parts.push(
           `<div class="voice-msg" data-src="${src}">` +
@@ -593,7 +596,9 @@
           `<div class="voice-time"><span class="voice-cur">0:00</span> / <span class="voice-dur">…</span></div>` +
           `</div></div>`,
         );
-      } else if (kind === 'video' && m.fileUrl) {
+      } else if (kind === 'voice' && m._pending) {
+        parts.push('<div>🎤 …</div>');
+      } else if (kind === 'video' && m.fileUrl && !m._pending) {
         const src = escapeHtml(fileUrl(m.fileUrl));
         parts.push(
           `<div class="video-note" data-src="${src}">` +
@@ -605,6 +610,18 @@
           `<video playsinline preload="metadata" src="${src}"></video>` +
           `<div class="vid-badge">▶</div>` +
           `</div></div>`,
+        );
+      } else if (kind === 'video' && m._pending) {
+        parts.push('<div>⭕ …</div>');
+      } else if (kind === 'file' && m._pending) {
+        const name = escapeHtml(m.file?.name || 'файл');
+        parts.push(
+          `<div class="file-card" style="pointer-events:none">` +
+          `<span class="file-card-icon">${FILE_ICON_SVG}</span>` +
+          `<span class="file-card-body">` +
+          `<span class="file-card-name">${name}</span>` +
+          `<span class="file-card-size">отправка…</span>` +
+          `</span></div>`,
         );
       } else if (kind === 'file' && m.fileUrl) {
         const name = escapeHtml(m.file?.name || 'файл');
@@ -630,6 +647,67 @@
       const cls = read ? 'ticks read' : 'ticks sent';
       const title = read ? 'прочитано' : 'отправлено';
       return `<div class="msg-foot"><span class="${cls}" title="${title}">${read ? '✓✓' : '✓'}</span></div>`;
+    }
+
+    function renderBubbleHtml(m) {
+      const mine = m.senderId === user.id;
+      const sender = activeChat?.type === 'group' && !mine
+        ? `<div class="sender">${escapeHtml(m.senderName || '?')}</div>` : '';
+      const extraCls = m.kind === 'video' ? ' has-video'
+        : (m.kind === 'image' && !m.text ? ' has-image' : '');
+      const pendingCls = m._pending ? ' pending' : '';
+      return `<div class="bubble ${mine ? 'mine' : 'theirs'}${extraCls}${pendingCls}" data-id="${m.id}">${sender}${renderMessageBody(m)}${renderTicks(m, mine)}</div>`;
+    }
+
+    function syncSigFromBox() {
+      const box = $('messages');
+      const bubbles = box.querySelectorAll('.bubble');
+      const last = bubbles[bubbles.length - 1];
+      lastMessagesSig = bubbles.length + ':' + (last?.dataset.id || '0');
+      lastMsgCount = bubbles.length;
+    }
+
+    function appendMessage(m, opts = {}) {
+      const box = $('messages');
+      if (box.querySelector('.bubble[data-id="' + m.id + '"]')) return;
+      box.insertAdjacentHTML('beforeend', renderBubbleHtml(m));
+      syncSigFromBox();
+      if (opts.forceBottom || userPinnedBottom) scrollToBottom(box);
+      wireVoicePlayers(box);
+      wireVideoNotes(box);
+      if (!m._pending) markChatRead();
+    }
+
+    function replaceMessage(oldId, msg) {
+      const box = $('messages');
+      const el = box.querySelector('.bubble[data-id="' + oldId + '"]');
+      if (el) el.outerHTML = renderBubbleHtml(msg);
+      else if (!box.querySelector('.bubble[data-id="' + msg.id + '"]')) {
+        box.insertAdjacentHTML('beforeend', renderBubbleHtml(msg));
+      }
+      syncSigFromBox();
+      if (userPinnedBottom) scrollToBottom(box);
+      wireVoicePlayers(box);
+      wireVideoNotes(box);
+      markChatRead();
+    }
+
+    function removeMessage(id) {
+      $('messages').querySelector('.bubble[data-id="' + id + '"]')?.remove();
+      syncSigFromBox();
+    }
+
+    function ingestIncomingMessage(message) {
+      const box = $('messages');
+      if (box.querySelector('.bubble[data-id="' + message.id + '"]')) return;
+      if (message.senderId === user.id) {
+        const pending = box.querySelector('.bubble.pending');
+        if (pending) {
+          replaceMessage(pending.dataset.id, message);
+          return;
+        }
+      }
+      appendMessage(message, { forceBottom: userPinnedBottom });
     }
 
     function renderChats() {
@@ -708,14 +786,7 @@
       lastMessagesSig = sig;
       lastMsgCount = data.messages?.length || 0;
 
-      box.innerHTML = data.messages.map((m) => {
-        const mine = m.senderId === user.id;
-        const sender = activeChat.type === 'group' && !mine
-          ? `<div class="sender">${escapeHtml(m.senderName || '?')}</div>` : '';
-        const extraCls = m.kind === 'video' ? ' has-video'
-          : (m.kind === 'image' && !m.text ? ' has-image' : '');
-        return `<div class="bubble ${mine ? 'mine' : 'theirs'}${extraCls}" data-id="${m.id}">${sender}${renderMessageBody(m)}${renderTicks(m, mine)}</div>`;
-      }).join('');
+      box.innerHTML = data.messages.map((m) => renderBubbleHtml(m)).join('');
       if (gen !== loadMsgGen) return;
 
       if (stick) {
@@ -914,7 +985,7 @@
         const ctx = new Ctx();
         const audio = await ctx.decodeAudioData(buf.slice(0));
         const data = audio.getChannelData(0);
-        const bars = 52;
+        const bars = 28;
         const block = Math.max(1, Math.floor(data.length / bars));
         const peaks = [];
         for (let i = 0; i < bars; i++) {
@@ -1017,7 +1088,7 @@
         paintWaveform(barsEl, peaks);
         if (saneDur(duration)) el.dataset.duration = String(duration);
       } catch {
-        paintWaveform(barsEl, Array.from({ length: 40 }, () => 0.35));
+        paintWaveform(barsEl, Array.from({ length: 28 }, () => 0.35));
       }
       if (!saneDur(Number(el.dataset.duration))) {
         const duration = await getDuration(src);
@@ -1378,7 +1449,7 @@
         try {
           const msg = JSON.parse(ev.data);
           if (msg.type === 'message' && activeChat && msg.message?.chatId === activeChat.id) {
-            loadMessages({ forceBottom: userPinnedBottom });
+            ingestIncomingMessage(msg.message);
             refreshChatList();
           }
           if (msg.type === 'read' && msg.chatId) {
@@ -1443,23 +1514,58 @@
       const text = $('msgInput').value.trim();
       if (!text || !activeChat) return;
       $('msgInput').value = '';
-      await api('/chats/' + activeChat.id + '/messages', {
-        method: 'POST',
-        body: JSON.stringify({ text }),
-      });
-      await loadMessages({ forceBottom: true });
-      refreshChatList();
+      userPinnedBottom = true;
+      const pendingId = 'pending-' + Date.now();
+      appendMessage({
+        id: pendingId,
+        senderId: user.id,
+        kind: 'text',
+        text,
+        status: 'sent',
+        _pending: true,
+      }, { forceBottom: true });
+
+      try {
+        const data = await api('/chats/' + activeChat.id + '/messages', {
+          method: 'POST',
+          body: JSON.stringify({ text }),
+        });
+        replaceMessage(pendingId, data.message);
+        refreshChatList();
+      } catch (e) {
+        removeMessage(pendingId);
+        $('msgInput').value = text;
+        showAppErr(e.message || 'не удалось отправить');
+      }
     }
 
     async function sendFile(file, kind, caption) {
       if (!activeChat || !file) return;
+      userPinnedBottom = true;
+      const pendingId = 'pending-' + Date.now();
+      const msgKind = kind || 'file';
+      appendMessage({
+        id: pendingId,
+        senderId: user.id,
+        kind: msgKind,
+        text: caption || (msgKind === 'file' ? 'отправка…' : ''),
+        file: { name: file.name || 'файл' },
+        status: 'sent',
+        _pending: true,
+      }, { forceBottom: true });
+
       const fd = new FormData();
       fd.append('file', file, file.name || 'upload');
       if (kind) fd.append('kind', kind);
       if (caption) fd.append('text', caption);
-      await api('/chats/' + activeChat.id + '/messages', { method: 'POST', body: fd });
-      await loadMessages({ forceBottom: true });
-      refreshChatList();
+      try {
+        const data = await api('/chats/' + activeChat.id + '/messages', { method: 'POST', body: fd });
+        replaceMessage(pendingId, data.message);
+        refreshChatList();
+      } catch (e) {
+        removeMessage(pendingId);
+        throw e;
+      }
     }
 
     async function onFilePicked(ev) {

@@ -16,7 +16,8 @@
           "NSAllowsArbitraryLoads": true
         },
         "NSMicrophoneUsageDescription": "Glink записывает голосовые сообщения",
-        "NSPhotoLibraryUsageDescription": "Glink отправляет фото в чат"
+        "NSCameraUsageDescription": "Glink записывает видео-кружки",
+        "NSPhotoLibraryUsageDescription": "Glink отправляет фото и файлы в чат"
       }
     },
     "android": {
@@ -24,10 +25,12 @@
         "backgroundColor": "#fff5f9"
       },
       "package": "com.glink.app",
-      "usesCleartextTraffic": true,
       "permissions": [
+        "INTERNET",
         "RECORD_AUDIO",
+        "CAMERA",
         "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO",
         "READ_EXTERNAL_STORAGE"
       ]
     },
@@ -40,18 +43,7 @@
     "plugins": [
       "expo-asset",
       "expo-font",
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Glink отправляет фото в чат"
-        }
-      ],
-      [
-        "expo-av",
-        {
-          "microphonePermission": "Glink записывает голосовые сообщения"
-        }
-      ]
+      "./plugins/withGlinkAndroidNetwork.js"
     ]
   }
 }

@@ -1,73 +1,71 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, StatusBar, StyleSheet, View } from 'react-native';
-import { fetchMe, getToken, logout } from './lib/api';
-import LoginScreen from './screens/LoginScreen';
-import ChatsListScreen from './screens/ChatsListScreen';
-import ChatScreen from './screens/ChatScreen';
+import { useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    Platform,
+    SafeAreaView,
+    StatusBar,
+    StyleSheet,
+    View,
+} from 'react-native';
+import { WebView } from 'react-native-webview';
+import Constants from 'expo-constants';
 import { theme } from './lib/theme';
 
+const SERVER_URL = Constants.expoConfig?.extra?.serverUrl || 'https://31.128.38.147:3920';
+
 export default function App() {
-    const [boot, setBoot] = useState(true);
-    const [user, setUser] = useState(null);
-    const [activeChat, setActiveChat] = useState(null);
-
-    useEffect(() => {
-        (async () => {
-            try {
-                const token = await getToken();
-                if (token) {
-                    const me = await fetchMe();
-                    setUser(me.user);
-                }
-            } catch {
-                setUser(null);
-            } finally {
-                setBoot(false);
-            }
-        })();
-    }, []);
-
-    async function handleLogout() {
-        await logout();
-        setUser(null);
-        setActiveChat(null);
-    }
-
-    if (boot) {
-        return (
-            <View style={styles.boot}>
-                <ActivityIndicator color={theme.primaryDark} size="large" />
-            </View>
-        );
-    }
+    const webRef = useRef(null);
+    const [loading, setLoading] = useState(true);
 
     return (
-        <>
+        <SafeAreaView style={styles.root}>
             <StatusBar barStyle="dark-content" backgroundColor={theme.bg} />
-            {!user ? (
-                <LoginScreen onAuthed={setUser} />
-            ) : activeChat ? (
-                <ChatScreen
-                    chat={activeChat}
-                    user={user}
-                    onBack={() => setActiveChat(null)}
-                />
-            ) : (
-                <ChatsListScreen
-                    user={user}
-                    onOpenChat={setActiveChat}
-                    onLogout={handleLogout}
-                />
-            )}
-        </>
+            {loading ? (
+                <View style={styles.loader}>
+                    <ActivityIndicator size="large" color={theme.primaryDark} />
+                </View>
+            ) : null}
+            <WebView
+                ref={webRef}
+                source={{ uri: SERVER_URL }}
+                style={styles.web}
+                onLoadEnd={() => setLoading(false)}
+                onLoadStart={() => setLoading(true)}
+                onError={() => setLoading(false)}
+                javaScriptEnabled
+                domStorageEnabled
+                sharedCookiesEnabled
+                thirdPartyCookiesEnabled
+                allowsInlineMediaPlayback
+                mediaPlaybackRequiresUserAction={false}
+                allowsFullscreenVideo
+                setSupportMultipleWindows={false}
+                originWhitelist={['https://*', 'http://*']}
+                cacheEnabled
+                pullToRefreshEnabled={Platform.OS === 'android'}
+                onPermissionRequest={(event) => {
+                    event.grant(event.resources);
+                }}
+                onContentProcessDidTerminate={() => webRef.current?.reload()}
+            />
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    boot: {
+    root: {
         flex: 1,
         backgroundColor: theme.bg,
+    },
+    web: {
+        flex: 1,
+        backgroundColor: theme.bg,
+    },
+    loader: {
+        ...StyleSheet.absoluteFillObject,
         alignItems: 'center',
         justifyContent: 'center',
+        backgroundColor: theme.bg,
+        zIndex: 1,
     },
 });
