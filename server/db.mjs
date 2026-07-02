@@ -227,6 +227,7 @@ export function addMessage({ chatId, senderId, text, kind = 'text', file = null 
             : null,
         createdAt: new Date().toISOString(),
         readBy: [],
+        reactions: {},
     };
 
     if (msgKind === 'text' && !msg.text) throw new Error('empty_message');
@@ -252,6 +253,23 @@ export function editMessage({ messageId, chatId, userId, text }) {
 
     const chat = findChatById(chatId);
     if (chat) chat.updatedAt = msg.editedAt;
+    persist();
+    return msg;
+}
+
+const REACTION_KEYS = new Set(['heart', 'thumbs', 'fire', 'strawberry']);
+
+export function toggleMessageReaction({ messageId, chatId, userId, reaction }) {
+    if (!REACTION_KEYS.has(reaction)) throw new Error('invalid_reaction');
+    const msg = db.messages.find((m) => m.id === messageId && m.chatId === chatId);
+    if (!msg) throw new Error('message_not_found');
+    const chat = findChatById(chatId);
+    if (!chat?.memberIds.includes(userId)) throw new Error('forbidden');
+
+    if (!msg.reactions || typeof msg.reactions !== 'object') msg.reactions = {};
+    if (msg.reactions[userId] === reaction) delete msg.reactions[userId];
+    else msg.reactions[userId] = reaction;
+
     persist();
     return msg;
 }

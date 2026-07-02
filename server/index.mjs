@@ -21,6 +21,7 @@ import {
     markMessagesRead,
     messagePreview,
     readStatusFor,
+    toggleMessageReaction,
     userInChat,
 } from './db.mjs';
 import {
@@ -478,6 +479,45 @@ app.patch('/chats/:chatId/messages/:messageId', authMiddleware, (req, res) => {
         }
         if (e.message === 'empty_message') {
             res.status(400).json({ error: 'empty_message' });
+            return;
+        }
+        throw e;
+    }
+});
+
+app.post('/chats/:chatId/messages/:messageId/reactions', authMiddleware, (req, res) => {
+    const { chatId, messageId } = req.params;
+    if (chatId.startsWith('pending:')) {
+        res.status(400).json({ error: 'waiting_peer' });
+        return;
+    }
+    if (!userInChat(req.userId, chatId)) {
+        res.status(403).json({ error: 'forbidden' });
+        return;
+    }
+    try {
+        const message = enrichMessage(
+            toggleMessageReaction({
+                messageId,
+                chatId,
+                userId: req.userId,
+                reaction: req.body?.reaction,
+            }),
+            req.userId,
+        );
+        broadcast(chatId, { type: 'message_reaction', message });
+        res.json({ message });
+    } catch (e) {
+        if (e.message === 'message_not_found') {
+            res.status(404).json({ error: 'message_not_found' });
+            return;
+        }
+        if (e.message === 'invalid_reaction') {
+            res.status(400).json({ error: 'invalid_reaction' });
+            return;
+        }
+        if (e.message === 'forbidden') {
+            res.status(403).json({ error: 'forbidden' });
             return;
         }
         throw e;

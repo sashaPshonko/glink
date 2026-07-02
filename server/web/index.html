@@ -122,7 +122,18 @@
     .who-btn.busy { opacity: 0.6; pointer-events: none; }
     .err { color: #e11d48; margin: 12px 0 0; text-align: center; font-size: 0.9rem; }
     #chatList { flex: 1; overflow: auto; min-height: 0; }
-    #appErr { padding: 12px 16px; background: #fff0f3; color: #e11d48; border-bottom: 1px solid #fce7f3; }
+    #appErr {
+      padding: 12px 16px; background: #fff0f3; color: #e11d48;
+      border-bottom: 1px solid #fce7f3;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      cursor: pointer;
+    }
+    #appErr.hidden { display: none; }
+    #appErrDismiss {
+      flex-shrink: 0; padding: 4px 10px; font-size: 0.85rem;
+      background: transparent; color: #e11d48; border: 1px solid rgba(225, 29, 72, 0.35);
+      border-radius: 8px;
+    }
     .empty { padding: 24px 16px; color: #b07a94; text-align: center; }
     .row {
       display: flex; gap: 12px; padding: 14px 16px;
@@ -257,7 +268,63 @@
       font-size: 0.68rem; color: rgba(92, 51, 71, 0.45);
       margin-right: 6px; user-select: none;
     }
-    .bubble.mine.editable { cursor: pointer; touch-action: manipulation; }
+    .bubble.mine.editable { cursor: default; touch-action: manipulation; }
+    .msg-row {
+      width: 100%; max-width: 100%;
+      display: flex; flex-direction: column; align-items: flex-start;
+    }
+    .msg-row.mine { align-items: flex-end; }
+    .msg-row-inner {
+      display: flex; align-items: flex-end;
+      width: 100%; max-width: 100%;
+    }
+    .msg-row.mine .msg-row-inner { justify-content: flex-end; }
+    .msg-row.theirs .msg-row-inner { justify-content: flex-start; }
+    .msg-hit {
+      flex: 1 1 auto; min-width: 56px; min-height: 40px;
+      align-self: stretch; -webkit-tap-highlight-color: transparent;
+    }
+    .msg-row.theirs .msg-hit { display: none; }
+    .msg-reactions {
+      display: flex; flex-wrap: wrap; gap: 4px;
+      margin-top: 3px; max-width: min(320px, 88%);
+    }
+    .msg-row.mine .msg-reactions { justify-content: flex-end; }
+    .msg-reaction-pill {
+      font-size: 0.82rem; padding: 2px 8px; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(252, 231, 243, 0.95); line-height: 1.35;
+    }
+    .msg-menu {
+      position: fixed; z-index: 500;
+      background: rgba(255, 255, 255, 0.98);
+      border: 1px solid rgba(252, 231, 243, 0.95);
+      border-radius: 14px;
+      box-shadow: 0 8px 28px rgba(92, 51, 71, 0.18);
+      padding: 8px; min-width: 190px;
+    }
+    .msg-menu.hidden { display: none; }
+    .msg-menu-reactions {
+      display: flex; gap: 6px; justify-content: center;
+      padding: 4px 4px 8px;
+      border-bottom: 1px solid rgba(252, 231, 243, 0.85);
+      margin-bottom: 4px;
+    }
+    .msg-menu-reactions button {
+      width: 42px; height: 42px; padding: 0; font-size: 1.35rem;
+      background: rgba(255, 236, 244, 0.92); border-radius: 50%;
+      border: none; cursor: pointer; line-height: 1;
+    }
+    .msg-menu-reactions button.sel {
+      background: #fbcfe8; box-shadow: 0 0 0 2px #e879a9;
+    }
+    .msg-menu-actions button {
+      display: block; width: 100%; text-align: left;
+      padding: 10px 12px; background: transparent; color: #9d174d;
+      border: none; border-radius: 10px; font-size: 0.95rem; cursor: pointer;
+    }
+    .msg-menu-actions button:active { background: rgba(255, 236, 244, 0.95); }
+    .msg-menu-actions button.hidden { display: none; }
     #composer { flex-wrap: wrap; }
     #editBanner {
       flex: 1 1 100%;
@@ -406,7 +473,7 @@
       </div>
       <button id="logoutBtn" class="secondary">выход</button>
     </header>
-    <p id="appErr" class="hidden"></p>
+    <p id="appErr" class="hidden"><span id="appErrText"></span><button type="button" id="appErrDismiss" class="secondary">✕</button></p>
     <div id="chatList"></div>
     <div id="chatView" class="hidden">
       <header>
@@ -427,6 +494,18 @@
         <input id="msgInput" type="text" placeholder="Сообщение…" />
         <button id="sendBtn" class="icon">♡</button>
       </div>
+    </div>
+  </div>
+  <div id="msgMenu" class="msg-menu hidden" role="menu">
+    <div class="msg-menu-reactions">
+      <button type="button" data-reaction="heart" title="сердечко">❤️</button>
+      <button type="button" data-reaction="thumbs" title="лайк">👍</button>
+      <button type="button" data-reaction="fire" title="огонь">❤️‍🔥</button>
+      <button type="button" data-reaction="strawberry" title="клубничка">🍓</button>
+    </div>
+    <div class="msg-menu-actions">
+      <button type="button" id="msgMenuCopy" data-action="copy">копировать</button>
+      <button type="button" id="msgMenuEdit" data-action="edit">редактировать</button>
     </div>
   </div>
   <div id="voiceRecOverlay" class="rec-overlay hidden">
@@ -491,8 +570,22 @@
     let selectedUsername = localStorage.getItem('glink_last_user') || '';
     let activeMessages = [];
     let editingMessageId = null;
-    let editPressTimer = null;
-    let editPressId = null;
+    let msgMenuTargetId = null;
+    let msgPressTimer = null;
+    let msgPressRow = null;
+    let msgPressXY = null;
+    let msgMenuDelayTimer = null;
+    let appErrTimer = null;
+    let lastMsgTap = { id: null, at: 0 };
+    const REACTION_EMOJI = {
+      heart: '❤️',
+      thumbs: '👍',
+      fire: '❤️‍🔥',
+      strawberry: '🍓',
+    };
+    const MSG_PRESS_MS = 480;
+    const DBL_TAP_MS = 320;
+    const APP_ERR_MS = 4000;
 
     const $ = (id) => document.getElementById(id);
 
@@ -619,9 +712,17 @@
 
     function showAppErr(msg) {
       const el = $('appErr');
-      if (!msg) { el.textContent = ''; el.classList.add('hidden'); return; }
-      el.textContent = msg;
+      const textEl = $('appErrText');
+      clearTimeout(appErrTimer);
+      appErrTimer = null;
+      if (!msg) {
+        textEl.textContent = '';
+        el.classList.add('hidden');
+        return;
+      }
+      textEl.textContent = msg;
       el.classList.remove('hidden');
+      appErrTimer = setTimeout(() => showAppErr(''), APP_ERR_MS);
     }
 
     function escapeHtml(s) {
@@ -784,6 +885,132 @@
       $('msgInput').setSelectionRange($('msgInput').value.length, $('msgInput').value.length);
     }
 
+    function clearMsgPress() {
+      clearTimeout(msgPressTimer);
+      msgPressTimer = null;
+      msgPressRow = null;
+      msgPressXY = null;
+    }
+
+    function messageCopyText(m) {
+      if (!m) return '';
+      if (m.text) return m.text;
+      if (m.kind === 'voice') return '🎤 голосовое';
+      if (m.kind === 'video_note') return '🎬 кружок';
+      if (m.kind === 'image') return '📷 фото';
+      if (m.kind === 'file') return m.file?.name ? '📎 ' + m.file.name : '📎 файл';
+      return '';
+    }
+
+    function clearMsgMenuDelay() {
+      clearTimeout(msgMenuDelayTimer);
+      msgMenuDelayTimer = null;
+    }
+
+    function tryDoubleTapHeart(row) {
+      const id = row.dataset.id;
+      const now = Date.now();
+      if (lastMsgTap.id === id && now - lastMsgTap.at < DBL_TAP_MS) {
+        lastMsgTap = { id: null, at: 0 };
+        clearMsgMenuDelay();
+        const m = getMessage(id);
+        if (m && !m._pending) {
+          closeMsgMenu();
+          toggleReaction(id, 'heart');
+          return true;
+        }
+      }
+      lastMsgTap = { id, at: now };
+      return false;
+    }
+
+    function closeMsgMenu() {
+      msgMenuTargetId = null;
+      $('msgMenu').classList.add('hidden');
+    }
+
+    function openMsgMenu(m, x, y) {
+      if (!m || m._pending) return;
+      msgMenuTargetId = m.id;
+      const menu = $('msgMenu');
+      const reactions = m.reactions || {};
+      menu.querySelectorAll('.msg-menu-reactions button').forEach((btn) => {
+        btn.classList.toggle('sel', reactions[user.id] === btn.dataset.reaction);
+      });
+      $('msgMenuEdit').classList.toggle('hidden', !canEditMessage(m));
+      $('msgMenuCopy').classList.toggle('hidden', !messageCopyText(m));
+      menu.classList.remove('hidden');
+      const pad = 8;
+      const rect = menu.getBoundingClientRect();
+      let left = x;
+      let top = y;
+      if (left + rect.width > window.innerWidth - pad) left = window.innerWidth - rect.width - pad;
+      if (top + rect.height > window.innerHeight - pad) top = window.innerHeight - rect.height - pad;
+      menu.style.left = Math.max(pad, left) + 'px';
+      menu.style.top = Math.max(pad, top) + 'px';
+    }
+
+    function isMsgInteractiveTarget(el) {
+      return Boolean(el.closest('.voice-play, .video-note, .file-card, video, audio, img, a'));
+    }
+
+    function findMsgRowFromEvent(e) {
+      if (isMsgInteractiveTarget(e.target)) return null;
+      return e.target.closest('.msg-row');
+    }
+
+    async function copyMessageText(m) {
+      const text = messageCopyText(m);
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch (_) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+    }
+
+    async function toggleReaction(messageId, reaction) {
+      if (!activeChat) return;
+      try {
+        const data = await api('/chats/' + activeChat.id + '/messages/' + messageId + '/reactions', {
+          method: 'POST',
+          body: JSON.stringify({ reaction }),
+        });
+        replaceMessage(messageId, data.message);
+        const m = data.message;
+        if (msgMenuTargetId === messageId) {
+          $('msgMenu').querySelectorAll('.msg-menu-reactions button').forEach((btn) => {
+            btn.classList.toggle('sel', (m.reactions || {})[user.id] === btn.dataset.reaction);
+          });
+        }
+      } catch (e) {
+        showAppErr(e.message || 'не удалось поставить реакцию');
+      }
+    }
+
+    function renderReactionsHtml(m) {
+      const reactions = m.reactions || {};
+      const counts = {};
+      for (const uid of Object.keys(reactions)) {
+        const key = reactions[uid];
+        if (!REACTION_EMOJI[key]) continue;
+        counts[key] = (counts[key] || 0) + 1;
+      }
+      const keys = Object.keys(counts);
+      if (!keys.length) return '';
+      return `<div class="msg-reactions">${keys.map((k) => {
+        const n = counts[k];
+        return `<span class="msg-reaction-pill">${REACTION_EMOJI[k]}${n > 1 ? ' ' + n : ''}</span>`;
+      }).join('')}</div>`;
+    }
+
     function cancelEdit() {
       editingMessageId = null;
       $('msgInput').value = '';
@@ -791,13 +1018,7 @@
       $('editBanner').classList.add('hidden');
     }
 
-    function clearEditPress() {
-      clearTimeout(editPressTimer);
-      editPressTimer = null;
-      editPressId = null;
-    }
-
-    function renderBubbleHtml(m) {
+    function renderBubbleInner(m) {
       const mine = m.senderId === user.id;
       const sender = activeChat?.type === 'group' && !mine
         ? `<div class="sender">${escapeHtml(m.senderName || '?')}</div>` : '';
@@ -807,20 +1028,32 @@
             : (m.kind === 'image' && !m.text ? ' has-image' : '')));
       const pendingCls = m._pending ? ' pending' : '';
       const editCls = canEditMessage(m) ? ' editable' : '';
-      return `<div class="bubble ${mine ? 'mine' : 'theirs'}${extraCls}${pendingCls}${editCls}" data-id="${m.id}">${sender}${renderMessageBody(m)}${renderTicks(m, mine)}</div>`;
+      return `<div class="bubble ${mine ? 'mine' : 'theirs'}${extraCls}${pendingCls}${editCls}">${sender}${renderMessageBody(m)}${renderTicks(m, mine)}</div>`;
+    }
+
+    function renderMessageRowHtml(m) {
+      const mine = m.senderId === user.id;
+      const rowCls = mine ? 'mine' : 'theirs';
+      const hit = mine ? '<div class="msg-hit" aria-hidden="true"></div>' : '';
+      const pendingCls = m._pending ? ' pending' : '';
+      return `<div class="msg-row ${rowCls}${pendingCls}" data-id="${m.id}"><div class="msg-row-inner">${hit}${renderBubbleInner(m)}</div>${renderReactionsHtml(m)}</div>`;
+    }
+
+    function renderBubbleHtml(m) {
+      return renderMessageRowHtml(m);
     }
 
     function syncSigFromBox() {
       const box = $('messages');
-      const bubbles = box.querySelectorAll('.bubble');
-      const last = bubbles[bubbles.length - 1];
-      lastMessagesSig = bubbles.length + ':' + (last?.dataset.id || '0');
-      lastMsgCount = bubbles.length;
+      const rows = box.querySelectorAll('.msg-row');
+      const last = rows[rows.length - 1];
+      lastMessagesSig = rows.length + ':' + (last?.dataset.id || '0');
+      lastMsgCount = rows.length;
     }
 
     function appendMessage(m, opts = {}) {
       const box = $('messages');
-      if (box.querySelector('.bubble[data-id="' + m.id + '"]')) return;
+      if (box.querySelector('.msg-row[data-id="' + m.id + '"]')) return;
       box.insertAdjacentHTML('beforeend', renderBubbleHtml(m));
       syncSigFromBox();
       if (opts.forceBottom || userPinnedBottom) scrollToBottom(box);
@@ -832,10 +1065,10 @@
 
     function replaceMessage(oldId, msg) {
       const box = $('messages');
-      const el = box.querySelector('.bubble[data-id="' + oldId + '"]');
-      if (el) el.outerHTML = renderBubbleHtml(msg);
-      else if (!box.querySelector('.bubble[data-id="' + msg.id + '"]')) {
-        box.insertAdjacentHTML('beforeend', renderBubbleHtml(msg));
+      const el = box.querySelector('.msg-row[data-id="' + oldId + '"]');
+      if (el) el.outerHTML = renderMessageRowHtml(msg);
+      else if (!box.querySelector('.msg-row[data-id="' + msg.id + '"]')) {
+        box.insertAdjacentHTML('beforeend', renderMessageRowHtml(msg));
       }
       upsertActiveMessage(msg);
       syncSigFromBox();
@@ -847,17 +1080,18 @@
     }
 
     function removeMessage(id) {
-      $('messages').querySelector('.bubble[data-id="' + id + '"]')?.remove();
+      $('messages').querySelector('.msg-row[data-id="' + id + '"]')?.remove();
       syncSigFromBox();
     }
 
     function ingestIncomingMessage(message) {
       const box = $('messages');
-      if (box.querySelector('.bubble[data-id="' + message.id + '"]')) return;
+      if (box.querySelector('.msg-row[data-id="' + message.id + '"]')) return;
       if (message.senderId === user.id) {
-        const pending = box.querySelector('.bubble.pending');
-        if (pending) {
-          replaceMessage(pending.dataset.id, message);
+        const pendingBubble = box.querySelector('.bubble.pending');
+        const pendingRow = pendingBubble?.closest('.msg-row');
+        if (pendingRow) {
+          replaceMessage(pendingRow.dataset.id, message);
           return;
         }
       }
@@ -986,9 +1220,9 @@
 
     function saveScrollAnchor(box) {
       const scrollTop = box.scrollTop;
-      for (const b of box.querySelectorAll('.bubble')) {
-        if (b.offsetTop + b.offsetHeight > scrollTop + 2) {
-          return { id: b.dataset.id, offset: scrollTop - b.offsetTop };
+      for (const row of box.querySelectorAll('.msg-row')) {
+        if (row.offsetTop + row.offsetHeight > scrollTop + 2) {
+          return { id: row.dataset.id, offset: scrollTop - row.offsetTop };
         }
       }
       return { bottom: true };
@@ -1000,7 +1234,7 @@
         scrollToBottom(box);
         return;
       }
-      const el = box.querySelector('.bubble[data-id="' + anchor.id + '"]');
+      const el = box.querySelector('.msg-row[data-id="' + anchor.id + '"]');
       if (el) setScrollTop(box, el.offsetTop + anchor.offset);
     }
 
@@ -1017,13 +1251,13 @@
 
     function messagesSig(messages) {
       if (!messages?.length) return '0';
-      return messages.map((m) => `${m.id}\t${m.text || ''}\t${m.editedAt || ''}`).join('\n');
+      return messages.map((m) => `${m.id}\t${m.text || ''}\t${m.editedAt || ''}\t${JSON.stringify(m.reactions || {})}`).join('\n');
     }
 
     function applyReadTicks(messages, box = $('messages')) {
       for (const m of messages) {
         if (m.senderId !== user.id) continue;
-        const bubble = box.querySelector('.bubble[data-id="' + m.id + '"]');
+        const bubble = box.querySelector('.msg-row[data-id="' + m.id + '"] .bubble');
         if (!bubble) continue;
         const html = renderTicks(m, true);
         const foot = bubble.querySelector('.msg-foot');
@@ -1634,6 +1868,9 @@
             replaceMessage(msg.message.id, msg.message);
             refreshChatList();
           }
+          if (msg.type === 'message_reaction' && activeChat && msg.message?.chatId === activeChat.id) {
+            replaceMessage(msg.message.id, msg.message);
+          }
           if (msg.type === 'read' && msg.chatId) {
             if (activeChat && msg.chatId === activeChat.id && msg.readerId !== user.id) {
               refreshReadTicks();
@@ -1674,6 +1911,7 @@
 
     function closeChatUI() {
       cancelEdit();
+      closeMsgMenu();
       activeMessages = [];
       activeChat = null;
       localStorage.removeItem('glink_active_chat');
@@ -2145,31 +2383,94 @@
 
     $('messages').addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      const bubble = e.target.closest('.bubble.mine.editable');
-      if (!bubble) return;
-      if (e.target.closest('.voice-play, .video-note, .file-card, video, audio, img, a')) return;
-      const m = getMessage(bubble.dataset.id);
-      if (!canEditMessage(m)) return;
-      editPressId = bubble.dataset.id;
-      editPressTimer = setTimeout(() => {
-        if (editPressId !== bubble.dataset.id) return;
-        startEditMessage(m);
-        clearEditPress();
-      }, 480);
+      const row = findMsgRowFromEvent(e);
+      if (!row) return;
+      const m = getMessage(row.dataset.id);
+      if (!m || m._pending) return;
+      msgPressRow = row;
+      msgPressXY = { x: e.clientX, y: e.clientY };
+      msgPressTimer = setTimeout(() => {
+        if (msgPressRow !== row) return;
+        openMsgMenu(m, e.clientX, e.clientY);
+        clearMsgPress();
+      }, MSG_PRESS_MS);
     });
-    $('messages').addEventListener('pointerup', clearEditPress);
-    $('messages').addEventListener('pointercancel', clearEditPress);
+    $('messages').addEventListener('pointerup', (e) => {
+      const row = msgPressRow;
+      const xy = msgPressXY;
+      const wasTimer = msgPressTimer;
+      clearMsgPress();
+      if (!row || !wasTimer) return;
+      if (tryDoubleTapHeart(row)) return;
+      if (row.contains(e.target) && e.target.closest('.msg-hit')) {
+        const rid = row.dataset.id;
+        const cx = xy?.x ?? e.clientX;
+        const cy = xy?.y ?? e.clientY;
+        clearMsgMenuDelay();
+        msgMenuDelayTimer = setTimeout(() => {
+          msgMenuDelayTimer = null;
+          if (lastMsgTap.id === rid && Date.now() - lastMsgTap.at < DBL_TAP_MS) return;
+          const m = getMessage(rid);
+          if (m) openMsgMenu(m, cx, cy);
+        }, DBL_TAP_MS);
+      }
+    });
+    $('messages').addEventListener('pointercancel', clearMsgPress);
     $('messages').addEventListener('pointermove', (e) => {
-      if (!editPressTimer) return;
-      const bubble = e.target.closest('.bubble.mine.editable');
-      if (!bubble || bubble.dataset.id !== editPressId) clearEditPress();
+      if (!msgPressTimer || !msgPressRow) return;
+      if (!msgPressRow.contains(e.target)) clearMsgPress();
+    });
+    $('messages').addEventListener('dblclick', (e) => {
+      const row = findMsgRowFromEvent(e);
+      if (!row) return;
+      e.preventDefault();
+      lastMsgTap = { id: null, at: 0 };
+      clearMsgMenuDelay();
+      closeMsgMenu();
+      const m = getMessage(row.dataset.id);
+      if (m && !m._pending) toggleReaction(row.dataset.id, 'heart');
     });
     $('messages').addEventListener('contextmenu', (e) => {
-      const bubble = e.target.closest('.bubble.mine.editable');
-      if (!bubble) return;
+      const row = findMsgRowFromEvent(e);
+      if (!row) return;
       e.preventDefault();
-      const m = getMessage(bubble.dataset.id);
-      if (canEditMessage(m)) startEditMessage(m);
+      const m = getMessage(row.dataset.id);
+      if (m) openMsgMenu(m, e.clientX, e.clientY);
+    });
+
+    $('msgMenu').querySelectorAll('.msg-menu-reactions button').forEach((btn) => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        if (!msgMenuTargetId) return;
+        toggleReaction(msgMenuTargetId, btn.dataset.reaction);
+      };
+    });
+    $('msgMenuCopy').onclick = async (e) => {
+      e.stopPropagation();
+      const m = getMessage(msgMenuTargetId);
+      closeMsgMenu();
+      if (m) await copyMessageText(m);
+    };
+    $('msgMenuEdit').onclick = (e) => {
+      e.stopPropagation();
+      const m = getMessage(msgMenuTargetId);
+      closeMsgMenu();
+      if (m) startEditMessage(m);
+    };
+    $('appErr').onclick = (e) => {
+      if (e.target.closest('#appErrDismiss') || e.target === $('appErr')) showAppErr('');
+    };
+    $('appErrDismiss').onclick = (e) => { e.stopPropagation(); showAppErr(''); };
+    $('msgInput').addEventListener('input', () => showAppErr(''));
+    document.addEventListener('pointerdown', (e) => {
+      if (!$('msgMenu').classList.contains('hidden') && !e.target.closest('#msgMenu')) {
+        closeMsgMenu();
+      }
+    }, true);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !$('msgMenu').classList.contains('hidden')) {
+        closeMsgMenu();
+      }
     });
 
     (async () => {
