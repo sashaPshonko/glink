@@ -185,7 +185,6 @@
       }
       #composer { gap: 5px; padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); }
       #messages { padding: 12px 10px; }
-      .msg-row { max-width: 88%; }
       .msg-stack { max-width: 88%; }
     }
     .bubble {
@@ -2458,7 +2457,9 @@
 
     $('messages').addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      const row = findMsgRowFromEvent(e);
+      const hit = e.target.closest('.msg-hit');
+      if (!hit) return;
+      const row = hit.closest('.msg-row');
       if (!row) return;
       const m = getMessage(row.dataset.id);
       if (!m || m._pending) return;
@@ -2471,32 +2472,35 @@
       }, MSG_PRESS_MS);
     });
     $('messages').addEventListener('pointerup', (e) => {
-      const row = msgPressRow;
+      const hit = e.target.closest('.msg-hit');
+      if (!hit) return;
+      const row = hit.closest('.msg-row');
       const xy = msgPressXY;
       const wasTimer = msgPressTimer;
+      const sameRow = msgPressRow === row;
       clearMsgPress();
-      if (!row || !wasTimer) return;
+      if (!row || !sameRow || !wasTimer) return;
       if (tryDoubleTapHeart(row)) return;
-      if (row.contains(e.target) && e.target.closest('.msg-hit')) {
-        const rid = row.dataset.id;
-        const cx = xy?.x ?? e.clientX;
-        const cy = xy?.y ?? e.clientY;
-        clearMsgMenuDelay();
-        msgMenuDelayTimer = setTimeout(() => {
-          msgMenuDelayTimer = null;
-          if (lastMsgTap.id === rid && Date.now() - lastMsgTap.at < DBL_TAP_MS) return;
-          const m = getMessage(rid);
-          if (m) openMsgMenu(m, cx, cy);
-        }, DBL_TAP_MS);
-      }
+      const rid = row.dataset.id;
+      clearMsgMenuDelay();
+      msgMenuDelayTimer = setTimeout(() => {
+        msgMenuDelayTimer = null;
+        if (lastMsgTap.id === rid && Date.now() - lastMsgTap.at < DBL_TAP_MS) return;
+        const m = getMessage(rid);
+        if (m) openMsgMenu(m, xy?.x ?? e.clientX, xy?.y ?? e.clientY);
+      }, DBL_TAP_MS);
     });
     $('messages').addEventListener('pointercancel', clearMsgPress);
     $('messages').addEventListener('pointermove', (e) => {
       if (!msgPressTimer || !msgPressRow) return;
-      if (!msgPressRow.contains(e.target)) clearMsgPress();
+      if (!e.target.closest('.msg-hit') || !msgPressRow.contains(e.target.closest('.msg-hit'))) {
+        clearMsgPress();
+      }
     });
     $('messages').addEventListener('dblclick', (e) => {
-      const row = findMsgRowFromEvent(e);
+      const hit = e.target.closest('.msg-hit');
+      if (!hit) return;
+      const row = hit.closest('.msg-row');
       if (!row) return;
       e.preventDefault();
       lastMsgTap = { id: null, at: 0 };
@@ -2506,7 +2510,9 @@
       if (m && !m._pending) toggleReaction(row.dataset.id, 'heart');
     });
     $('messages').addEventListener('contextmenu', (e) => {
-      const row = findMsgRowFromEvent(e);
+      const hit = e.target.closest('.msg-hit');
+      if (!hit) return;
+      const row = hit.closest('.msg-row');
       if (!row) return;
       e.preventDefault();
       const m = getMessage(row.dataset.id);
