@@ -598,6 +598,27 @@
       width: 56px; height: 56px; border-radius: 50%; border: none;
       font-size: 1.4rem; cursor: pointer; color: #fff;
     }
+    .rec-stage.hidden { display: none !important; }
+    .review-play-btn {
+      width: min(52vw, 200px); height: min(52vw, 200px);
+      border-radius: 50%; border: 4px solid #fff;
+      background: rgba(255, 255, 255, 0.12);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 4rem; cursor: pointer; color: #fff;
+    }
+    #videoRecPreview.mirror { transform: scaleX(-1); }
+    #videoRecPlayback {
+      width: min(72vw, 280px); height: min(72vw, 280px);
+      border-radius: 50%; object-fit: cover; background: #000;
+      cursor: pointer;
+    }
+    #videoFlipBtn {
+      background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.5);
+      font-size: 1.2rem;
+    }
+    #voiceStopBtn, #videoStopBtn { background: rgba(255,255,255,0.2); border: 2px solid #fff; }
+    #voicePauseBtn, #videoPauseBtn { background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.5); }
+    #voiceReviewAttachBtn, #videoReviewAttachBtn { background: #e879a9; border: 2px solid #fff; }
     .rec-cancel { background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.5); }
     .rec-send { background: #e879a9; border: 2px solid #fff; }
     .video-note {
@@ -672,11 +693,11 @@
       display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
     }
     #videoRecOverlay.hidden { display: none !important; }
+    #videoRecOverlay .rec-actions { display: flex; gap: 28px; margin-top: 8px; }
     #videoRecPreview {
       width: min(72vw, 280px); height: min(72vw, 280px);
       border-radius: 50%; object-fit: cover;
       border: none; background: #000;
-      transform: scaleX(-1);
     }
     #videoRecTimer { color: #fbcfe8; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
     #videoRecStatus { color: #fbcfe8; font-size: 0.9rem; min-height: 1.2em; }
@@ -747,21 +768,48 @@
     </div>
   </div>
   <div id="voiceRecOverlay" class="rec-overlay hidden">
-    <div class="voice-rec-icon">🎤</div>
-    <div id="voiceRecTimer" class="rec-timer">0:00</div>
-    <div id="voiceRecStatus" class="rec-status">включаю микрофон…</div>
-    <div class="rec-actions">
-      <button id="voiceCancelBtn" type="button" class="rec-cancel" title="Отмена">✕</button>
-      <button id="voiceSendBtn" type="button" class="rec-send" title="Готово">✓</button>
+    <div id="voiceRecRecord" class="rec-stage">
+      <div class="voice-rec-icon">🎤</div>
+      <div id="voiceRecTimer" class="rec-timer">0:00</div>
+      <div id="voiceRecStatus" class="rec-status">включаю микрофон…</div>
+      <div class="rec-actions">
+        <button id="voiceCancelBtn" type="button" class="rec-cancel" title="Отмена">✕</button>
+        <button id="voicePauseBtn" type="button" class="rec-cancel" title="Пауза">⏸</button>
+        <button id="voiceStopBtn" type="button" title="Стоп">⏹</button>
+      </div>
+    </div>
+    <div id="voiceRecReview" class="rec-stage hidden">
+      <button type="button" id="voiceReviewPlay" class="review-play-btn" title="Слушать">▶</button>
+      <div id="voiceReviewDur" class="rec-timer">0:00</div>
+      <div class="rec-status">прослушай перед отправкой</div>
+      <div class="rec-actions">
+        <button id="voiceReviewCancelBtn" type="button" class="rec-cancel" title="Отмена">✕</button>
+        <button id="voiceReviewRedoBtn" type="button" class="rec-cancel" title="Перезаписать">↺</button>
+        <button id="voiceReviewAttachBtn" type="button" class="rec-send" title="Прикрепить">✓</button>
+      </div>
     </div>
   </div>
   <div id="videoRecOverlay" class="hidden">
-    <video id="videoRecPreview" autoplay muted playsinline webkit-playsinline></video>
-    <div id="videoRecTimer">0:00</div>
-    <div id="videoRecStatus">включаю камеру…</div>
-    <div class="video-rec-actions">
-      <button id="videoCancelBtn" type="button" title="Отмена">✕</button>
-      <button id="videoSendBtn" type="button" title="Готово">✓</button>
+    <div id="videoRecRecord" class="rec-stage">
+      <video id="videoRecPreview" autoplay muted playsinline webkit-playsinline class="mirror"></video>
+      <div id="videoRecTimer">0:00</div>
+      <div id="videoRecStatus">включаю камеру…</div>
+      <div class="rec-actions">
+        <button id="videoCancelBtn" type="button" class="rec-cancel" title="Отмена">✕</button>
+        <button id="videoFlipBtn" type="button" title="Камера">🔄</button>
+        <button id="videoPauseBtn" type="button" title="Пауза">⏸</button>
+        <button id="videoStopBtn" type="button" title="Стоп">⏹</button>
+      </div>
+    </div>
+    <div id="videoRecReview" class="rec-stage hidden">
+      <video id="videoRecPlayback" playsinline webkit-playsinline></video>
+      <div id="videoReviewDur" class="rec-timer">0:00</div>
+      <div class="rec-status">посмотри перед отправкой</div>
+      <div class="rec-actions">
+        <button id="videoReviewCancelBtn" type="button" class="rec-cancel" title="Отмена">✕</button>
+        <button id="videoReviewRedoBtn" type="button" class="rec-cancel" title="Перезаписать">↺</button>
+        <button id="videoReviewAttachBtn" type="button" class="rec-send" title="Прикрепить">✓</button>
+      </div>
     </div>
   </div>
 
@@ -810,8 +858,21 @@
     let voiceStarting = false;
     let voiceRecInterval = null;
     let voiceRecStarted = 0;
+    let voiceRecStage = 'idle';
+    let voiceReviewBlob = null;
+    let voiceReviewUrl = null;
+    let voiceReviewAudio = null;
+    let voiceRecAccumPaused = 0;
+    let voiceRecPauseStart = 0;
     let videoDiscard = false;
     let videoStarting = false;
+    let videoRecStage = 'idle';
+    let videoReviewBlob = null;
+    let videoReviewUrl = null;
+    let videoFacingMode = 'user';
+    let videoCamDevices = null;
+    let videoRecAccumPaused = 0;
+    let videoRecPauseStart = 0;
     let lastMsgCount = 0;
     let lastMessagesSig = '';
     let userPinnedBottom = true;
@@ -2576,6 +2637,170 @@
       return '.webm';
     }
 
+    async function resolveVideoCamDevices() {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const cams = devices.filter((d) => d.kind === 'videoinput');
+        let front = null;
+        let back = null;
+        for (const d of cams) {
+          const label = (d.label || '').toLowerCase();
+          if (/front|user|selfie|facetime|передн/.test(label)) front = front || d.deviceId;
+          else if (/back|rear|environment|задн|camera 0|cam 0/.test(label)) back = back || d.deviceId;
+        }
+        if (!front && cams[0]) front = cams[0].deviceId;
+        if (!back && cams.length > 1) {
+          back = cams.find((d) => d.deviceId !== front)?.deviceId || cams[1].deviceId;
+        }
+        videoCamDevices = { front, back, count: cams.length };
+      } catch {
+        videoCamDevices = { front: null, back: null, count: 0 };
+      }
+      return videoCamDevices;
+    }
+
+    function videoConstraints(facingMode, withAudio) {
+      const deviceId = facingMode === 'user' ? videoCamDevices?.front : videoCamDevices?.back;
+      const video = deviceId
+        ? { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 640 } }
+        : { facingMode: { ideal: facingMode }, width: { ideal: 640 }, height: { ideal: 640 } };
+      return withAudio ? { video, audio: true } : { video, audio: false };
+    }
+
+    async function acquireVideoOnlyTrack(facingMode) {
+      await resolveVideoCamDevices();
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(videoConstraints(facingMode, false));
+        return stream.getVideoTracks()[0];
+      } catch {
+        return (await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: facingMode }, width: { ideal: 640 }, height: { ideal: 640 } },
+          audio: false,
+        })).getVideoTracks()[0];
+      }
+    }
+
+    function applyVideoPreviewMirror() {
+      $('videoRecPreview').classList.toggle('mirror', videoFacingMode === 'user');
+    }
+
+    function mediaRecorderCanPause() {
+      return typeof MediaRecorder !== 'undefined' && typeof MediaRecorder.prototype.pause === 'function';
+    }
+
+    function recElapsedMs(started, accumPaused, pauseStart, state) {
+      let ms = Date.now() - started - accumPaused;
+      if (state === 'paused' && pauseStart) ms -= Date.now() - pauseStart;
+      return Math.max(0, ms);
+    }
+
+    function clearVoiceReview() {
+      if (voiceReviewAudio) {
+        voiceReviewAudio.pause();
+        voiceReviewAudio = null;
+      }
+      if (voiceReviewUrl) URL.revokeObjectURL(voiceReviewUrl);
+      voiceReviewUrl = null;
+      voiceReviewBlob = null;
+      $('voiceReviewPlay').textContent = '▶';
+    }
+
+    function clearVideoReview() {
+      const pb = $('videoRecPlayback');
+      if (pb) {
+        pb.pause();
+        pb.removeAttribute('src');
+        pb.load();
+      }
+      if (videoReviewUrl) URL.revokeObjectURL(videoReviewUrl);
+      videoReviewUrl = null;
+      videoReviewBlob = null;
+    }
+
+    function showVoiceRecordUI() {
+      voiceRecStage = 'record';
+      $('voiceRecReview').classList.add('hidden');
+      $('voiceRecRecord').classList.remove('hidden');
+    }
+
+    function showVoiceReviewUI(blob) {
+      clearVoiceReview();
+      voiceReviewBlob = blob;
+      voiceReviewUrl = URL.createObjectURL(blob);
+      voiceRecStage = 'review';
+      $('voiceRecRecord').classList.add('hidden');
+      $('voiceRecReview').classList.remove('hidden');
+      $('voiceRecOverlay').classList.remove('hidden');
+      $('mediaBtn').classList.remove('recording');
+      const audio = new Audio();
+      audio.preload = 'metadata';
+      audio.src = voiceReviewUrl;
+      audio.onloadedmetadata = () => {
+        $('voiceReviewDur').textContent = saneDur(audio.duration) ? fmtTime(audio.duration) : '0:00';
+      };
+      voiceReviewAudio = new Audio(voiceReviewUrl);
+      voiceReviewAudio.onended = () => { $('voiceReviewPlay').textContent = '▶'; };
+      voiceReviewAudio.onpause = () => {
+        if (voiceReviewAudio.ended) return;
+        $('voiceReviewPlay').textContent = '▶';
+      };
+    }
+
+    function showVideoRecordUI() {
+      videoRecStage = 'record';
+      $('videoRecReview').classList.add('hidden');
+      $('videoRecRecord').classList.remove('hidden');
+    }
+
+    function showVideoReviewUI(blob, type) {
+      clearVideoReview();
+      videoReviewBlob = blob;
+      videoReviewUrl = URL.createObjectURL(blob);
+      videoRecStage = 'review';
+      $('videoRecRecord').classList.add('hidden');
+      $('videoRecReview').classList.remove('hidden');
+      $('videoRecOverlay').classList.remove('hidden');
+      $('mediaBtn').classList.remove('recording');
+      const pb = $('videoRecPlayback');
+      pb.src = videoReviewUrl;
+      pb.onloadedmetadata = () => {
+        $('videoReviewDur').textContent = saneDur(pb.duration) ? fmtTime(pb.duration) : '0:00';
+      };
+      pb.onended = () => { pb.currentTime = 0; };
+    }
+
+    function toggleVoiceReviewPlay() {
+      if (!voiceReviewUrl) return;
+      if (!voiceReviewAudio) voiceReviewAudio = new Audio(voiceReviewUrl);
+      const btn = $('voiceReviewPlay');
+      if (voiceReviewAudio.paused) {
+        voiceReviewAudio.play().catch(() => showAppErr('не удалось воспроизвести'));
+        btn.textContent = '⏸';
+      } else {
+        voiceReviewAudio.pause();
+        btn.textContent = '▶';
+      }
+    }
+
+    function toggleVideoReviewPlay() {
+      const pb = $('videoRecPlayback');
+      if (!pb?.src) return;
+      if (pb.paused) pb.play().catch(() => showAppErr('не удалось воспроизвести'));
+      else pb.pause();
+    }
+
+    function updateVoiceRecTimerDisplay() {
+      const state = mediaRecorder?.state;
+      const sec = Math.floor(recElapsedMs(voiceRecStarted, voiceRecAccumPaused, voiceRecPauseStart, state) / 1000);
+      $('voiceRecTimer').textContent = fmtTime(sec);
+    }
+
+    function updateVideoRecTimerDisplay() {
+      const state = videoRecorder?.state;
+      const sec = Math.floor(recElapsedMs(videoRecStarted, videoRecAccumPaused, videoRecPauseStart, state) / 1000);
+      $('videoRecTimer').textContent = fmtTime(sec);
+    }
+
     function cleanupVideoStream() {
       videoStream?.getTracks().forEach((t) => t.stop());
       videoStream = null;
@@ -2587,13 +2812,19 @@
       $('videoRecOverlay').classList.add('hidden');
       cleanupVideoStream();
       stopVideoRecTimer();
+      clearVideoReview();
+      videoRecStage = 'idle';
+      videoRecAccumPaused = 0;
+      videoRecPauseStart = 0;
       $('videoRecTimer').textContent = '0:00';
       $('videoRecStatus').textContent = '';
+      $('videoPauseBtn').textContent = '⏸';
+      showVideoRecordUI();
       $('mediaBtn').classList.remove('recording');
     }
 
-    function finishVideoRecording() {
-      if (videoRecorder?.state === 'recording') {
+    function stopVideoRecorder() {
+      if (videoRecorder?.state === 'recording' || videoRecorder?.state === 'paused') {
         try { videoRecorder.requestData(); } catch { /* ignore */ }
         videoRecorder.stop();
       } else {
@@ -2601,6 +2832,87 @@
         videoRecorder = null;
         videoStarting = false;
       }
+    }
+
+    function toggleVideoRecPause() {
+      if (!mediaRecorderCanPause() || !videoRecorder) return;
+      if (videoRecorder.state === 'recording') {
+        videoRecorder.pause();
+        videoRecPauseStart = Date.now();
+        $('videoPauseBtn').textContent = '▶';
+        $('videoRecStatus').textContent = '⏸ пауза';
+      } else if (videoRecorder.state === 'paused') {
+        videoRecAccumPaused += Date.now() - videoRecPauseStart;
+        videoRecPauseStart = 0;
+        videoRecorder.resume();
+        $('videoPauseBtn').textContent = '⏸';
+        $('videoRecStatus').textContent = '⭕ идёт запись';
+      }
+    }
+
+    async function flipVideoCamera() {
+      if (!videoStream || videoRecStage !== 'record') return;
+      const state = videoRecorder?.state;
+      const shouldResume = state === 'recording';
+      if (state === 'recording' || state === 'paused') {
+        try { videoRecorder.pause(); } catch { /* ignore */ }
+        if (state === 'recording') videoRecPauseStart = Date.now();
+      }
+      const nextFacing = videoFacingMode === 'user' ? 'environment' : 'user';
+      try {
+        const oldTrack = videoStream.getVideoTracks()[0];
+        let newTrack = null;
+        if (oldTrack?.applyConstraints) {
+          try {
+            await oldTrack.applyConstraints({ facingMode: { ideal: nextFacing } });
+            const settings = oldTrack.getSettings?.() || {};
+            if (settings.facingMode === nextFacing || settings.facingMode === (nextFacing === 'user' ? 'left' : 'right')) {
+              videoFacingMode = nextFacing;
+              applyVideoPreviewMirror();
+              if (shouldResume) {
+                videoRecAccumPaused += Date.now() - videoRecPauseStart;
+                videoRecPauseStart = 0;
+                try { videoRecorder.resume(); } catch { /* ignore */ }
+                $('videoPauseBtn').textContent = '⏸';
+                $('videoRecStatus').textContent = '⭕ идёт запись';
+              } else if (state === 'paused') {
+                $('videoRecStatus').textContent = '⏸ пауза';
+              }
+              return;
+            }
+          } catch { /* fall through to track swap */ }
+        }
+        videoFacingMode = nextFacing;
+        newTrack = await acquireVideoOnlyTrack(videoFacingMode);
+        if (oldTrack) {
+          videoStream.removeTrack(oldTrack);
+          oldTrack.stop();
+        }
+        videoStream.addTrack(newTrack);
+        const preview = $('videoRecPreview');
+        preview.srcObject = videoStream;
+        applyVideoPreviewMirror();
+        await preview.play().catch(() => {});
+        if (shouldResume) {
+          videoRecAccumPaused += Date.now() - videoRecPauseStart;
+          videoRecPauseStart = 0;
+          try { videoRecorder.resume(); } catch { /* ignore */ }
+          $('videoPauseBtn').textContent = '⏸';
+          $('videoRecStatus').textContent = '⭕ идёт запись';
+        } else if (state === 'paused') {
+          $('videoRecStatus').textContent = '⏸ пауза';
+        }
+      } catch (e) {
+        showAppErr('не удалось переключить камеру');
+      }
+    }
+
+    function attachVideoReview() {
+      if (!videoReviewBlob) return;
+      const type = videoReviewBlob.type || 'video/webm';
+      const ext = videoExt(type);
+      addDraftAttachment(new File([videoReviewBlob], 'video' + ext, { type }), 'video_note');
+      hideVideoOverlay();
     }
 
     async function openVideoRecorder() {
@@ -2621,16 +2933,28 @@
       videoStarting = true;
       videoDiscard = false;
       videoChunks = [];
+      videoFacingMode = 'user';
+      videoCamDevices = null;
+      videoRecAccumPaused = 0;
+      videoRecPauseStart = 0;
+      clearVideoReview();
+      showVideoRecordUI();
       $('videoRecOverlay').classList.remove('hidden');
       $('videoRecStatus').textContent = 'включаю камеру…';
       $('videoRecTimer').textContent = '0:00';
+      $('videoPauseBtn').textContent = '⏸';
+      if (!mediaRecorderCanPause()) $('videoPauseBtn').style.display = 'none';
+      else $('videoPauseBtn').style.display = '';
       $('mediaBtn').classList.add('recording');
 
       try {
         videoStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 640 } },
+          video: { facingMode: { ideal: videoFacingMode }, width: { ideal: 640 }, height: { ideal: 640 } },
           audio: true,
         });
+        await resolveVideoCamDevices();
+        const canFlip = (videoCamDevices?.count || 0) > 1 || (videoCamDevices?.front && videoCamDevices?.back);
+        $('videoFlipBtn').style.display = canFlip ? '' : 'none';
         if (videoDiscard) {
           hideVideoOverlay();
           videoStarting = false;
@@ -2639,6 +2963,7 @@
 
         const preview = $('videoRecPreview');
         preview.srcObject = videoStream;
+        applyVideoPreviewMirror();
         await preview.play().catch(() => {});
 
         const mime = videoMimeType();
@@ -2657,30 +2982,33 @@
           const rec = videoRecorder;
           videoRecorder = null;
           videoStarting = false;
-          hideVideoOverlay();
+          cleanupVideoStream();
+          stopVideoRecTimer();
           if (discard || !videoChunks.length) {
             videoChunks = [];
+            hideVideoOverlay();
             return;
           }
           const type = rec.mimeType || videoChunks[0]?.type || 'video/webm';
           const blob = new Blob(videoChunks, { type });
           videoChunks = [];
           if (blob.size < 2000) {
+            hideVideoOverlay();
             showAppErr('слишком короткое видео');
             return;
           }
-          const ext = videoExt(type);
-          setDraftAttachment(new File([blob], 'video' + ext, { type }), 'video_note');
+          showVideoReviewUI(blob, type);
         };
 
         videoRecorder.start(250);
         videoStarting = false;
+        videoRecStage = 'record';
         videoRecStarted = Date.now();
         $('videoRecStatus').textContent = '⭕ идёт запись';
         videoRecTimer = setInterval(() => {
-          const sec = Math.floor((Date.now() - videoRecStarted) / 1000);
-          $('videoRecTimer').textContent = fmtTime(sec);
-          if (sec >= 60) finishVideoRecording();
+          updateVideoRecTimerDisplay();
+          const sec = Math.floor(recElapsedMs(videoRecStarted, videoRecAccumPaused, videoRecPauseStart, videoRecorder?.state) / 1000);
+          if (sec >= 60) stopVideoRecorder();
         }, 200);
       } catch (e) {
         hideVideoOverlay();
@@ -2693,8 +3021,12 @@
     }
 
     function cancelVideoRecording() {
+      if (videoRecStage === 'review') {
+        hideVideoOverlay();
+        return;
+      }
       videoDiscard = true;
-      finishVideoRecording();
+      stopVideoRecorder();
       if (videoStarting) {
         hideVideoOverlay();
         videoStarting = false;
@@ -2770,8 +3102,8 @@
       pollTimer = setInterval(() => {
         if (voiceAudio && !voiceAudio.paused) return;
         if (activeVideoEl && !activeVideoEl.paused) return;
-        if (mediaRecorder?.state === 'recording') return;
-        if (videoRecorder?.state === 'recording') return;
+        if (mediaRecorder?.state === 'recording' || mediaRecorder?.state === 'paused') return;
+        if (videoRecorder?.state === 'recording' || videoRecorder?.state === 'paused') return;
         syncMessages();
       }, 5000);
     }
@@ -3067,13 +3399,19 @@
       $('voiceRecOverlay').classList.add('hidden');
       cleanupVoiceStream();
       stopVoiceRecTimer();
+      clearVoiceReview();
+      voiceRecStage = 'idle';
+      voiceRecAccumPaused = 0;
+      voiceRecPauseStart = 0;
       $('voiceRecTimer').textContent = '0:00';
       $('voiceRecStatus').textContent = '';
+      $('voicePauseBtn').textContent = '⏸';
+      showVoiceRecordUI();
       $('mediaBtn').classList.remove('recording');
     }
 
-    function finishVoiceRecording() {
-      if (mediaRecorder?.state === 'recording') {
+    function stopVoiceRecorder() {
+      if (mediaRecorder?.state === 'recording' || mediaRecorder?.state === 'paused') {
         try { mediaRecorder.requestData(); } catch { /* ignore */ }
         mediaRecorder.stop();
       } else {
@@ -3083,9 +3421,37 @@
       }
     }
 
+    function toggleVoiceRecPause() {
+      if (!mediaRecorderCanPause() || !mediaRecorder) return;
+      if (mediaRecorder.state === 'recording') {
+        mediaRecorder.pause();
+        voiceRecPauseStart = Date.now();
+        $('voicePauseBtn').textContent = '▶';
+        $('voiceRecStatus').textContent = '⏸ пауза';
+      } else if (mediaRecorder.state === 'paused') {
+        voiceRecAccumPaused += Date.now() - voiceRecPauseStart;
+        voiceRecPauseStart = 0;
+        mediaRecorder.resume();
+        $('voicePauseBtn').textContent = '⏸';
+        $('voiceRecStatus').textContent = '🎤 идёт запись';
+      }
+    }
+
+    function attachVoiceReview() {
+      if (!voiceReviewBlob) return;
+      const type = voiceReviewBlob.type || 'audio/webm';
+      const ext = voiceExt(type);
+      addDraftAttachment(new File([voiceReviewBlob], 'voice' + ext, { type }), 'voice');
+      hideVoiceOverlay();
+    }
+
     function cancelVoiceRecording() {
+      if (voiceRecStage === 'review') {
+        hideVoiceOverlay();
+        return;
+      }
       voiceDiscard = true;
-      finishVoiceRecording();
+      stopVoiceRecorder();
       if (voiceStarting) {
         hideVoiceOverlay();
         voiceStarting = false;
@@ -3111,9 +3477,16 @@
       voiceStarting = true;
       voiceDiscard = false;
       voiceChunks = [];
+      voiceRecAccumPaused = 0;
+      voiceRecPauseStart = 0;
+      clearVoiceReview();
+      showVoiceRecordUI();
       $('voiceRecOverlay').classList.remove('hidden');
       $('voiceRecStatus').textContent = 'включаю микрофон…';
       $('voiceRecTimer').textContent = '0:00';
+      $('voicePauseBtn').textContent = '⏸';
+      if (!mediaRecorderCanPause()) $('voicePauseBtn').style.display = 'none';
+      else $('voicePauseBtn').style.display = '';
       $('mediaBtn').classList.add('recording');
 
       try {
@@ -3140,30 +3513,33 @@
           const rec = mediaRecorder;
           mediaRecorder = null;
           voiceStarting = false;
-          hideVoiceOverlay();
+          cleanupVoiceStream();
+          stopVoiceRecTimer();
           if (discard || !voiceChunks.length) {
             voiceChunks = [];
+            hideVoiceOverlay();
             return;
           }
           const type = rec.mimeType || voiceChunks[0]?.type || 'audio/webm';
           const blob = new Blob(voiceChunks, { type });
           voiceChunks = [];
           if (blob.size < 800) {
+            hideVoiceOverlay();
             showAppErr('слишком короткое — говори дольше');
             return;
           }
-          const ext = voiceExt(type);
-          setDraftAttachment(new File([blob], 'voice' + ext, { type }), 'voice');
+          showVoiceReviewUI(blob);
         };
 
         mediaRecorder.start(250);
         voiceStarting = false;
+        voiceRecStage = 'record';
         voiceRecStarted = Date.now();
         $('voiceRecStatus').textContent = '🎤 идёт запись';
         voiceRecInterval = setInterval(() => {
-          const sec = Math.floor((Date.now() - voiceRecStarted) / 1000);
-          $('voiceRecTimer').textContent = fmtTime(sec);
-          if (sec >= 120) finishVoiceRecording();
+          updateVoiceRecTimerDisplay();
+          const sec = Math.floor(recElapsedMs(voiceRecStarted, voiceRecAccumPaused, voiceRecPauseStart, mediaRecorder?.state) / 1000);
+          if (sec >= 120) stopVoiceRecorder();
         }, 200);
       } catch (e) {
         hideVoiceOverlay();
@@ -3302,9 +3678,20 @@
     updateMediaBtn();
 
     $('voiceCancelBtn').onclick = (e) => { e.preventDefault(); cancelVoiceRecording(); };
-    $('voiceSendBtn').onclick = (e) => { e.preventDefault(); finishVoiceRecording(); };
+    $('voicePauseBtn').onclick = (e) => { e.preventDefault(); toggleVoiceRecPause(); };
+    $('voiceStopBtn').onclick = (e) => { e.preventDefault(); stopVoiceRecorder(); };
+    $('voiceReviewPlay').onclick = (e) => { e.preventDefault(); toggleVoiceReviewPlay(); };
+    $('voiceReviewCancelBtn').onclick = (e) => { e.preventDefault(); hideVoiceOverlay(); };
+    $('voiceReviewRedoBtn').onclick = (e) => { e.preventDefault(); hideVoiceOverlay(); openVoiceRecorder(); };
+    $('voiceReviewAttachBtn').onclick = (e) => { e.preventDefault(); attachVoiceReview(); };
     $('videoCancelBtn').onclick = (e) => { e.preventDefault(); cancelVideoRecording(); };
-    $('videoSendBtn').onclick = (e) => { e.preventDefault(); finishVideoRecording(); };
+    $('videoFlipBtn').onclick = (e) => { e.preventDefault(); flipVideoCamera(); };
+    $('videoPauseBtn').onclick = (e) => { e.preventDefault(); toggleVideoRecPause(); };
+    $('videoStopBtn').onclick = (e) => { e.preventDefault(); stopVideoRecorder(); };
+    $('videoRecPlayback').onclick = (e) => { e.preventDefault(); toggleVideoReviewPlay(); };
+    $('videoReviewCancelBtn').onclick = (e) => { e.preventDefault(); hideVideoOverlay(); };
+    $('videoReviewRedoBtn').onclick = (e) => { e.preventDefault(); hideVideoOverlay(); openVideoRecorder(); };
+    $('videoReviewAttachBtn').onclick = (e) => { e.preventDefault(); attachVideoReview(); };
 
     $('messages').addEventListener('scroll', () => {
       if (suppressScrollTrack || !activeChat) return;
