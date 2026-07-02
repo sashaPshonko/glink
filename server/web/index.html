@@ -275,14 +275,22 @@
     }
     .msg-row.mine { align-items: flex-end; }
     .msg-row-inner {
-      display: flex; align-items: flex-end;
-      width: 100%; max-width: 100%;
+      position: relative;
+      display: inline-flex;
+      align-items: flex-end;
+      max-width: 100%;
     }
-    .msg-row.mine .msg-row-inner { justify-content: flex-end; }
-    .msg-row.theirs .msg-row-inner { justify-content: flex-start; }
     .msg-hit {
-      flex: 1 1 auto; min-width: 56px; min-height: 40px;
-      align-self: stretch; -webkit-tap-highlight-color: transparent;
+      position: absolute;
+      right: 100%;
+      top: 0;
+      bottom: 0;
+      width: 44px;
+      margin-right: 2px;
+      background: transparent;
+      border: none;
+      outline: none;
+      -webkit-tap-highlight-color: transparent;
     }
     .msg-row.theirs .msg-hit { display: none; }
     .msg-reactions {
