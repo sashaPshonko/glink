@@ -10,16 +10,48 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.glink.app"
+      "bundleIdentifier": "com.glink.app",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        },
+        "NSMicrophoneUsageDescription": "Glink записывает голосовые сообщения",
+        "NSPhotoLibraryUsageDescription": "Glink отправляет фото в чат"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#fff5f9"
       },
-      "package": "com.glink.app"
+      "package": "com.glink.app",
+      "usesCleartextTraffic": true,
+      "permissions": [
+        "RECORD_AUDIO",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE"
+      ]
     },
     "extra": {
-      "serverUrl": "http://192.168.1.1:3920"
-    }
+      "serverUrl": "http://31.128.38.147:3920",
+      "eas": {
+        "projectId": "6f9b01a6-a682-4ec8-8ea1-e08f7c481412"
+      }
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Glink отправляет фото в чат"
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Glink записывает голосовые сообщения"
+        }
+      ]
+    ]
   }
 }

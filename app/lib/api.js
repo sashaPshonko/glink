@@ -26,14 +26,15 @@ export async function setToken(token) {
     else await AsyncStorage.removeItem(TOKEN_KEY);
 }
 
-async function api(path, { method = 'GET', body, token } = {}) {
+async function api(path, { method = 'GET', body, token, formData } = {}) {
     const base = await getServerUrl();
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = {};
+    if (!formData) headers['Content-Type'] = 'application/json';
     if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch(`${base}${path}`, {
         method,
         headers,
-        body: body ? JSON.stringify(body) : undefined,
+        body: formData || (body ? JSON.stringify(body) : undefined),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -41,6 +42,31 @@ async function api(path, { method = 'GET', body, token } = {}) {
         err.code = data.error;
         throw err;
     }
+    return data;
+}
+
+export async function fileUrl(path) {
+    const base = await getServerUrl();
+    const token = await getToken();
+    const sep = path.includes('?') ? '&' : '?';
+    return `${base}${path}${sep}token=${encodeURIComponent(token || '')}`;
+}
+
+export async function testServer(url) {
+    const base = (url || (await getServerUrl())).replace(/\/$/, '');
+    const res = await fetch(`${base}/health`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) throw new Error('bad_health');
+    return data;
+}
+
+export async function signin({ username, serverUrl }) {
+    if (serverUrl) await setServerUrl(serverUrl);
+    const data = await api('/auth/signin', {
+        method: 'POST',
+        body: { username },
+    });
+    await setToken(data.token);
     return data;
 }
 
@@ -90,6 +116,19 @@ export async function sendMessage(chatId, text) {
         method: 'POST',
         token,
         body: { text },
+    });
+}
+
+export async function sendMediaMessage(chatId, { uri, name, mime, kind, text }) {
+    const token = await getToken();
+    const formData = new FormData();
+    formData.append('file', { uri, name: name || 'upload', type: mime || 'application/octet-stream' });
+    if (kind) formData.append('kind', kind);
+    if (text) formData.append('text', text);
+    return api(`/chats/${chatId}/messages`, {
+        method: 'POST',
+        token,
+        formData,
     });
 }
 

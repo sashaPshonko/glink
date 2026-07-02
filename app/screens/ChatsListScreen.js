@@ -9,18 +9,12 @@ import {
     View,
 } from 'react-native';
 import { fetchChats } from '../lib/api';
+import { chatSubtitle } from '../lib/messageFormat';
 import { theme } from '../lib/theme';
 
 function chatTitle(chat) {
     if (chat.type === 'group') return chat.title || 'Группа';
     return chat.peer?.displayName || chat.peer?.username || '?';
-}
-
-function chatSubtitle(chat) {
-    if (chat.waiting) return 'ещё не зарегистрировался';
-    if (chat.lastMessage?.text) return chat.lastMessage.text;
-    if (chat.type === 'group') return `${chat.members?.length || 3} участника`;
-    return 'Напиши первым ♡';
 }
 
 export default function ChatsListScreen({ user, onOpenChat, onLogout }) {

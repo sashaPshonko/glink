@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
+    Image,
     KeyboardAvoidingView,
+    Linking,
     Platform,
     Pressable,
     StyleSheet,
@@ -10,7 +12,17 @@ import {
     TextInput,
     View,
 } from 'react-native';
-import { connectWs, fetchMessages, sendMessage } from '../lib/api';
+import { Audio } from 'expo-av';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
+import {
+    connectWs,
+    fetchMessages,
+    fileUrl,
+    sendMediaMessage,
+    sendMessage,
+} from '../lib/api';
+import { LinkText } from '../lib/messageFormat';
 import { placeholder, theme } from '../lib/theme';
 
 function chatTitle(chat) {
@@ -18,11 +30,86 @@ function chatTitle(chat) {
     return chat.peer?.displayName || chat.peer?.username || '?';
 }
 
+function MessageBody({ item, isGroup, mine }) {
+    const [src, setSrc] = useState(null);
+    const kind = item.kind || 'text';
+
+    useEffect(() => {
+        let alive = true;
+        if (item.fileUrl) {
+            fileUrl(item.fileUrl).then((url) => {
+                if (alive) setSrc(url);
+            });
+        }
+        return () => { alive = false; };
+    }, [item.fileUrl]);
+
+    return (
+        <View>
+            {isGroup && !mine && (
+                <Text style={styles.sender}>{item.senderName}</Text>
+            )}
+            {kind === 'image' && src ? (
+                <Pressable onPress={() => Linking.openURL(src)}>
+                    <Image source={{ uri: src }} style={styles.image} resizeMode="cover" />
+                </Pressable>
+            ) : null}
+            {kind === 'voice' && src ? (
+                <VoicePlayer uri={src} />
+            ) : null}
+            {kind === 'file' && src ? (
+                <Pressable onPress={() => Linking.openURL(src)}>
+                    <Text style={styles.fileLink}>📎 {item.file?.name || 'файл'}</Text>
+                </Pressable>
+            ) : null}
+            {item.text ? <LinkText text={item.text} style={styles.bubbleText} /> : null}
+        </View>
+    );
+}
+
+function VoicePlayer({ uri }) {
+    const soundRef = useRef(null);
+    const [playing, setPlaying] = useState(false);
+
+    async function toggle() {
+        if (playing && soundRef.current) {
+            await soundRef.current.stopAsync();
+            await soundRef.current.unloadAsync();
+            soundRef.current = null;
+            setPlaying(false);
+            return;
+        }
+        const { sound } = await Audio.Sound.createAsync({ uri });
+        soundRef.current = sound;
+        setPlaying(true);
+        sound.setOnPlaybackStatusUpdate((st) => {
+            if (st.didJustFinish) {
+                setPlaying(false);
+                sound.unloadAsync();
+                soundRef.current = null;
+            }
+        });
+        await sound.playAsync();
+    }
+
+    useEffect(() => () => {
+        soundRef.current?.unloadAsync();
+    }, []);
+
+    return (
+        <Pressable onPress={toggle} style={styles.voiceBtn}>
+            <Text style={styles.voiceText}>{playing ? '⏸ пауза' : '▶ голосовое'}</Text>
+        </Pressable>
+    );
+}
+
 export default function ChatScreen({ chat, user, onBack }) {
     const [messages, setMessages] = useState([]);
     const [text, setText] = useState('');
     const [loading, setLoading] = useState(true);
+    const [recording, setRecording] = useState(false);
     const listRef = useRef(null);
+    const recordingRef = useRef(null);
     const isGroup = chat.type === 'group';
 
     const appendMessage = useCallback((msg) => {
@@ -76,6 +163,69 @@ export default function ChatScreen({ chat, user, onBack }) {
         appendMessage(message);
     }
 
+    async function pickPhoto() {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) return;
+        const picked = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            quality: 0.85,
+        });
+        if (picked.canceled || !picked.assets?.[0]) return;
+        const asset = picked.assets[0];
+        const { message } = await sendMediaMessage(chat.id, {
+            uri: asset.uri,
+            name: asset.fileName || 'photo.jpg',
+            mime: asset.mimeType || 'image/jpeg',
+            kind: 'image',
+        });
+        appendMessage(message);
+    }
+
+    async function pickFile() {
+        const picked = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true });
+        if (picked.canceled || !picked.assets?.[0]) return;
+        const asset = picked.assets[0];
+        const { message } = await sendMediaMessage(chat.id, {
+            uri: asset.uri,
+            name: asset.name,
+            mime: asset.mimeType || 'application/octet-stream',
+            kind: 'file',
+        });
+        appendMessage(message);
+    }
+
+    async function startVoice() {
+        if (recording) return;
+        const perm = await Audio.requestPermissionsAsync();
+        if (!perm.granted) return;
+        await Audio.setAudioModeAsync({
+            allowsRecordingIOS: true,
+            playsInSilentModeIOS: true,
+        });
+        const rec = new Audio.Recording();
+        await rec.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+        await rec.startAsync();
+        recordingRef.current = rec;
+        setRecording(true);
+    }
+
+    async function stopVoice() {
+        const rec = recordingRef.current;
+        if (!rec || !recording) return;
+        setRecording(false);
+        recordingRef.current = null;
+        await rec.stopAndUnloadAsync();
+        const uri = rec.getURI();
+        if (!uri) return;
+        const { message } = await sendMediaMessage(chat.id, {
+            uri,
+            name: 'voice.m4a',
+            mime: 'audio/mp4',
+            kind: 'voice',
+        });
+        appendMessage(message);
+    }
+
     if (loading) {
         return (
             <View style={styles.center}>
@@ -112,22 +262,27 @@ export default function ChatScreen({ chat, user, onBack }) {
                 renderItem={({ item }) => {
                     const mine = item.senderId === user.id;
                     return (
-                        <View
-                            style={[
-                                styles.bubble,
-                                mine ? styles.mine : styles.theirs,
-                            ]}
-                        >
-                            {isGroup && !mine && (
-                                <Text style={styles.sender}>{item.senderName}</Text>
-                            )}
-                            <Text style={styles.bubbleText}>{item.text}</Text>
+                        <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
+                            <MessageBody item={item} isGroup={isGroup} mine={mine} />
                         </View>
                     );
                 }}
             />
 
             <View style={styles.composer}>
+                <Pressable style={styles.toolBtn} onPress={pickPhoto}>
+                    <Text style={styles.toolText}>📷</Text>
+                </Pressable>
+                <Pressable style={styles.toolBtn} onPress={pickFile}>
+                    <Text style={styles.toolText}>📎</Text>
+                </Pressable>
+                <Pressable
+                    style={[styles.toolBtn, recording && styles.toolRec]}
+                    onPressIn={startVoice}
+                    onPressOut={stopVoice}
+                >
+                    <Text style={styles.toolText}>🎤</Text>
+                </Pressable>
                 <TextInput
                     style={styles.input}
                     placeholder="Сообщение…"
@@ -193,23 +348,51 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     bubbleText: { color: theme.bubbleText, fontSize: 16 },
+    image: {
+        width: 220,
+        height: 220,
+        borderRadius: 12,
+        marginBottom: 4,
+        backgroundColor: theme.border,
+    },
+    fileLink: { color: theme.link, fontSize: 16, fontWeight: '600', marginBottom: 4 },
+    voiceBtn: {
+        backgroundColor: theme.bgSoft,
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        marginBottom: 4,
+        alignSelf: 'flex-start',
+    },
+    voiceText: { color: theme.primaryDark, fontWeight: '600' },
     composer: {
         flexDirection: 'row',
         padding: 12,
-        gap: 8,
+        gap: 6,
+        alignItems: 'center',
         borderTopWidth: 1,
         borderTopColor: theme.border,
         backgroundColor: theme.bgSoft,
     },
+    toolBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    toolRec: { backgroundColor: '#fecdd3' },
+    toolText: { fontSize: 18 },
     input: {
         flex: 1,
         backgroundColor: theme.surface,
         color: theme.text,
         borderRadius: 22,
-        paddingHorizontal: 16,
+        paddingHorizontal: 14,
         paddingVertical: 10,
         borderWidth: 1,
         borderColor: theme.border,
+        minWidth: 0,
     },
     send: {
         width: 44,

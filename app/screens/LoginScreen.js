@@ -9,41 +9,67 @@ import {
     TextInput,
     View,
 } from 'react-native';
-import { defaultServerUrl, getServerUrl, login, register } from '../lib/api';
+import { defaultServerUrl, signin, testServer } from '../lib/api';
 import { placeholder, theme } from '../lib/theme';
 
+const FALLBACK_ACCOUNTS = [
+    { username: 'sasha_pshonko', displayName: 'Саша' },
+    { username: 'dasha_pshonko', displayName: 'Даша' },
+    { username: 'senya', displayName: 'Сеня' },
+];
+
 export default function LoginScreen({ onAuthed }) {
-    const [mode, setMode] = useState('login');
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
-    const [displayName, setDisplayName] = useState('');
+    const [accounts, setAccounts] = useState(FALLBACK_ACCOUNTS);
     const [serverUrl, setServerUrl] = useState(defaultServerUrl());
     const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
+    const [loadingUser, setLoadingUser] = useState('');
+    const [serverOk, setServerOk] = useState(null);
 
     useEffect(() => {
-        getServerUrl().then(setServerUrl);
+        setServerUrl(defaultServerUrl());
+        loadAccounts(defaultServerUrl());
     }, []);
 
-    async function submit() {
-        setError('');
-        setLoading(true);
+    async function loadAccounts(url) {
         try {
-            const payload = {
-                username: username.trim().toLowerCase(),
-                password,
-                displayName: displayName.trim(),
+            const data = await testServer(url || serverUrl);
+            if (data.accounts?.length) {
+                setAccounts(data.accounts.map(({ username, displayName }) => ({
+                    username,
+                    displayName,
+                })));
+            }
+        } catch {
+            /* keep fallback */
+        }
+    }
+
+    async function checkServer() {
+        setServerOk(null);
+        const url = serverUrl.trim();
+        try {
+            await testServer(url);
+            setServerOk(true);
+            await loadAccounts(url);
+        } catch {
+            setServerOk(false);
+        }
+    }
+
+    async function pick(username) {
+        if (loadingUser) return;
+        setError('');
+        setLoadingUser(username);
+        try {
+            const data = await signin({
+                username,
                 serverUrl: serverUrl.trim(),
-            };
-            const data =
-                mode === 'login'
-                    ? await login(payload)
-                    : await register(payload);
+            });
             onAuthed(data.user);
         } catch (e) {
-            setError(e.code || e.message || 'error');
+            setError(e.message || 'ошибка');
         } finally {
-            setLoading(false);
+            setLoadingUser('');
         }
     }
 
@@ -52,62 +78,53 @@ export default function LoginScreen({ onAuthed }) {
             style={styles.root}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-            <Text style={styles.logo}>Glink</Text>
-            <Text style={styles.sub}>нежно-розовый чат для нас ♡</Text>
+            <Text style={styles.logo}>Glink ♡</Text>
+            <Text style={styles.sub}>нажми на себя — и в чат</Text>
+
+            <View style={styles.whoRow}>
+                {accounts.map((a) => {
+                    const busy = loadingUser === a.username;
+                    return (
+                        <Pressable
+                            key={a.username}
+                            style={[styles.whoBtn, busy && styles.whoBusy]}
+                            onPress={() => pick(a.username)}
+                            disabled={Boolean(loadingUser)}
+                        >
+                            {busy ? (
+                                <ActivityIndicator color={theme.primaryDark} />
+                            ) : (
+                                <>
+                                    <View style={styles.whoAv}>
+                                        <Text style={styles.whoAvText}>
+                                            {(a.displayName || a.username)[0].toUpperCase()}
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.whoName}>{a.displayName}</Text>
+                                </>
+                            )}
+                        </Pressable>
+                    );
+                })}
+            </View>
+
+            {error ? <Text style={styles.error}>{error}</Text> : null}
 
             <TextInput
-                style={styles.input}
+                style={[styles.input, styles.serverInput]}
                 placeholder="URL сервера"
                 placeholderTextColor={placeholder}
                 autoCapitalize="none"
                 value={serverUrl}
                 onChangeText={setServerUrl}
             />
-            <TextInput
-                style={styles.input}
-                placeholder="логин"
-                placeholderTextColor={placeholder}
-                autoCapitalize="none"
-                value={username}
-                onChangeText={setUsername}
-            />
-            {mode === 'register' && (
-                <TextInput
-                    style={styles.input}
-                    placeholder="имя"
-                    placeholderTextColor={placeholder}
-                    value={displayName}
-                    onChangeText={setDisplayName}
-                />
+            <Pressable style={styles.checkBtn} onPress={checkServer}>
+                <Text style={styles.checkText}>Проверить сервер</Text>
+            </Pressable>
+            {serverOk === true && <Text style={styles.serverOk}>сервер доступен ✓</Text>}
+            {serverOk === false && (
+                <Text style={styles.serverBad}>сервер недоступен</Text>
             )}
-            <TextInput
-                style={styles.input}
-                placeholder="пароль"
-                placeholderTextColor={placeholder}
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-            />
-
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-
-            <Pressable style={styles.btn} onPress={submit} disabled={loading}>
-                {loading ? (
-                    <ActivityIndicator color={theme.textOnPrimary} />
-                ) : (
-                    <Text style={styles.btnText}>
-                        {mode === 'login' ? 'Войти' : 'Регистрация'}
-                    </Text>
-                )}
-            </Pressable>
-
-            <Pressable onPress={() => setMode(mode === 'login' ? 'register' : 'login')}>
-                <Text style={styles.switch}>
-                    {mode === 'login'
-                        ? 'Нет аккаунта? Зарегистрироваться'
-                        : 'Уже есть аккаунт? Войти'}
-                </Text>
-            </Pressable>
         </KeyboardAvoidingView>
     );
 }
@@ -119,26 +136,47 @@ const styles = StyleSheet.create({
         padding: 24,
         justifyContent: 'center',
     },
-    logo: { color: theme.primaryDark, fontSize: 42, fontWeight: '700' },
-    sub: { color: theme.textMuted, marginBottom: 28, marginTop: 4 },
+    logo: { color: theme.primaryDark, fontSize: 36, fontWeight: '800', textAlign: 'center' },
+    sub: { color: theme.textMuted, marginBottom: 28, marginTop: 4, textAlign: 'center' },
+    whoRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+    whoBtn: {
+        flex: 1,
+        backgroundColor: theme.surface,
+        borderRadius: 16,
+        paddingVertical: 16,
+        paddingHorizontal: 4,
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: theme.border,
+        minHeight: 100,
+        justifyContent: 'center',
+    },
+    whoBusy: { opacity: 0.7 },
+    whoAv: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: theme.avatar,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 8,
+    },
+    whoAvText: { color: theme.primaryDark, fontWeight: '700', fontSize: 20 },
+    whoName: { color: theme.text, fontWeight: '700', fontSize: 15 },
     input: {
         backgroundColor: theme.surface,
         color: theme.text,
         borderRadius: 16,
         paddingHorizontal: 16,
         paddingVertical: 13,
-        marginBottom: 10,
-        borderWidth: 1,
+        marginBottom: 8,
+        borderWidth: 2,
         borderColor: theme.border,
     },
-    btn: {
-        backgroundColor: theme.primaryDark,
-        borderRadius: 16,
-        paddingVertical: 14,
-        alignItems: 'center',
-        marginTop: 8,
-    },
-    btnText: { color: theme.textOnPrimary, fontWeight: '600', fontSize: 16 },
-    switch: { color: theme.link, textAlign: 'center', marginTop: 18 },
-    error: { color: theme.error, marginBottom: 8 },
+    serverInput: { marginTop: 20, marginBottom: 6 },
+    error: { color: theme.error, marginBottom: 8, textAlign: 'center' },
+    checkBtn: { alignSelf: 'center', paddingVertical: 6 },
+    checkText: { color: theme.link, fontSize: 14 },
+    serverOk: { color: '#16a34a', textAlign: 'center', marginTop: 4 },
+    serverBad: { color: theme.error, textAlign: 'center', marginTop: 4 },
 });
