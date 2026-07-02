@@ -265,5 +265,5 @@ export function readStatusFor(message, chat, viewerId) {
     const readBy = Array.isArray(message.readBy) ? message.readBy : [];
     const others = (chat?.memberIds || []).filter((id) => id !== viewerId);
     if (!others.length) return 'sent';
-    return others.every((id) => readBy.includes(id)) ? 'read' : 'sent';
+    return others.some((id) => readBy.includes(id)) ? 'read' : 'sent';
 }

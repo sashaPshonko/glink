@@ -6,20 +6,39 @@
   <title>Glink</title>
   <style>
     * { box-sizing: border-box; }
+    :root {
+      --glink-bg: #fff0f6;
+      --glink-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='%23e879a9' fill-opacity='0.09'%3E%3Cpath d='M40 58s-22-14-22-32c0-8 6-14 14-14 5 0 9 3 11 7 2-4 6-7 11-7 8 0 14 6 14 14 0 18-22 32-22 32z'/%3E%3C/g%3E%3Cg fill='%23f472b6' fill-opacity='0.06' transform='translate(40 40)'%3E%3Ccircle cx='0' cy='0' r='3'/%3E%3C/g%3E%3C/svg%3E");
+      --glink-dots: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Ccircle cx='2' cy='2' r='1.2' fill='%23db2777' fill-opacity='0.07'/%3E%3C/svg%3E");
+    }
+    .glink-pattern {
+      background-color: var(--glink-bg);
+      background-image:
+        radial-gradient(ellipse 90% 70% at 10% 0%, rgba(251, 207, 232, 0.55), transparent 55%),
+        radial-gradient(ellipse 80% 60% at 95% 100%, rgba(244, 114, 182, 0.35), transparent 50%),
+        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.4), transparent 70%),
+        var(--glink-pattern),
+        var(--glink-dots);
+      background-size: 100% 100%, 100% 100%, 100% 100%, 80px 80px, 20px 20px;
+      background-attachment: fixed;
+    }
     body {
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #fff5f9;
       color: #5c3347;
       height: 100dvh;
       display: flex;
       flex-direction: column;
     }
+    html, body { height: 100%; overflow: hidden; }
+    body.glink-pattern { min-height: 100dvh; min-height: 100svh; }
     .hidden { display: none !important; }
     header {
       padding: 16px 20px;
-      background: #ffecf4;
-      border-bottom: 1px solid #fce7f3;
+      background: rgba(255, 236, 244, 0.88);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(252, 231, 243, 0.9);
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -50,12 +69,13 @@
       align-items: center;
       justify-content: center;
       padding: 24px 16px;
-      background: linear-gradient(160deg, #fff5f9 0%, #ffecf4 50%, #fce7f3 100%);
     }
     .login-card {
       width: 100%;
       max-width: 420px;
-      background: #fff;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       border-radius: 24px;
       padding: 28px 24px 24px;
       box-shadow: 0 8px 32px rgba(232, 121, 169, 0.15);
@@ -101,7 +121,11 @@
     .empty { padding: 24px 16px; color: #b07a94; text-align: center; }
     .row {
       display: flex; gap: 12px; padding: 14px 16px;
-      border-bottom: 1px solid #fce7f3; background: #fff; cursor: pointer;
+      border-bottom: 1px solid rgba(252, 231, 243, 0.85);
+      background: rgba(255, 255, 255, 0.78);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      cursor: pointer;
     }
     .row.wait { opacity: 0.5; cursor: default; }
     .avatar {
@@ -111,17 +135,47 @@
     }
     .avatar.group { background: #f9a8d4; }
     .preview { color: #b07a94; font-size: 0.9rem; margin-top: 4px; }
-    #chatView { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    #chatView { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
     #messages {
       flex: 1; overflow: auto; padding: 16px;
       display: flex; flex-direction: column; gap: 8px;
+      -webkit-overflow-scrolling: touch;
+    }
+    #composer {
+      display: flex; gap: 8px; padding: 10px 12px;
+      padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+      align-items: center; flex-shrink: 0;
+      border-top: 1px solid rgba(252, 231, 243, 0.9);
+      background: rgba(255, 236, 244, 0.95);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    #composer input[type="text"] {
+      margin: 0; flex: 1; min-width: 0;
+      width: 100%;
+      padding: 11px 14px;
+      border: 1px solid rgba(252, 231, 243, 0.95);
+      border-radius: 22px;
+      font-size: 16px;
+      background: rgba(255, 255, 255, 0.9);
+    }
+    @media (max-width: 520px) {
+      header { padding: 10px 12px; padding-top: calc(10px + env(safe-area-inset-top, 0px)); }
+      #chatView > header { padding-top: calc(10px + env(safe-area-inset-top, 0px)); }
+      header h1 { font-size: 1.15rem; }
+      button.icon {
+        width: 38px; height: 38px; font-size: 1.05rem;
+      }
+      #composer { gap: 5px; padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); }
+      #messages { padding: 12px 10px; }
+      .bubble { max-width: 88%; }
     }
     .bubble {
       max-width: 82%; padding: 10px 14px; border-radius: 16px;
       line-height: 1.4; word-break: break-word;
     }
-    .mine { align-self: flex-end; background: #f9c5df; }
-    .theirs { align-self: flex-start; background: #fff; border: 1px solid #fce7f3; }
+    .mine { align-self: flex-end; background: rgba(249, 197, 223, 0.95); }
+    .theirs { align-self: flex-start; background: rgba(255, 255, 255, 0.92); border: 1px solid rgba(252, 231, 243, 0.95); }
     .sender { font-size: 0.75rem; color: #db2777; font-weight: 600; margin-bottom: 4px; }
     .bubble a { color: #be185d; text-decoration: underline; }
     .bubble img {
@@ -172,21 +226,6 @@
     .voice-bars i.on { background: rgba(157, 23, 77, 0.88); }
     .bubble.theirs .voice-bars i { background: rgba(232, 121, 169, 0.28); }
     .bubble.theirs .voice-bars i.on { background: rgba(219, 39, 119, 0.85); }
-    .voice-track {
-      height: 8px; border-radius: 4px; margin-top: 6px;
-      background: rgba(157, 23, 77, 0.12); overflow: hidden;
-      border: 1px solid rgba(157, 23, 77, 0.18);
-      cursor: pointer; touch-action: manipulation;
-    }
-    .bubble.theirs .voice-track {
-      background: rgba(232, 121, 169, 0.15);
-      border-color: rgba(232, 121, 169, 0.25);
-    }
-    .voice-track-fill {
-      height: 100%; width: 0%; min-width: 0; border-radius: 3px;
-      background: #db2777;
-    }
-    .bubble.theirs .voice-track-fill { background: #e879a9; }
     .voice-time {
       font-size: 0.72rem; color: rgba(92, 51, 71, 0.65);
       margin-top: 3px; font-variant-numeric: tabular-nums;
@@ -202,18 +241,6 @@
     .file-link {
       display: inline-flex; align-items: center; gap: 6px;
       margin-top: 4px; color: #be185d; font-weight: 600;
-    }
-    #composer {
-      display: flex; gap: 8px; padding: 12px; align-items: center;
-      border-top: 1px solid #fce7f3; background: #ffecf4;
-    }
-    #composer input[type="text"] {
-      margin: 0; flex: 1; min-width: 0;
-      width: 100%;
-      padding: 12px 14px;
-      border: 1px solid #fce7f3;
-      border-radius: 12px;
-      font-size: 1rem;
     }
     #voiceHint { display: none !important; }
     .rec-overlay {
@@ -279,8 +306,8 @@
     #videoSendBtn { background: #e879a9; border: 2px solid #fff; }
   </style>
 </head>
-<body>
-  <div id="login">
+<body class="glink-pattern">
+  <div id="login" class="glink-pattern">
     <div class="login-card">
       <h1 class="login-logo">Glink ♡</h1>
       <p class="login-sub">нажми на себя — и в чат</p>
@@ -289,7 +316,7 @@
     </div>
   </div>
 
-  <div id="app" class="hidden" style="display:flex;flex-direction:column;height:100dvh">
+  <div id="app" class="hidden glink-pattern" style="display:flex;flex-direction:column;height:100dvh;height:100svh;min-height:0;overflow:hidden">
     <header>
       <div>
         <h1 id="hdrTitle">Glink</h1>
@@ -528,7 +555,6 @@
           `<button type="button" class="voice-play" aria-label="играть">▶</button>` +
           `<div class="voice-body">` +
           `<div class="voice-wave"><div class="voice-bars"></div></div>` +
-          `<div class="voice-track"><div class="voice-track-fill"></div></div>` +
           `<div class="voice-time"><span class="voice-cur">0:00</span> / <span class="voice-dur">…</span></div>` +
           `</div></div>`,
         );
@@ -645,19 +671,31 @@
       }
     }
 
-    function patchReadTicks(messageIds) {
-      if (!messageIds?.length) return;
-      const box = $('messages');
-      for (const id of messageIds) {
-        const bubble = box.querySelector(`.bubble[data-id="${CSS.escape(id)}"]`);
-        if (!bubble?.classList.contains('mine')) continue;
-        let foot = bubble.querySelector('.msg-foot');
-        if (!foot) {
-          foot = document.createElement('div');
-          foot.className = 'msg-foot';
-          bubble.appendChild(foot);
+    async function refreshReadTicks() {
+      if (!activeChat) return;
+      try {
+        const data = await api('/chats/' + activeChat.id + '/messages');
+        const box = $('messages');
+        for (const m of data.messages) {
+          if (m.senderId !== user.id) continue;
+          const bubble = box.querySelector('.bubble[data-id="' + m.id + '"]');
+          if (!bubble) continue;
+          const html = renderTicks(m, true);
+          const foot = bubble.querySelector('.msg-foot');
+          if (html) {
+            if (foot) foot.outerHTML = html;
+            else bubble.insertAdjacentHTML('beforeend', html);
+          } else if (foot) foot.remove();
         }
-        foot.innerHTML = '<span class="ticks read" title="прочитано">✓✓</span>';
+      } catch (_) {}
+    }
+
+    function wsJoinAllChats() {
+      if (!ws || ws.readyState !== 1) return;
+      for (const c of chats) {
+        if (!c.waiting && c.id) {
+          ws.send(JSON.stringify({ type: 'join', chatId: c.id }));
+        }
       }
     }
 
@@ -757,8 +795,6 @@
       const dur = saneDur(duration) || voiceDuration(el, voiceAudio);
       const cur = Math.max(0, current || 0);
       const pct = dur > 0 ? Math.min(100, (cur / dur) * 100) : 0;
-      const fill = el.querySelector('.voice-track-fill');
-      if (fill) fill.style.width = (pct > 0 ? Math.max(pct, 1) : 0) + '%';
       const wave = el.querySelector('.voice-wave');
       if (wave) wave.style.setProperty('--pct', pct + '%');
       const bars = el.querySelectorAll('.voice-bars i');
@@ -843,11 +879,6 @@
       if (saved > 0) updateVoiceProgress(el, saved, Number(el.dataset.duration) || 0);
       el.dataset.ready = '1';
       el.querySelector('.voice-wave').onclick = (e) => {
-        const rect = e.currentTarget.getBoundingClientRect();
-        const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-        seekVoice(el, src, pct);
-      };
-      el.querySelector('.voice-track').onclick = (e) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
         seekVoice(el, src, pct);
@@ -1100,9 +1131,7 @@
       if (ws) ws.close();
       const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
       ws = new WebSocket(proto + '//' + location.host + '/ws?token=' + encodeURIComponent(token));
-      ws.onopen = () => {
-        if (activeChat) ws.send(JSON.stringify({ type: 'join', chatId: activeChat.id }));
-      };
+      ws.onopen = () => { wsJoinAllChats(); };
       ws.onmessage = (ev) => {
         try {
           const msg = JSON.parse(ev.data);
@@ -1112,8 +1141,10 @@
             loadMessages({ forceBottom: nearBottom });
             refreshChatList();
           }
-          if (msg.type === 'read' && activeChat && msg.chatId === activeChat.id) {
-            if (msg.readerId !== user.id) patchReadTicks(msg.messageIds);
+          if (msg.type === 'read' && msg.chatId) {
+            if (activeChat && msg.chatId === activeChat.id && msg.readerId !== user.id) {
+              refreshReadTicks();
+            }
           }
         } catch (_) {}
       };
@@ -1127,13 +1158,14 @@
       $('chatTitle').textContent = chatTitle(chat);
       $('chatSub').textContent = chat.type === 'group' ? 'группа ♡' : 'личный чат';
       await loadMessages({ forceBottom: true });
-      if (ws?.readyState === 1) ws.send(JSON.stringify({ type: 'join', chatId: chat.id }));
+      if (ws?.readyState === 1) wsJoinAllChats();
       clearInterval(pollTimer);
       pollTimer = setInterval(() => {
         if (voiceAudio && !voiceAudio.paused) return;
         if (activeVideoEl && !activeVideoEl.paused) return;
         if (mediaRecorder?.state === 'recording') return;
         if (videoRecorder?.state === 'recording') return;
+        refreshReadTicks();
         loadMessages();
       }, 5000);
     }
@@ -1143,6 +1175,7 @@
       const data = await api('/chats');
       chats = data.chats || [];
       renderChats();
+      wsJoinAllChats();
     }
 
     async function refreshChatList() {
@@ -1150,6 +1183,7 @@
         const data = await api('/chats');
         chats = data.chats || [];
         renderChats();
+        wsJoinAllChats();
       } catch (_) {}
     }
 
