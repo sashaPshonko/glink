@@ -1,0 +1,196 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+import { randomUUID } from 'crypto';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DATA_DIR = process.env.GLINK_DATA || join(__dirname, 'data');
+const DB_FILE = join(DATA_DIR, 'store.json');
+
+const empty = () => ({
+    users: [],
+    chats: [],
+    messages: [],
+});
+
+function load() {
+    if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
+    if (!existsSync(DB_FILE)) {
+        const db = empty();
+        save(db);
+        return db;
+    }
+    return JSON.parse(readFileSync(DB_FILE, 'utf8'));
+}
+
+function save(db) {
+    writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+}
+
+let db = load();
+
+export function resetDb() {
+    db = empty();
+    save(db);
+}
+
+export function countUsers() {
+    return db.users.length;
+}
+
+export function createUser({ username, passwordHash, displayName }) {
+    if (db.users.some((u) => u.username === username)) {
+        throw new Error('username_taken');
+    }
+    const user = {
+        id: randomUUID(),
+        username,
+        passwordHash,
+        displayName: displayName || username,
+        createdAt: new Date().toISOString(),
+    };
+    db.users.push(user);
+    save(db);
+    return user;
+}
+
+export function findUserByUsername(username) {
+    return db.users.find((u) => u.username === username) || null;
+}
+
+export function findUserById(id) {
+    return db.users.find((u) => u.id === id) || null;
+}
+
+export function listUsersExcept(userId) {
+    return db.users
+        .filter((u) => u.id !== userId)
+        .map(({ id, username, displayName }) => ({ id, username, displayName }));
+}
+
+export function dmKey(a, b) {
+    return [a, b].sort().join(':');
+}
+
+export function getOrCreateMainGroup(memberIds, title) {
+    const key = MEMBERS.slice().sort().join('+');
+    const sorted = [...new Set(memberIds)].sort();
+    let chat = db.chats.find((c) => c.type === 'group' && c.groupKey === key);
+    if (!chat) {
+        chat = {
+            id: randomUUID(),
+            type: 'group',
+            groupKey: key,
+            title,
+            memberIds: sorted,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        };
+        db.chats.push(chat);
+        save(db);
+        return chat;
+    }
+    const merged = [...new Set([...chat.memberIds, ...sorted])].sort();
+    if (merged.join(',') !== chat.memberIds.slice().sort().join(',')) {
+        chat.memberIds = merged;
+        chat.updatedAt = new Date().toISOString();
+        save(db);
+    }
+    if (chat.title !== title) {
+        chat.title = title;
+        save(db);
+    }
+    return chat;
+}
+
+export function getOrCreateDm(userId, peerId) {
+    const key = dmKey(userId, peerId);
+    let chat = db.chats.find((c) => c.type === 'dm' && c.dmKey === key);
+    if (!chat) {
+        chat = {
+            id: randomUUID(),
+            type: 'dm',
+            dmKey: key,
+            memberIds: [userId, peerId],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        };
+        db.chats.push(chat);
+        save(db);
+    }
+    return chat;
+}
+
+export function listChatsForUser(userId) {
+    return db.chats
+        .filter((c) => c.memberIds.includes(userId))
+        .map((chat) => formatChatRow(chat, userId))
+        .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+}
+
+function lastMessageFor(chatId) {
+    return db.messages
+        .filter((m) => m.chatId === chatId)
+        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+}
+
+function formatChatRow(chat, userId) {
+    const last = lastMessageFor(chat.id);
+    const base = {
+        id: chat.id,
+        type: chat.type,
+        lastMessage: last
+            ? { text: last.text, createdAt: last.createdAt, senderId: last.senderId }
+            : null,
+        updatedAt: last?.createdAt || chat.updatedAt,
+    };
+    if (chat.type === 'group') {
+        return {
+            ...base,
+            title: chat.title,
+            members: chat.memberIds
+                .map((id) => findUserById(id))
+                .filter(Boolean)
+                .map(({ id, username, displayName }) => ({ id, username, displayName })),
+        };
+    }
+    const peerId = chat.memberIds.find((id) => id !== userId);
+    const peer = peerId ? findUserById(peerId) : null;
+    return {
+        ...base,
+        peer: peer
+            ? { id: peer.id, username: peer.username, displayName: peer.displayName }
+            : null,
+    };
+}
+
+export function userInChat(userId, chatId) {
+    const chat = db.chats.find((c) => c.id === chatId);
+    return Boolean(chat?.memberIds.includes(userId));
+}
+
+export function listMessages(chatId, after = null) {
+    let rows = db.messages.filter((m) => m.chatId === chatId);
+    if (after) {
+        const t = Date.parse(after);
+        rows = rows.filter((m) => Date.parse(m.createdAt) > t);
+    }
+    return rows.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+}
+
+export function addMessage({ chatId, senderId, text }) {
+    const chat = db.chats.find((c) => c.id === chatId);
+    if (!chat) throw new Error('chat_not_found');
+    const msg = {
+        id: randomUUID(),
+        chatId,
+        senderId,
+        text: String(text || '').trim(),
+        createdAt: new Date().toISOString(),
+    };
+    if (!msg.text) throw new Error('empty_message');
+    db.messages.push(msg);
+    chat.updatedAt = msg.createdAt;
+    save(db);
+    return msg;
+}
