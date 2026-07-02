@@ -246,10 +246,19 @@
       color: rgba(92, 51, 71, 0.42); user-select: none;
     }
     .ticks.read { color: #2563eb; }
-    .file-link {
-      display: inline-flex; align-items: center; gap: 6px;
-      margin-top: 4px; color: #be185d; font-weight: 600;
+    .file-card {
+      display: flex; align-items: center; gap: 10px;
+      margin-top: 4px; padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.5);
+      border-radius: 12px; color: #9d174d; text-decoration: none;
+      max-width: min(280px, 100%);
     }
+    .bubble.mine .file-card { background: rgba(255, 255, 255, 0.35); }
+    .file-card-icon { width: 28px; height: 28px; flex-shrink: 0; color: #be185d; }
+    .file-card-icon svg { width: 100%; height: 100%; display: block; }
+    .file-card-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .file-card-name { font-weight: 600; font-size: 0.9rem; word-break: break-all; line-height: 1.25; }
+    .file-card-size { font-size: 0.75rem; color: #b07a94; }
     #voiceHint { display: none !important; }
     .rec-overlay {
       position: fixed; inset: 0; z-index: 200;
@@ -276,13 +285,29 @@
     .rec-cancel { background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.5); }
     .rec-send { background: #e879a9; border: 2px solid #fff; }
     .video-note {
-      width: 200px; height: 200px; border-radius: 50%;
-      overflow: hidden; position: relative; margin-top: 4px;
-      background: #1a1a1a; cursor: pointer; flex-shrink: 0;
+      width: 200px; height: 200px; position: relative; margin-top: 4px;
+      flex-shrink: 0; touch-action: none; cursor: pointer;
     }
-    .video-note video {
+    .video-note-hole {
+      position: absolute; inset: 9px; border-radius: 50%;
+      overflow: hidden; background: #1a1a1a; z-index: 1;
+    }
+    .video-note-hole video {
       width: 100%; height: 100%; object-fit: cover; display: block;
     }
+    .vid-ring {
+      position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2;
+      pointer-events: none;
+    }
+    .vid-ring-track {
+      fill: none; stroke: rgba(232, 121, 169, 0.22); stroke-width: 5;
+    }
+    .vid-ring-fill {
+      fill: none; stroke: #e879a9; stroke-width: 5; stroke-linecap: round;
+      transform: rotate(-90deg); transform-origin: 100px 100px;
+      transition: stroke-dashoffset 0.08s linear;
+    }
+    .video-note.seeking .vid-ring-fill { transition: none; }
     .video-note .vid-badge {
       position: absolute; inset: 0; display: flex;
       align-items: center; justify-content: center;
@@ -344,7 +369,7 @@
       </header>
       <div id="messages"></div>
       <div id="composer">
-        <input id="fileInput" type="file" class="hidden" accept="image/*,*/*" />
+        <input id="fileInput" type="file" class="hidden" />
         <button id="mediaBtn" type="button" class="icon secondary" title="Файл" aria-label="Файл"></button>
         <input id="msgInput" type="text" placeholder="Сообщение…" />
         <button id="sendBtn" class="icon">♡</button>
@@ -572,12 +597,26 @@
         const src = escapeHtml(fileUrl(m.fileUrl));
         parts.push(
           `<div class="video-note" data-src="${src}">` +
+          `<svg class="vid-ring" viewBox="0 0 200 200" aria-hidden="true">` +
+          `<circle class="vid-ring-track" cx="100" cy="100" r="${VID_RING_R}"/>` +
+          `<circle class="vid-ring-fill" cx="100" cy="100" r="${VID_RING_R}"/>` +
+          `</svg>` +
+          `<div class="video-note-hole">` +
           `<video playsinline preload="metadata" src="${src}"></video>` +
-          `<div class="vid-badge">▶</div></div>`,
+          `<div class="vid-badge">▶</div>` +
+          `</div></div>`,
         );
       } else if (kind === 'file' && m.fileUrl) {
         const name = escapeHtml(m.file?.name || 'файл');
-        parts.push(`<a class="file-link" href="${fileUrl(m.fileUrl)}" target="_blank" rel="noopener">📎 ${name}</a>`);
+        const size = m.file?.size ? fmtFileSize(m.file.size) : '';
+        parts.push(
+          `<a class="file-card" href="${fileUrl(m.fileUrl)}" target="_blank" rel="noopener">` +
+          `<span class="file-card-icon">${FILE_ICON_SVG}</span>` +
+          `<span class="file-card-body">` +
+          `<span class="file-card-name">${name}</span>` +
+          (size ? `<span class="file-card-size">${size}</span>` : '') +
+          `</span></a>`,
+        );
       }
 
       if (m.text) parts.push(`<div>${linkify(m.text)}</div>`);
@@ -813,6 +852,17 @@
       return `${m}:${String(sec).padStart(2, '0')}`;
     }
 
+    function fmtFileSize(bytes) {
+      const n = Number(bytes) || 0;
+      if (n < 1024) return n + ' B';
+      if (n < 1024 * 1024) return (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KB';
+      return (n / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    const FILE_ICON_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.5 6v11.5a4 4 0 01-8 0V5a2.5 2.5 0 015 0v10.5a1 1 0 11-2 0V6H9v9.5a3.5 3.5 0 007 0V5a4 4 0 00-8 0v12.5a5.5 5.5 0 0011 0V6h-1.5z"/></svg>';
+    const VID_RING_R = 96;
+    const VID_RING_LEN = 2 * Math.PI * VID_RING_R;
+
     function saneDur(d) {
       return d > 0 && Number.isFinite(d) ? d : 0;
     }
@@ -1046,18 +1096,119 @@
       });
     }
 
+    function initVideoRing(wrap) {
+      const ring = wrap.querySelector('.vid-ring-fill');
+      if (!ring || ring.dataset.ready) return;
+      ring.dataset.ready = '1';
+      ring.style.strokeDasharray = String(VID_RING_LEN);
+      ring.style.strokeDashoffset = String(VID_RING_LEN);
+    }
+
+    function updateVideoRing(wrap, vid) {
+      const ring = wrap.querySelector('.vid-ring-fill');
+      if (!ring || !vid) return;
+      const dur = vid.duration;
+      if (!dur || !Number.isFinite(dur) || dur <= 0) return;
+      const pct = Math.min(1, Math.max(0, vid.currentTime / dur));
+      ring.style.strokeDashoffset = String(VID_RING_LEN * (1 - pct));
+    }
+
+    function isOnVideoRing(wrap, x, y) {
+      const rect = wrap.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dist = Math.hypot(x - cx, y - cy);
+      const half = rect.width / 2;
+      return dist >= half * 0.78 && dist <= half + 4;
+    }
+
+    function seekVideoNote(wrap, vid, x, y) {
+      const rect = wrap.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      let angle = Math.atan2(x - cx, -(y - cy));
+      if (angle < 0) angle += Math.PI * 2;
+      const pct = angle / (Math.PI * 2);
+      const dur = vid.duration;
+      if (!dur || !Number.isFinite(dur) || dur <= 0) return;
+      vid.currentTime = Math.max(0, Math.min(dur, pct * dur));
+      updateVideoRing(wrap, vid);
+    }
+
+    function hookVideoProgress(wrap, vid) {
+      vid.ontimeupdate = () => {
+        if (activeVideoEl === vid) updateVideoRing(wrap, vid);
+      };
+      vid.onloadedmetadata = () => updateVideoRing(wrap, vid);
+    }
+
     function wireVideoNotes(container) {
       container.querySelectorAll('.video-note').forEach((wrap) => {
         if (wrap.dataset.wired) return;
         wrap.dataset.wired = '1';
         const vid = wrap.querySelector('video');
         const src = wrap.dataset.src;
-        wrap.onclick = () => toggleVideoNote(wrap, vid, src);
+        initVideoRing(wrap);
+        hookVideoProgress(wrap, vid);
+
+        wrap.addEventListener('pointerdown', (e) => {
+          if (e.pointerType === 'mouse' && e.button !== 0) return;
+          e.preventDefault();
+          if (isOnVideoRing(wrap, e.clientX, e.clientY)) {
+            wrap.setPointerCapture(e.pointerId);
+            wrap.classList.add('seeking');
+            wrap.dataset.seeking = '1';
+            seekVideoNote(wrap, vid, e.clientX, e.clientY);
+            playVideoNote(wrap, vid, src);
+          } else {
+            toggleVideoNote(wrap, vid, src);
+          }
+        });
+
+        wrap.addEventListener('pointermove', (e) => {
+          if (wrap.dataset.seeking !== '1') return;
+          seekVideoNote(wrap, vid, e.clientX, e.clientY);
+        });
+
+        const endSeek = (e) => {
+          if (wrap.dataset.seeking !== '1') return;
+          if (e?.pointerId != null && wrap.hasPointerCapture?.(e.pointerId)) {
+            wrap.releasePointerCapture(e.pointerId);
+          }
+          wrap.dataset.seeking = '';
+          wrap.classList.remove('seeking');
+        };
+        wrap.addEventListener('pointerup', endSeek);
+        wrap.addEventListener('pointercancel', endSeek);
+
         vid.onended = () => {
           wrap.classList.remove('playing');
           if (activeVideoEl === vid) activeVideoEl = null;
+          updateVideoRing(wrap, vid);
         };
       });
+    }
+
+    function playVideoNote(wrap, vid, src) {
+      if (activeVideoEl && activeVideoEl !== vid) {
+        activeVideoEl.pause();
+        activeVideoEl.closest('.video-note')?.classList.remove('playing');
+      }
+      if (voiceAudio && !voiceAudio.paused) {
+        voiceAudio.pause();
+        if (voiceBtnEl) voiceBtnEl.textContent = '▶';
+        stopVoiceRaf();
+      }
+      if (!vid.src) vid.src = src;
+      if (vid.paused) {
+        vid.play().then(() => {
+          wrap.classList.add('playing');
+          activeVideoEl = vid;
+        }).catch(() => showAppErr('не удалось воспроизвести видео'));
+      } else {
+        wrap.classList.add('playing');
+        activeVideoEl = vid;
+      }
     }
 
     function toggleVideoNote(wrap, vid, src) {
@@ -1068,19 +1219,10 @@
       if (!vid.paused) {
         vid.pause();
         wrap.classList.remove('playing');
-        activeVideoEl = null;
+        if (activeVideoEl === vid) activeVideoEl = null;
         return;
       }
-      if (voiceAudio && !voiceAudio.paused) {
-        voiceAudio.pause();
-        if (voiceBtnEl) voiceBtnEl.textContent = '▶';
-        stopVoiceRaf();
-      }
-      if (!vid.src) vid.src = src;
-      vid.play().then(() => {
-        wrap.classList.add('playing');
-        activeVideoEl = vid;
-      }).catch(() => showAppErr('не удалось воспроизвести видео'));
+      playVideoNote(wrap, vid, src);
     }
 
     function videoMimeType() {

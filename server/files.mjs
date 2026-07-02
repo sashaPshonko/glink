@@ -22,9 +22,11 @@ export function maxUploadBytes() {
 export function guessKind(mime, hint = '') {
     const m = String(mime || '').toLowerCase();
     const h = String(hint || '').toLowerCase();
+    if (h === 'file') return 'file';
     if (h === 'voice' || h === 'audio') return 'voice';
     if (h === 'video' || h === 'video_note') return 'video';
-    if (h === 'image' || m.startsWith('image/')) return 'image';
+    if (h === 'image') return 'image';
+    if (m.startsWith('image/')) return 'image';
     if (m.startsWith('video/')) return 'video';
     if (m.startsWith('audio/')) return 'voice';
     return 'file';
