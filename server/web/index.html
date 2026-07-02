@@ -144,14 +144,48 @@
       cursor: pointer;
     }
     .row.wait { opacity: 0.5; cursor: default; }
+    .avatar-wrap { position: relative; flex-shrink: 0; width: 44px; height: 44px; }
     .avatar {
       width: 44px; height: 44px; border-radius: 50%;
       background: #fbcfe8; display: flex; align-items: center; justify-content: center;
       color: #e879a9; font-weight: 700;
     }
     .avatar.group { background: #f9a8d4; }
-    .preview { color: #b07a94; font-size: 0.9rem; margin-top: 4px; }
-    #chatView { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+    .preview {
+      color: #b07a94; font-size: 0.9rem; margin-top: 4px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      max-width: 100%;
+    }
+    .row-body { flex: 1; min-width: 0; }
+    .row-top {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      min-width: 0;
+    }
+    .row-top strong {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      min-width: 0; flex: 1;
+    }
+    .avatar-wrap .unread-badge {
+      position: absolute; top: -3px; right: -3px;
+      flex-shrink: 0; min-width: 20px; height: 20px; padding: 0 5px;
+      border-radius: 999px; background: #db2777; color: #fff;
+      font-size: 0.7rem; font-weight: 700; line-height: 20px; text-align: center;
+      border: 2px solid rgba(255, 255, 255, 0.95);
+      box-shadow: 0 1px 4px rgba(219, 39, 119, 0.35);
+    }
+    #chatView { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; position: relative; }
+    #unreadJumpBtn {
+      position: absolute;
+      left: 50%; transform: translateX(-50%);
+      bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+      z-index: 20; padding: 8px 14px; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(232, 121, 169, 0.45);
+      color: #9d174d; font-size: 0.85rem; font-weight: 600;
+      box-shadow: 0 4px 16px rgba(92, 51, 71, 0.15);
+      cursor: pointer;
+    }
+    #unreadJumpBtn.hidden { display: none; }
     #messages {
       flex: 1; overflow: auto; padding: 16px;
       display: flex; flex-direction: column; gap: 8px;
@@ -161,20 +195,27 @@
     #composer {
       display: flex; gap: 8px; padding: 10px 12px;
       padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-      align-items: center; flex-shrink: 0;
+      align-items: flex-end; flex-shrink: 0;
       border-top: 1px solid rgba(252, 231, 243, 0.9);
       background: rgba(255, 236, 244, 0.95);
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
     }
-    #composer input[type="text"] {
+    #msgInput {
       margin: 0; flex: 1; min-width: 0;
       width: 100%;
       padding: 11px 14px;
       border: 1px solid rgba(252, 231, 243, 0.95);
       border-radius: 22px;
       font-size: 16px;
+      font-family: inherit;
+      line-height: 1.35;
       background: rgba(255, 255, 255, 0.9);
+      resize: none;
+      overflow-y: hidden;
+      min-height: 42px;
+      max-height: 132px;
+      box-sizing: border-box;
     }
     @media (max-width: 520px) {
       header { padding: 10px 12px; padding-top: calc(10px + env(safe-area-inset-top, 0px)); }
@@ -352,18 +393,54 @@
     .msg-row.theirs .msg-row-inner { margin-right: auto; }
     .msg-reactions {
       display: flex; flex-wrap: wrap; gap: 4px;
-      margin-top: 3px;
+      align-items: center;
     }
     .msg-reaction-pill {
       font-size: 0.82rem; padding: 2px 8px; border-radius: 999px;
-      background: rgba(255, 255, 255, 0.88);
-      border: 1px solid rgba(252, 231, 243, 0.95); line-height: 1.35;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(92, 51, 71, 0.08);
+      box-shadow: 0 1px 3px rgba(92, 51, 71, 0.1);
+      line-height: 1.35;
       cursor: pointer; font: inherit; color: inherit;
       user-select: none; -webkit-user-select: none;
     }
     .msg-reaction-pill.mine {
-      background: #ffecf4;
-      border-color: rgba(232, 121, 169, 0.55);
+      background: rgba(255, 255, 255, 0.98);
+      border-color: rgba(232, 121, 169, 0.35);
+    }
+    .msg-foot.has-reactions {
+      display: flex; flex-wrap: wrap; align-items: flex-end;
+      justify-content: flex-end; gap: 6px 8px;
+      margin-top: 6px; min-height: 24px;
+    }
+    .msg-foot.has-reactions .msg-reactions {
+      margin-right: auto; align-self: flex-end;
+    }
+    .msg-foot.has-reactions .msg-meta {
+      display: flex; align-items: center; gap: 4px;
+      flex-shrink: 0; margin-left: auto;
+    }
+    .bubble.has-reactions { padding-bottom: 8px; }
+    .bubble.has-video.has-reactions {
+      padding: 0 10px 8px;
+      background: rgba(249, 197, 223, 0.95) !important;
+      border-radius: 28px 28px 12px 28px;
+      width: fit-content; max-width: min(220px, 88%);
+    }
+    .bubble.theirs.has-video.has-reactions {
+      background: rgba(255, 255, 255, 0.92) !important;
+      border: 1px solid rgba(252, 231, 243, 0.95) !important;
+      border-radius: 28px 28px 28px 12px;
+    }
+    .bubble.has-image.has-reactions:not(.has-caption) {
+      padding: 0 8px 8px;
+      background: rgba(249, 197, 223, 0.95) !important;
+      border-radius: 28px 28px 12px 28px;
+    }
+    .bubble.theirs.has-image.has-reactions:not(.has-caption) {
+      background: rgba(255, 255, 255, 0.92) !important;
+      border: 1px solid rgba(252, 231, 243, 0.95) !important;
+      border-radius: 28px 28px 28px 12px;
     }
     .msg-menu {
       position: fixed; z-index: 500;
@@ -466,12 +543,16 @@
     .vid-ring-fill {
       fill: none; stroke: #e879a9; stroke-width: 4; stroke-linecap: round;
       transform: rotate(-90deg); transform-origin: 100px 100px;
-      transition: stroke-dashoffset 0.08s linear;
+      transition: none;
       opacity: 0;
     }
     .video-note.playing .vid-ring-fill,
-    .video-note.seeking .vid-ring-fill { opacity: 1; }
+    .video-note.seeking .vid-ring-fill,
+    .video-note.viewed .vid-ring-fill { opacity: 1; }
     .video-note.seeking .vid-ring-fill { transition: none; }
+    .video-note:not(.playing):not(.seeking) .vid-ring-fill {
+      transition: stroke-dashoffset 0.12s ease-out;
+    }
     .video-note .vid-badge {
       position: absolute; inset: 0; display: flex;
       align-items: center; justify-content: center;
@@ -559,6 +640,7 @@
         </div>
       </header>
       <div id="messages"></div>
+      <button type="button" id="unreadJumpBtn" class="hidden">новые ↓</button>
       <div id="composer">
         <div id="editBanner" class="hidden">
           <span>✎ редактирование</span>
@@ -566,7 +648,7 @@
         </div>
         <input id="fileInput" type="file" class="hidden" />
         <button id="mediaBtn" type="button" class="icon secondary" title="Файл" aria-label="Файл"></button>
-        <input id="msgInput" type="text" placeholder="Сообщение…" />
+        <textarea id="msgInput" rows="1" placeholder="Сообщение…"></textarea>
         <button id="sendBtn" class="icon">♡</button>
       </div>
     </div>
@@ -631,6 +713,13 @@
     let videoRecTimer = null;
     let videoRecStarted = 0;
     let activeVideoEl = null;
+    let videoRaf = null;
+    let videoRafWrap = null;
+    let videoRafVid = null;
+    let lastChatActivityAt = Date.now();
+    let readPendingTimer = null;
+    const notifySeen = new Set();
+    const CHAT_IDLE_MS = 10000;
     let voiceDiscard = false;
     let voiceStarting = false;
     let voiceRecInterval = null;
@@ -801,7 +890,28 @@
     }
 
     function escapeHtml(s) {
-      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function truncatePreview(text, maxLen = 72) {
+      if (!text) return '';
+      const clean = String(text).replace(/\s+/g, ' ').trim();
+      if (clean.length <= maxLen) return clean;
+      return clean.slice(0, maxLen - 1) + '…';
+    }
+
+    function resizeMsgInput() {
+      const el = $('msgInput');
+      if (!el) return;
+      el.style.height = 'auto';
+      const max = 132;
+      const next = Math.min(el.scrollHeight, max);
+      el.style.height = next + 'px';
+      el.style.overflowY = el.scrollHeight > max ? 'auto' : 'hidden';
     }
 
     function linkify(text) {
@@ -912,7 +1022,7 @@
       return parts.join('');
     }
 
-    function renderTicks(m, mine) {
+    function renderMsgMeta(m, mine) {
       const edited = m.editedAt
         ? `<span class="edited-mark" title="изменено">изм.</span>`
         : '';
@@ -921,12 +1031,23 @@
         : '';
       if (!mine || !m.status) {
         if (!when && !edited) return '';
-        return `<div class="msg-foot">${when}${edited}</div>`;
+        return `${when}${edited}`;
       }
       const read = m.status === 'read';
       const cls = read ? 'ticks read' : 'ticks sent';
       const title = read ? 'прочитано' : 'отправлено';
-      return `<div class="msg-foot">${when}${edited}<span class="${cls}" title="${title}">${read ? '✓✓' : '✓'}</span></div>`;
+      return `${when}${edited}<span class="${cls}" title="${title}">${read ? '✓✓' : '✓'}</span>`;
+    }
+
+    function renderBubbleFoot(m, mine) {
+      const reactionsHtml = renderReactionsHtml(m);
+      const meta = renderMsgMeta(m, mine);
+      if (!reactionsHtml && !meta) return '';
+      if (reactionsHtml) {
+        const metaHtml = meta ? `<div class="msg-meta">${meta}</div>` : '';
+        return `<div class="msg-foot has-reactions"><div class="msg-reactions">${reactionsHtml}</div>${metaHtml}</div>`;
+      }
+      return `<div class="msg-foot">${meta}</div>`;
     }
 
     function canEditMessage(m) {
@@ -961,6 +1082,7 @@
       $('composer').classList.add('editing');
       $('editBanner').classList.remove('hidden');
       $('msgInput').focus();
+      resizeMsgInput();
       $('msgInput').setSelectionRange($('msgInput').value.length, $('msgInput').value.length);
     }
 
@@ -1094,6 +1216,7 @@
 
     async function toggleReaction(messageId, reaction) {
       if (!activeChat) return;
+      touchChatActivity();
       const prev = getMessage(messageId);
       if (!prev || prev._pending) return;
       const optimistic = applyReactionToggle(prev, reaction);
@@ -1124,11 +1247,16 @@
       const keys = Object.keys(counts);
       if (!keys.length) return '';
       const myReaction = reactions[user?.id];
-      return `<div class="msg-reactions">${keys.map((k) => {
+      return keys.map((k) => {
         const n = counts[k];
         const mine = myReaction === k ? ' mine' : '';
         return `<button type="button" class="msg-reaction-pill${mine}" data-reaction="${k}">${REACTION_EMOJI[k]}${n > 1 ? ' ' + n : ''}</button>`;
-      }).join('')}</div>`;
+      }).join('');
+    }
+
+    function hasReactions(m) {
+      const reactions = m.reactions || {};
+      return Object.keys(reactions).some((uid) => REACTION_EMOJI[reactions[uid]]);
     }
 
     function cancelEdit() {
@@ -1136,6 +1264,7 @@
       $('msgInput').value = '';
       $('composer').classList.remove('editing');
       $('editBanner').classList.add('hidden');
+      resizeMsgInput();
     }
 
     function renderBubbleInner(m) {
@@ -1147,7 +1276,8 @@
           : (m.kind === 'audio' ? ' has-media-audio'
             : (m.kind === 'image' ? (' has-image' + (m.text ? ' has-caption' : '')) : '')));
       const pendingCls = m._pending ? ' pending' : '';
-      return `<div class="bubble ${mine ? 'mine' : 'theirs'}${extraCls}${pendingCls}">${sender}${renderMessageBody(m)}${renderTicks(m, mine)}</div>`;
+      const reactCls = hasReactions(m) ? ' has-reactions' : '';
+      return `<div class="bubble ${mine ? 'mine' : 'theirs'}${extraCls}${reactCls}${pendingCls}">${sender}${renderMessageBody(m)}${renderBubbleFoot(m, mine)}</div>`;
     }
 
     function renderMessageRowHtml(m) {
@@ -1159,7 +1289,6 @@
         `<div class="msg-hit msg-hit-left" aria-hidden="true"></div>` +
         `<div class="msg-stack">` +
         `<div class="msg-row-inner">${renderBubbleInner(m)}</div>` +
-        `${renderReactionsHtml(m)}` +
         `</div>` +
         `<div class="msg-hit msg-hit-right" aria-hidden="true"></div>` +
         `</div></div>`;
@@ -1235,12 +1364,26 @@
       if (chats.length) {
         $('chatList').innerHTML = chats.map((c) => {
           const wait = c.waiting ? ' wait' : '';
-          const sub = c.waiting ? 'ещё не зарегистрировался' : (c.lastMessage?.text || 'Напиши первым ♡');
+          const sub = c.waiting
+            ? 'ещё не зарегистрировался'
+            : truncatePreview(c.lastMessage?.text || 'Напиши первым ♡');
           const av = c.type === 'group' ? '♡' : (chatTitle(c)[0] || '?').toUpperCase();
           const cls = c.type === 'group' ? 'avatar group' : 'avatar';
+          const unread = c.unreadCount || 0;
+          const badge = unread > 0
+            ? `<span class="unread-badge">${unreadBadgeText(unread)}</span>`
+            : '';
           return `<div class="row${wait}" data-id="${c.id}" data-wait="${c.waiting ? '1' : ''}">
-            <div class="${cls}">${av}</div>
-            <div><strong>${escapeHtml(chatTitle(c))}</strong><div class="preview">${escapeHtml(sub)}</div></div>
+            <div class="avatar-wrap">
+              <div class="${cls}">${av}</div>
+              ${badge}
+            </div>
+            <div class="row-body">
+              <div class="row-top">
+                <strong>${escapeHtml(chatTitle(c))}</strong>
+              </div>
+              <div class="preview">${escapeHtml(sub)}</div>
+            </div>
           </div>`;
         }).join('');
         $('chatList').querySelectorAll('.row').forEach((el) => {
@@ -1295,7 +1438,7 @@
       const sig = messagesSig(data.messages);
       if (!opts.forceBottom && sig === lastMessagesSig && box.querySelector('.bubble')) {
         applyReadTicks(data.messages, box);
-        markChatRead();
+        scheduleMarkVisibleRead();
         return;
       }
       lastMessagesSig = sig;
@@ -1314,7 +1457,8 @@
       wireVoicePlayers(box);
       wireVideoNotes(box);
       wireInlineMedia(box);
-      markChatRead();
+      scheduleMarkVisibleRead();
+      updateInChatUnreadBadge();
 
       if (restore) {
         const el = [...box.querySelectorAll('.voice-msg')].find((n) => n.dataset.src === restore.src);
@@ -1385,12 +1529,13 @@
         if (m.senderId !== user.id) continue;
         const bubble = box.querySelector('.msg-row[data-id="' + m.id + '"] .bubble');
         if (!bubble) continue;
-        const html = renderTicks(m, true);
+        const html = renderBubbleFoot(m, true);
         const foot = bubble.querySelector('.msg-foot');
         if (html) {
           if (foot) foot.outerHTML = html;
           else bubble.insertAdjacentHTML('beforeend', html);
         } else if (foot) foot.remove();
+        bubble.classList.toggle('has-reactions', hasReactions(m));
       }
     }
 
@@ -1403,7 +1548,7 @@
           await loadMessages({ forceBottom: userPinnedBottom, messages: data.messages });
         } else {
           applyReadTicks(data.messages);
-          markChatRead();
+          scheduleMarkVisibleRead();
         }
       } catch (_) {}
     }
@@ -1416,6 +1561,255 @@
       } catch (_) {}
     }
 
+    function touchChatActivity() {
+      lastChatActivityAt = Date.now();
+    }
+
+    function isChatIdle() {
+      return Date.now() - lastChatActivityAt >= CHAT_IDLE_MS;
+    }
+
+    function isMsgRowVisible(row) {
+      const box = $('messages');
+      if (!box || !row) return false;
+      const br = box.getBoundingClientRect();
+      const rr = row.getBoundingClientRect();
+      const top = Math.max(br.top, rr.top);
+      const bottom = Math.min(br.bottom, rr.bottom);
+      const visible = bottom - top;
+      return visible >= Math.min(28, rr.height * 0.35);
+    }
+
+    function getVisibleUnreadMessageIds() {
+      if (!activeChat || !user) return [];
+      const ids = [];
+      $('messages').querySelectorAll('.msg-row').forEach((row) => {
+        const m = getMessage(row.dataset.id);
+        if (!m || m.senderId === user.id || m._pending || !m.unread) return;
+        if (isMsgRowVisible(row)) ids.push(m.id);
+      });
+      return ids;
+    }
+
+    function countActiveChatUnread() {
+      if (!user) return 0;
+      return activeMessages.filter((m) => m.unread && m.senderId !== user.id && !m._pending).length;
+    }
+
+    function setChatUnreadCount(chatId, count) {
+      const c = chats.find((x) => x.id === chatId);
+      if (c) c.unreadCount = Math.max(0, count);
+    }
+
+    function bumpChatUnread(chatId) {
+      const c = chats.find((x) => x.id === chatId);
+      if (c) c.unreadCount = (c.unreadCount || 0) + 1;
+    }
+
+    function unreadBadgeText(n) {
+      if (n > 99) return '99+';
+      return String(n);
+    }
+
+    function updateChatListBadges() {
+      $('chatList').querySelectorAll('.row').forEach((row) => {
+        const c = chats.find((x) => x.id === row.dataset.id);
+        const wrap = row.querySelector('.avatar-wrap');
+        if (!wrap) return;
+        let badge = wrap.querySelector('.unread-badge');
+        const n = c?.unreadCount || 0;
+        if (n > 0) {
+          if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'unread-badge';
+            wrap.appendChild(badge);
+          }
+          badge.textContent = unreadBadgeText(n);
+        } else if (badge) {
+          badge.remove();
+        }
+      });
+    }
+
+    function updateInChatUnreadBadge() {
+      const btn = $('unreadJumpBtn');
+      if (!btn || !activeChat) {
+        btn?.classList.add('hidden');
+        return;
+      }
+      const box = $('messages');
+      let count = 0;
+      let firstId = null;
+      for (const m of activeMessages) {
+        if (!m.unread || m.senderId === user.id || m._pending) continue;
+        const row = box.querySelector('.msg-row[data-id="' + m.id + '"]');
+        if (row && isMsgRowVisible(row)) continue;
+        count++;
+        if (!firstId) firstId = m.id;
+      }
+      if (!count) {
+        btn.classList.add('hidden');
+        return;
+      }
+      const word = count === 1 ? 'новое' : 'новых';
+      btn.textContent = count + ' ' + word + ' ↓';
+      btn.classList.remove('hidden');
+      btn.onclick = () => {
+        touchChatActivity();
+        if (firstId) {
+          const row = box.querySelector('.msg-row[data-id="' + firstId + '"]');
+          if (row) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          else scrollToBottom(box);
+        } else {
+          scrollToBottom(box);
+        }
+      };
+    }
+
+    function scheduleMarkVisibleRead() {
+      clearTimeout(readPendingTimer);
+      readPendingTimer = setTimeout(() => {
+        readPendingTimer = null;
+        markVisibleMessagesRead();
+      }, 180);
+    }
+
+    async function markVisibleMessagesRead() {
+      if (!activeChat || document.hidden || isChatIdle()) return;
+      const ids = getVisibleUnreadMessageIds();
+      if (!ids.length) {
+        updateInChatUnreadBadge();
+        return;
+      }
+      try {
+        const data = await api('/chats/' + activeChat.id + '/read', {
+          method: 'POST',
+          body: JSON.stringify({ messageIds: ids }),
+        });
+        for (const id of data.messageIds || ids) {
+          const m = getMessage(id);
+          if (m) {
+            m.unread = false;
+            upsertActiveMessage(m);
+          }
+        }
+        if (typeof data.unreadCount === 'number') {
+          setChatUnreadCount(activeChat.id, data.unreadCount);
+        } else {
+          setChatUnreadCount(activeChat.id, countActiveChatUnread());
+        }
+        updateChatListBadges();
+        updateInChatUnreadBadge();
+      } catch (_) {}
+    }
+
+    function notifyBody(m) {
+      if (m.text) return String(m.text).slice(0, 140);
+      const kind = m.kind || 'text';
+      if (kind === 'image') return '📷 фото';
+      if (kind === 'voice') return '🎤 голосовое';
+      if (kind === 'video_note') return '⭕ кружок';
+      if (kind === 'video') return '🎬 видео';
+      if (kind === 'audio') return '🎵 аудио';
+      if (kind === 'file') return '📎 ' + (m.file?.name || 'файл');
+      return 'новое сообщение';
+    }
+
+    function shouldNotifyForMessage(message) {
+      if (!message || message.senderId === user?.id) return false;
+      if (document.hidden) return true;
+      if (!activeChat || message.chatId !== activeChat.id) return true;
+      if (isChatIdle()) return true;
+      const row = $('messages').querySelector('.msg-row[data-id="' + message.id + '"]');
+      if (!row) return true;
+      return !isMsgRowVisible(row);
+    }
+
+    function showNotification(title, body, chatId) {
+      const payload = { type: 'notify', title, body, chatId };
+      if (window.ReactNativeWebView?.postMessage) {
+        window.ReactNativeWebView.postMessage(JSON.stringify(payload));
+        return;
+      }
+      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+      try {
+        const n = new Notification(title, { body, tag: 'glink-' + chatId, renotify: true });
+        n.onclick = () => {
+          window.focus();
+          window.glinkOpenChat?.(chatId);
+          n.close();
+        };
+      } catch (_) {}
+    }
+
+    function maybeNotify(message) {
+      if (!shouldNotifyForMessage(message)) return;
+      if (notifySeen.has(message.id)) return;
+      notifySeen.add(message.id);
+      const title = message.senderName || chatTitle(chats.find((c) => c.id === message.chatId) || {});
+      showNotification(title || 'Glink', notifyBody(message), message.chatId);
+    }
+
+    async function ensureNotifyPermission() {
+      if (window.ReactNativeWebView?.postMessage) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'notify:request' }));
+        return;
+      }
+      if (typeof Notification === 'undefined' || Notification.permission !== 'default') return;
+      try { await Notification.requestPermission(); } catch (_) {}
+    }
+
+    function handleIncomingWsMessage(message) {
+      if (!message?.chatId) return;
+      const inActive = activeChat && message.chatId === activeChat.id;
+      if (message.senderId !== user?.id) {
+        message.unread = true;
+        if (!inActive) bumpChatUnread(message.chatId);
+      }
+      if (inActive) {
+        ingestIncomingMessage(message);
+        maybeNotify(message);
+        if (message.senderId !== user?.id) {
+          setChatUnreadCount(message.chatId, countActiveChatUnread());
+        }
+        scheduleMarkVisibleRead();
+        updateInChatUnreadBadge();
+        updateChatListBadges();
+      } else {
+        maybeNotify(message);
+        refreshChatList();
+      }
+      if (inActive) {
+        const c = chats.find((x) => x.id === message.chatId);
+        if (c) {
+          c.lastMessage = {
+            text: truncatePreview(notifyBody(message)),
+            kind: message.kind || 'text',
+            createdAt: message.createdAt,
+            senderId: message.senderId,
+          };
+          c.updatedAt = message.createdAt || c.updatedAt;
+        }
+        updateChatListBadges();
+      }
+    }
+
+    function bindChatActivity() {
+      const touch = () => touchChatActivity();
+      $('chatView').addEventListener('pointerdown', touch, { passive: true });
+      $('msgInput').addEventListener('input', touch);
+      $('msgInput').addEventListener('focus', touch);
+      $('sendBtn').addEventListener('click', touch);
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) scheduleMarkVisibleRead();
+      });
+    }
+
+    window.glinkOpenChat = async (chatId) => {
+      const chat = chats.find((c) => c.id === chatId);
+      if (chat && !chat.waiting) await openChat(chat);
+    };
+
     function wsJoinAllChats() {
       if (!ws || ws.readyState !== 1) return;
       for (const c of chats) {
@@ -1426,10 +1820,7 @@
     }
 
     async function markChatRead() {
-      if (!activeChat) return;
-      try {
-        await api('/chats/' + activeChat.id + '/read', { method: 'POST', body: '{}' });
-      } catch (_) {}
+      scheduleMarkVisibleRead();
     }
 
     function fmtTime(s) {
@@ -1701,6 +2092,26 @@
       });
     }
 
+    function stopVideoRaf() {
+      if (videoRaf) cancelAnimationFrame(videoRaf);
+      videoRaf = null;
+      videoRafWrap = null;
+      videoRafVid = null;
+    }
+
+    function trackVideoProgress(wrap, vid) {
+      stopVideoRaf();
+      videoRafWrap = wrap;
+      videoRafVid = vid;
+      const tick = () => {
+        if (videoRafVid !== vid || videoRafWrap !== wrap) return;
+        if (vid.paused || vid.ended) return;
+        updateVideoRing(wrap, vid);
+        videoRaf = requestAnimationFrame(tick);
+      };
+      videoRaf = requestAnimationFrame(tick);
+    }
+
     function initVideoRing(wrap) {
       const ring = wrap.querySelector('.vid-ring-fill');
       if (!ring || ring.dataset.ready) return;
@@ -1716,6 +2127,7 @@
       if (!dur || !Number.isFinite(dur) || dur <= 0) return;
       const pct = Math.min(1, Math.max(0, vid.currentTime / dur));
       ring.style.strokeDashoffset = String(VID_RING_LEN * (1 - pct));
+      wrap.classList.toggle('viewed', pct > 0.005);
     }
 
     function isOnVideoRing(wrap, x, y) {
@@ -1741,10 +2153,11 @@
     }
 
     function hookVideoProgress(wrap, vid) {
-      vid.ontimeupdate = () => {
-        if (activeVideoEl === vid) updateVideoRing(wrap, vid);
-      };
       vid.onloadedmetadata = () => updateVideoRing(wrap, vid);
+      vid.onpause = () => {
+        stopVideoRaf();
+        updateVideoRing(wrap, vid);
+      };
     }
 
     function wireInlineMedia(container) {
@@ -1761,6 +2174,7 @@
           if (activeVideoEl && activeVideoEl !== el) {
             activeVideoEl.pause();
             activeVideoEl.closest('.video-note')?.classList.remove('playing');
+            stopVideoRaf();
           }
           container.querySelectorAll('.media-video video, .media-audio audio').forEach((other) => {
             if (other !== el && !other.paused) other.pause();
@@ -1810,6 +2224,7 @@
 
         vid.onended = () => {
           wrap.classList.remove('playing');
+          stopVideoRaf();
           if (activeVideoEl === vid) activeVideoEl = null;
           updateVideoRing(wrap, vid);
         };
@@ -1820,6 +2235,7 @@
       if (activeVideoEl && activeVideoEl !== vid) {
         activeVideoEl.pause();
         activeVideoEl.closest('.video-note')?.classList.remove('playing');
+        stopVideoRaf();
       }
       if (voiceAudio && !voiceAudio.paused) {
         voiceAudio.pause();
@@ -1831,10 +2247,12 @@
         vid.play().then(() => {
           wrap.classList.add('playing');
           activeVideoEl = vid;
+          trackVideoProgress(wrap, vid);
         }).catch(() => showAppErr('не удалось воспроизвести видео'));
       } else {
         wrap.classList.add('playing');
         activeVideoEl = vid;
+        trackVideoProgress(wrap, vid);
       }
     }
 
@@ -1842,11 +2260,14 @@
       if (activeVideoEl && activeVideoEl !== vid) {
         activeVideoEl.pause();
         activeVideoEl.closest('.video-note')?.classList.remove('playing');
+        stopVideoRaf();
       }
       if (!vid.paused) {
         vid.pause();
         wrap.classList.remove('playing');
+        stopVideoRaf();
         if (activeVideoEl === vid) activeVideoEl = null;
+        updateVideoRing(wrap, vid);
         return;
       }
       playVideoNote(wrap, vid, src);
@@ -2004,20 +2425,32 @@
       ws.onmessage = (ev) => {
         try {
           const msg = JSON.parse(ev.data);
-          if (msg.type === 'message' && activeChat && msg.message?.chatId === activeChat.id) {
-            ingestIncomingMessage(msg.message);
+          if (msg.type === 'message' && msg.message) {
+            handleIncomingWsMessage(msg.message);
+          }
+          if (msg.type === 'message_edit' && msg.message) {
+            if (activeChat && msg.message.chatId === activeChat.id) {
+              replaceMessage(msg.message.id, msg.message);
+            }
             refreshChatList();
           }
-          if (msg.type === 'message_edit' && activeChat && msg.message?.chatId === activeChat.id) {
-            replaceMessage(msg.message.id, msg.message);
-            refreshChatList();
-          }
-          if (msg.type === 'message_reaction' && activeChat && msg.message?.chatId === activeChat.id) {
-            replaceMessage(msg.message.id, msg.message);
+          if (msg.type === 'message_reaction' && msg.message) {
+            if (activeChat && msg.message.chatId === activeChat.id) {
+              replaceMessage(msg.message.id, msg.message);
+            }
           }
           if (msg.type === 'read' && msg.chatId) {
             if (activeChat && msg.chatId === activeChat.id && msg.readerId !== user.id) {
               refreshReadTicks();
+            }
+            if (msg.readerId === user?.id) {
+              if (typeof msg.unreadCount === 'number') {
+                setChatUnreadCount(msg.chatId, msg.unreadCount);
+              } else if (msg.chatId === activeChat?.id) {
+                setChatUnreadCount(msg.chatId, countActiveChatUnread());
+              }
+              updateChatListBadges();
+              updateInChatUnreadBadge();
             }
           }
         } catch (_) {}
@@ -2026,6 +2459,7 @@
 
     async function openChat(chat, opts = {}) {
       activeChat = chat;
+      touchChatActivity();
       localStorage.setItem('glink_active_chat', chat.id);
       lastMsgCount = 0;
       lastMessagesSig = '';
@@ -2042,6 +2476,9 @@
         );
       }
       await loadMessages({ forceBottom: true });
+      setChatUnreadCount(chat.id, countActiveChatUnread());
+      updateChatListBadges();
+      updateInChatUnreadBadge();
       if (ws?.readyState === 1) wsJoinAllChats();
       clearInterval(pollTimer);
       pollTimer = setInterval(() => {
@@ -2063,8 +2500,10 @@
       pollTimer = null;
       cancelVoiceRecording();
       cancelVideoRecording();
+      $('unreadJumpBtn')?.classList.add('hidden');
       $('chatList').classList.remove('hidden');
       $('chatView').classList.add('hidden');
+      refreshChatList();
     }
 
     function userGoBack() {
@@ -2137,6 +2576,8 @@
     async function enterApp() {
       showApp();
       connectWs();
+      ensureNotifyPermission();
+      bindChatActivity();
       try {
         await loadChats();
         await restoreActiveChat();
@@ -2176,6 +2617,7 @@
       } catch (e) {
         startEditMessage(m);
         $('msgInput').value = text;
+        resizeMsgInput();
         showAppErr(e.message || 'не удалось сохранить');
       }
     }
@@ -2187,7 +2629,9 @@
       }
       const text = $('msgInput').value.trim();
       if (!text || !activeChat) return;
+      touchChatActivity();
       $('msgInput').value = '';
+      resizeMsgInput();
       userPinnedBottom = true;
       const pendingId = 'pending-' + Date.now();
       appendMessage({
@@ -2211,6 +2655,7 @@
       } catch (e) {
         removeMessage(pendingId);
         $('msgInput').value = text;
+        resizeMsgInput();
         showAppErr(e.message || 'не удалось отправить');
       }
     }
@@ -2463,9 +2908,17 @@
         }
         return;
       }
-      if (e.key === 'Enter') sendText();
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendText();
+        return;
+      }
       if (e.key === 'Escape' && editingMessageId) cancelEdit();
     };
+    $('msgInput').addEventListener('input', () => {
+      showAppErr('');
+      resizeMsgInput();
+    });
     $('fileInput').onchange = onFilePicked;
     document.addEventListener('paste', onPasteImage);
 
@@ -2555,7 +3008,10 @@
 
     $('messages').addEventListener('scroll', () => {
       if (suppressScrollTrack || !activeChat) return;
+      touchChatActivity();
       userPinnedBottom = isAtBottom($('messages'));
+      scheduleMarkVisibleRead();
+      updateInChatUnreadBadge();
     }, { passive: true });
 
     $('messages').addEventListener('selectstart', (e) => {
@@ -2668,7 +3124,6 @@
       if (e.target.closest('#appErrDismiss') || e.target === $('appErr')) showAppErr('');
     };
     $('appErrDismiss').onclick = (e) => { e.stopPropagation(); showAppErr(''); };
-    $('msgInput').addEventListener('input', () => showAppErr(''));
     document.addEventListener('pointerdown', (e) => {
       if (!$('msgMenu').classList.contains('hidden') && !e.target.closest('#msgMenu')) {
         closeMsgMenu();

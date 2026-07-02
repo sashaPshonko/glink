@@ -278,6 +278,41 @@ export function findChatById(chatId) {
     return db.chats.find((c) => c.id === chatId) || null;
 }
 
+export function isMessageUnread(message, userId) {
+    if (!message || message.senderId === userId) return false;
+    const readBy = Array.isArray(message.readBy) ? message.readBy : [];
+    return !readBy.includes(userId);
+}
+
+export function countUnreadMessages(chatId, userId) {
+    let count = 0;
+    for (const msg of db.messages) {
+        if (msg.chatId !== chatId) continue;
+        if (isMessageUnread(msg, userId)) count++;
+    }
+    return count;
+}
+
+/** @returns {string[]} ids of messages newly marked read */
+export function markMessagesReadByIds(chatId, readerId, messageIds) {
+    const chat = findChatById(chatId);
+    if (!chat?.memberIds.includes(readerId)) return [];
+
+    const wanted = new Set(messageIds);
+    const updated = [];
+    for (const msg of db.messages) {
+        if (msg.chatId !== chatId || !wanted.has(msg.id)) continue;
+        if (msg.senderId === readerId) continue;
+        if (!Array.isArray(msg.readBy)) msg.readBy = [];
+        if (!msg.readBy.includes(readerId)) {
+            msg.readBy.push(readerId);
+            updated.push(msg.id);
+        }
+    }
+    if (updated.length) persist();
+    return updated;
+}
+
 /** @returns {string[]} ids of messages newly marked read */
 export function markMessagesRead(chatId, readerId) {
     const chat = findChatById(chatId);

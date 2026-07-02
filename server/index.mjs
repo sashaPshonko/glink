@@ -18,7 +18,10 @@ import {
     getOrCreateDm,
     getOrCreateMainGroup,
     listMessages,
+    countUnreadMessages,
+    isMessageUnread,
     markMessagesRead,
+    markMessagesReadByIds,
     messagePreview,
     readStatusFor,
     toggleMessageReaction,
@@ -107,6 +110,7 @@ function enrichMessage(msg, viewerId = null) {
     }
     if (viewerId && chat) {
         base.status = readStatusFor(msg, chat, viewerId);
+        base.unread = isMessageUnread(msg, viewerId);
     }
     return base;
 }
@@ -147,6 +151,7 @@ function buildChatList(userId) {
                     }
                     : null,
                 updatedAt: last?.createdAt || chat.updatedAt,
+                unreadCount: countUnreadMessages(chat.id, userId),
             });
         } else {
             chats.push({
@@ -185,6 +190,7 @@ function buildChatList(userId) {
                 }
                 : null,
             updatedAt: last?.createdAt || group.updatedAt,
+            unreadCount: countUnreadMessages(group.id, userId),
         });
     }
 
@@ -360,16 +366,21 @@ app.post('/chats/:chatId/read', authMiddleware, (req, res) => {
         res.status(403).json({ error: 'forbidden' });
         return;
     }
-    const messageIds = markMessagesRead(chatId, req.userId);
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const requestedIds = Array.isArray(body.messageIds) ? body.messageIds.map(String) : null;
+    const messageIds = requestedIds?.length
+        ? markMessagesReadByIds(chatId, req.userId, requestedIds)
+        : markMessagesRead(chatId, req.userId);
     if (messageIds.length) {
         broadcast(chatId, {
             type: 'read',
             chatId,
             readerId: req.userId,
             messageIds,
+            unreadCount: countUnreadMessages(chatId, req.userId),
         });
     }
-    res.json({ ok: true, messageIds });
+    res.json({ ok: true, messageIds, unreadCount: countUnreadMessages(chatId, req.userId) });
 });
 
 function maybeUpload(req, res, next) {

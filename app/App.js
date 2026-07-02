@@ -10,9 +10,18 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import Constants from 'expo-constants';
+import * as Notifications from 'expo-notifications';
 import { theme } from './lib/theme';
 
 const SERVER_URL = Constants.expoConfig?.extra?.serverUrl || 'https://31.128.38.147:3920';
+
+Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+    }),
+});
 
 const BACK_JS = `
 (function () {
@@ -35,6 +44,43 @@ export default function App() {
         return () => sub.remove();
     }, []);
 
+    useEffect(() => {
+        Notifications.requestPermissionsAsync().catch(() => {});
+        const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+            const chatId = response.notification.request.content.data?.chatId;
+            if (!chatId) return;
+            webRef.current?.injectJavaScript(
+                `window.glinkOpenChat && window.glinkOpenChat(${JSON.stringify(chatId)}); true;`,
+            );
+        });
+        return () => sub.remove();
+    }, []);
+
+    const onWebMessage = async (event) => {
+        const raw = event.nativeEvent.data;
+        if (raw === 'glink:back:exit') {
+            BackHandler.exitApp();
+            return;
+        }
+        try {
+            const msg = JSON.parse(raw);
+            if (msg.type === 'notify:request') {
+                await Notifications.requestPermissionsAsync();
+                return;
+            }
+            if (msg.type === 'notify') {
+                await Notifications.scheduleNotificationAsync({
+                    content: {
+                        title: msg.title || 'Glink',
+                        body: msg.body || '',
+                        data: { chatId: msg.chatId || '' },
+                    },
+                    trigger: null,
+                });
+            }
+        } catch (_) {}
+    };
+
     return (
         <SafeAreaView style={styles.root}>
             <StatusBar barStyle="dark-content" backgroundColor={theme.bg} />
@@ -50,11 +96,7 @@ export default function App() {
                 onLoadEnd={() => setLoading(false)}
                 onLoadStart={() => setLoading(true)}
                 onError={() => setLoading(false)}
-                onMessage={(event) => {
-                    if (event.nativeEvent.data === 'glink:back:exit') {
-                        BackHandler.exitApp();
-                    }
-                }}
+                onMessage={onWebMessage}
                 javaScriptEnabled
                 domStorageEnabled
                 sharedCookiesEnabled

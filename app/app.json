@@ -36,7 +36,8 @@
         "CAMERA",
         "READ_MEDIA_IMAGES",
         "READ_MEDIA_VIDEO",
-        "READ_EXTERNAL_STORAGE"
+        "READ_EXTERNAL_STORAGE",
+        "POST_NOTIFICATIONS"
       ]
     },
     "extra": {
@@ -48,6 +49,7 @@
     "plugins": [
       "expo-asset",
       "expo-font",
+      "expo-notifications",
       "./plugins/withGlinkAndroidNetwork.js"
     ]
   }
