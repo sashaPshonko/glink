@@ -218,7 +218,12 @@
     #voiceHint {
       position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
       background: #e11d48; color: #fff; padding: 10px 16px; border-radius: 20px;
-      font-size: 0.9rem; z-index: 10;
+      font-size: 0.9rem; z-index: 10; display: flex; align-items: center; gap: 12px;
+    }
+    #voiceHint.hidden { display: none !important; }
+    #voiceCancelBtn {
+      background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.5);
+      color: #fff; border-radius: 10px; padding: 6px 10px; font-size: 0.85rem; cursor: pointer;
     }
     .video-note {
       width: 200px; height: 200px; border-radius: 50%;
@@ -241,13 +246,22 @@
       background: rgba(92, 51, 71, 0.94);
       display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
     }
+    #videoRecOverlay.hidden { display: none !important; }
     #videoRecPreview {
       width: min(72vw, 280px); height: min(72vw, 280px);
       border-radius: 50%; object-fit: cover;
       border: 4px solid #fff; background: #000;
+      transform: scaleX(-1);
     }
-    #videoRecHint { color: #fff; font-size: 0.95rem; }
     #videoRecTimer { color: #fbcfe8; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+    #videoRecStatus { color: #fbcfe8; font-size: 0.9rem; min-height: 1.2em; }
+    .video-rec-actions { display: flex; gap: 28px; margin-top: 8px; }
+    .video-rec-actions button {
+      width: 56px; height: 56px; border-radius: 50%; border: none;
+      font-size: 1.4rem; cursor: pointer; color: #fff;
+    }
+    #videoCancelBtn { background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.5); }
+    #videoSendBtn { background: #e879a9; border: 2px solid #fff; }
   </style>
 </head>
 <body>
@@ -289,11 +303,18 @@
       </div>
     </div>
   </div>
-  <div id="voiceHint" class="hidden">🎤 говорите… отпусти или нажми ещё раз</div>
+  <div id="voiceHint" class="hidden">
+    <span>🎤 говорите… отпусти</span>
+    <button id="voiceCancelBtn" type="button">✕ отмена</button>
+  </div>
   <div id="videoRecOverlay" class="hidden">
-    <video id="videoRecPreview" autoplay muted playsinline></video>
+    <video id="videoRecPreview" autoplay muted playsinline webkit-playsinline></video>
     <div id="videoRecTimer">0:00</div>
-    <div id="videoRecHint">⭕ снимаешь… отпусти</div>
+    <div id="videoRecStatus">включаю камеру…</div>
+    <div class="video-rec-actions">
+      <button id="videoCancelBtn" type="button" title="Отмена">✕</button>
+      <button id="videoSendBtn" type="button" title="Отправить">✓</button>
+    </div>
   </div>
 
   <script>
@@ -325,6 +346,12 @@
     let videoRecTimer = null;
     let videoRecStarted = 0;
     let activeVideoEl = null;
+    let voiceDiscard = false;
+    let voiceStarting = false;
+    let voicePendingStop = false;
+    let videoDiscard = false;
+    let videoStarting = false;
+    let lastMsgCount = 0;
     let selectedUsername = localStorage.getItem('glink_last_user') || '';
     let accounts = [];
 
@@ -543,8 +570,14 @@
       }
     }
 
-    async function loadMessages() {
+    async function loadMessages(opts = {}) {
       if (!activeChat) return;
+
+      const box = $('messages');
+      const prevScroll = box.scrollTop;
+      const prevHeight = box.scrollHeight;
+      const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 120;
+      const stick = opts.forceBottom || nearBottom || lastMsgCount === 0;
 
       let restore = null;
       if (voiceAudio) {
@@ -562,14 +595,18 @@
       }
 
       const data = await api('/chats/' + activeChat.id + '/messages');
-      const box = $('messages');
+      lastMsgCount = data.messages?.length || 0;
       box.innerHTML = data.messages.map((m) => {
         const mine = m.senderId === user.id;
         const sender = activeChat.type === 'group' && !mine
           ? `<div class="sender">${escapeHtml(m.senderName || '?')}</div>` : '';
         return `<div class="bubble ${mine ? 'mine' : 'theirs'}${m.kind === 'video' ? ' has-video' : ''}" data-id="${m.id}">${sender}${renderMessageBody(m)}${renderTicks(m, mine)}</div>`;
       }).join('');
-      box.scrollTop = box.scrollHeight;
+      if (stick) {
+        box.scrollTop = box.scrollHeight;
+      } else {
+        box.scrollTop = Math.max(0, prevScroll + (box.scrollHeight - prevHeight));
+      }
       wireVoicePlayers(box);
       wireVideoNotes(box);
       markChatRead();
@@ -584,6 +621,22 @@
             if (btn) toggleVoice(restore.src, btn, el);
           }
         }
+      }
+    }
+
+    function patchReadTicks(messageIds) {
+      if (!messageIds?.length) return;
+      const box = $('messages');
+      for (const id of messageIds) {
+        const bubble = box.querySelector(`.bubble[data-id="${CSS.escape(id)}"]`);
+        if (!bubble?.classList.contains('mine')) continue;
+        let foot = bubble.querySelector('.msg-foot');
+        if (!foot) {
+          foot = document.createElement('div');
+          foot.className = 'msg-foot';
+          bubble.appendChild(foot);
+        }
+        foot.innerHTML = '<span class="ticks read" title="прочитано">✓✓</span>';
       }
     }
 
@@ -879,12 +932,11 @@
     }
 
     function videoMimeType() {
-      const types = [
-        'video/webm;codecs=vp9,opus',
-        'video/webm;codecs=vp8,opus',
-        'video/webm',
-        'video/mp4',
-      ];
+      const apple = /iPad|iPhone|iPod/.test(navigator.userAgent)
+        || (navigator.userAgent.includes('Mac') && 'ontouchend' in document);
+      const types = apple
+        ? ['video/mp4', 'video/webm;codecs=vp8,opus', 'video/webm']
+        : ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'];
       return types.find((t) => MediaRecorder.isTypeSupported(t)) || '';
     }
 
@@ -893,21 +945,39 @@
       return '.webm';
     }
 
-    function stopVideoRecTimer() {
-      clearInterval(videoRecTimer);
-      videoRecTimer = null;
+    function cleanupVideoStream() {
+      videoStream?.getTracks().forEach((t) => t.stop());
+      videoStream = null;
+      const preview = $('videoRecPreview');
+      preview.srcObject = null;
     }
 
     function hideVideoOverlay() {
       $('videoRecOverlay').classList.add('hidden');
-      const preview = $('videoRecPreview');
-      preview.srcObject = null;
+      cleanupVideoStream();
       stopVideoRecTimer();
       $('videoRecTimer').textContent = '0:00';
+      $('videoRecStatus').textContent = '';
+      $('videoBtn').classList.remove('recording');
     }
 
-    async function startVideo() {
-      if (!activeChat || videoRecorder || mediaRecorder) return;
+    function finishVideoRecording() {
+      if (videoRecorder?.state === 'recording') {
+        try { videoRecorder.requestData(); } catch { /* ignore */ }
+        videoRecorder.stop();
+      } else {
+        hideVideoOverlay();
+        videoRecorder = null;
+        videoStarting = false;
+      }
+    }
+
+    async function openVideoRecorder() {
+      if (!activeChat || videoRecorder || videoStarting || mediaRecorder) return;
+      if (!window.MediaRecorder) {
+        showAppErr('запись видео не поддерживается — обнови браузер');
+        return;
+      }
       if (!navigator.mediaDevices?.getUserMedia) {
         showAppErr('камера недоступна — нужен HTTPS');
         return;
@@ -916,30 +986,54 @@
         showAppErr('видео работает только по HTTPS');
         return;
       }
+
+      videoStarting = true;
+      videoDiscard = false;
+      videoChunks = [];
+      $('videoRecOverlay').classList.remove('hidden');
+      $('videoRecStatus').textContent = 'включаю камеру…';
+      $('videoRecTimer').textContent = '0:00';
+      $('videoBtn').classList.add('recording');
+
       try {
         videoStream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 640 } },
           audio: true,
         });
+        if (videoDiscard) {
+          hideVideoOverlay();
+          videoStarting = false;
+          return;
+        }
+
         const preview = $('videoRecPreview');
         preview.srcObject = videoStream;
-        $('videoRecOverlay').classList.remove('hidden');
-        videoChunks = [];
+        await preview.play().catch(() => {});
+
         const mime = videoMimeType();
-        videoRecorder = mime
-          ? new MediaRecorder(videoStream, { mimeType: mime })
-          : new MediaRecorder(videoStream);
+        if (!mime) {
+          hideVideoOverlay();
+          videoStarting = false;
+          showAppErr('браузер не умеет записывать видео — попробуй Safari/Chrome');
+          return;
+        }
+
+        videoRecorder = new MediaRecorder(videoStream, { mimeType: mime });
         videoRecorder.ondataavailable = (e) => { if (e.data.size) videoChunks.push(e.data); };
         videoRecorder.onstop = async () => {
-          hideVideoOverlay();
-          videoStream?.getTracks().forEach((t) => t.stop());
-          videoStream = null;
+          const discard = videoDiscard;
+          videoDiscard = false;
           const rec = videoRecorder;
           videoRecorder = null;
-          $('videoBtn').classList.remove('recording');
-          if (!videoChunks.length) return;
+          videoStarting = false;
+          hideVideoOverlay();
+          if (discard || !videoChunks.length) {
+            videoChunks = [];
+            return;
+          }
           const type = rec.mimeType || videoChunks[0]?.type || 'video/webm';
           const blob = new Blob(videoChunks, { type });
+          videoChunks = [];
           if (blob.size < 2000) {
             showAppErr('слишком короткое видео');
             return;
@@ -951,28 +1045,33 @@
             showAppErr(e.message || 'не удалось отправить видео');
           }
         };
+
         videoRecorder.start(250);
+        videoStarting = false;
         videoRecStarted = Date.now();
+        $('videoRecStatus').textContent = '⭕ идёт запись';
         videoRecTimer = setInterval(() => {
           const sec = Math.floor((Date.now() - videoRecStarted) / 1000);
           $('videoRecTimer').textContent = fmtTime(sec);
-          if (sec >= 60) stopVideo();
+          if (sec >= 60) finishVideoRecording();
         }, 200);
-        $('videoBtn').classList.add('recording');
       } catch (e) {
         hideVideoOverlay();
-        videoStream?.getTracks().forEach((t) => t.stop());
-        videoStream = null;
+        videoStarting = false;
+        videoRecorder = null;
         const n = e?.name || '';
         if (n === 'NotAllowedError') showAppErr('нет доступа к камере');
         else showAppErr('не удалось включить камеру');
       }
     }
 
-    function stopVideo() {
-      if (videoRecorder?.state === 'recording') {
-        try { videoRecorder.requestData(); } catch { /* ignore */ }
-        videoRecorder.stop();
+    function cancelVideoRecording() {
+      videoDiscard = true;
+      finishVideoRecording();
+      if (videoStarting) {
+        hideVideoOverlay();
+        videoStarting = false;
+        videoChunks = [];
       }
     }
 
@@ -987,11 +1086,13 @@
         try {
           const msg = JSON.parse(ev.data);
           if (msg.type === 'message' && activeChat && msg.message?.chatId === activeChat.id) {
-            loadMessages();
+            const box = $('messages');
+            const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 120;
+            loadMessages({ forceBottom: nearBottom });
             refreshChatList();
           }
           if (msg.type === 'read' && activeChat && msg.chatId === activeChat.id) {
-            loadMessages();
+            if (msg.readerId !== user.id) patchReadTicks(msg.messageIds);
           }
         } catch (_) {}
       };
@@ -999,11 +1100,12 @@
 
     async function openChat(chat) {
       activeChat = chat;
+      lastMsgCount = 0;
       $('chatList').classList.add('hidden');
       $('chatView').classList.remove('hidden');
       $('chatTitle').textContent = chatTitle(chat);
       $('chatSub').textContent = chat.type === 'group' ? 'группа ♡' : 'личный чат';
-      await loadMessages();
+      await loadMessages({ forceBottom: true });
       if (ws?.readyState === 1) ws.send(JSON.stringify({ type: 'join', chatId: chat.id }));
       clearInterval(pollTimer);
       pollTimer = setInterval(() => {
@@ -1047,7 +1149,7 @@
         method: 'POST',
         body: JSON.stringify({ text }),
       });
-      await loadMessages();
+      await loadMessages({ forceBottom: true });
       refreshChatList();
     }
 
@@ -1058,7 +1160,7 @@
       if (kind) fd.append('kind', kind);
       if (caption) fd.append('text', caption);
       await api('/chats/' + activeChat.id + '/messages', { method: 'POST', body: fd });
-      await loadMessages();
+      await loadMessages({ forceBottom: true });
       refreshChatList();
     }
 
@@ -1089,8 +1191,28 @@
       return '.webm';
     }
 
+    function cleanupVoiceStream() {
+      voiceStream?.getTracks().forEach((t) => t.stop());
+      voiceStream = null;
+    }
+
+    function cancelVoiceRecording() {
+      voiceDiscard = true;
+      voicePendingStop = true;
+      $('voiceHint').classList.add('hidden');
+      $('voiceBtn').classList.remove('recording');
+      if (mediaRecorder?.state === 'recording') {
+        stopVoice();
+      } else {
+        cleanupVoiceStream();
+        mediaRecorder = null;
+        voiceStarting = false;
+        voiceChunks = [];
+      }
+    }
+
     async function startVoice() {
-      if (!activeChat || mediaRecorder) return;
+      if (!activeChat || mediaRecorder || voiceStarting || videoRecorder || videoStarting) return;
       if (!navigator.mediaDevices?.getUserMedia) {
         showAppErr('микрофон недоступен — нужен HTTPS или Safari/Chrome');
         return;
@@ -1099,8 +1221,16 @@
         showAppErr('голосовые работают только по HTTPS (или localhost)');
         return;
       }
+      voiceStarting = true;
+      voiceDiscard = false;
+      voicePendingStop = false;
       try {
         voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (voiceDiscard || voicePendingStop) {
+          cleanupVoiceStream();
+          voiceStarting = false;
+          return;
+        }
         voiceChunks = [];
         const mime = voiceMimeType();
         mediaRecorder = mime
@@ -1110,13 +1240,17 @@
         mediaRecorder.onstop = async () => {
           $('voiceBtn').classList.remove('recording');
           $('voiceHint').classList.add('hidden');
-          voiceStream?.getTracks().forEach((t) => t.stop());
-          voiceStream = null;
+          cleanupVoiceStream();
           const rec = mediaRecorder;
           mediaRecorder = null;
-          if (!voiceChunks.length) return;
-          const type = rec.mimeType || voiceChunks[0]?.type || 'audio/webm';
-          const blob = new Blob(voiceChunks, { type });
+          voiceStarting = false;
+          const discard = voiceDiscard;
+          voiceDiscard = false;
+          const chunks = voiceChunks;
+          voiceChunks = [];
+          if (discard || !chunks.length) return;
+          const type = rec.mimeType || chunks[0]?.type || 'audio/webm';
+          const blob = new Blob(chunks, { type });
           if (blob.size < 800) {
             showAppErr('слишком короткое — держи 🎤 дольше');
             return;
@@ -1131,7 +1265,10 @@
         mediaRecorder.start(200);
         $('voiceBtn').classList.add('recording');
         $('voiceHint').classList.remove('hidden');
+        if (voicePendingStop) stopVoice();
       } catch (e) {
+        voiceStarting = false;
+        cleanupVoiceStream();
         if (!window.isSecureContext && location.hostname !== 'localhost') {
           showAppErr('голосовые только по HTTPS — открой https://' + location.host);
           return;
@@ -1148,10 +1285,19 @@
     }
 
     function stopVoice() {
+      if (voiceStarting) {
+        voicePendingStop = true;
+        return;
+      }
       if (mediaRecorder?.state === 'recording') {
         try { mediaRecorder.requestData(); } catch { /* ignore */ }
         mediaRecorder.stop();
       }
+    }
+
+    function stopVideoRecTimer() {
+      clearInterval(videoRecTimer);
+      videoRecTimer = null;
     }
 
     $('logoutBtn').onclick = () => {
@@ -1159,20 +1305,22 @@
       if (ws) ws.close();
       clearInterval(pollTimer);
       stopVoice();
-      stopVideo();
+      cancelVideoRecording();
       showLogin();
     };
     $('backBtn').onclick = () => {
       activeChat = null;
       clearInterval(pollTimer);
       stopVoice();
-      stopVideo();
+      cancelVideoRecording();
       loadChats();
     };
     $('sendBtn').onclick = sendText;
     $('msgInput').onkeydown = (e) => { if (e.key === 'Enter') sendText(); };
     $('attachBtn').onclick = () => $('fileInput').click();
     $('fileInput').onchange = onFilePicked;
+
+    $('voiceCancelBtn').onclick = (e) => { e.stopPropagation(); cancelVoiceRecording(); };
 
     const voiceBtn = $('voiceBtn');
     voiceBtn.addEventListener('mousedown', (e) => { e.preventDefault(); startVoice(); });
@@ -1181,12 +1329,9 @@
     voiceBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startVoice(); }, { passive: false });
     voiceBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopVoice(); }, { passive: false });
 
-    const videoBtn = $('videoBtn');
-    videoBtn.addEventListener('mousedown', (e) => { e.preventDefault(); startVideo(); });
-    videoBtn.addEventListener('mouseup', (e) => { e.preventDefault(); stopVideo(); });
-    videoBtn.addEventListener('mouseleave', stopVideo);
-    videoBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startVideo(); }, { passive: false });
-    videoBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopVideo(); }, { passive: false });
+    $('videoBtn').onclick = (e) => { e.preventDefault(); openVideoRecorder(); };
+    $('videoCancelBtn').onclick = (e) => { e.preventDefault(); cancelVideoRecording(); };
+    $('videoSendBtn').onclick = (e) => { e.preventDefault(); finishVideoRecording(); };
 
     (async () => {
       if (!token) return showLogin();
