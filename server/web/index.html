@@ -699,6 +699,10 @@
     }
     .voice-rec-icon.recording-active {
       animation: recPulse 1.2s ease-in-out infinite;
+      animation-play-state: running;
+    }
+    .voice-rec-icon.recording-active.rec-pulse-paused {
+      animation-play-state: paused;
     }
     @keyframes recPulse { 50% { transform: scale(1.05); opacity: 0.85; } }
     .rec-timer { color: #fbcfe8; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
@@ -824,11 +828,10 @@
     .video-rec-preview-wrap.recording-active::before {
       border-color: #fff;
       animation: recRingPulse 1.2s ease-in-out infinite;
+      animation-play-state: running;
     }
-    .video-rec-preview-wrap.rec-paused::before {
-      animation: none;
-      border-color: rgba(255, 255, 255, 0.42);
-      opacity: 0.75;
+    .video-rec-preview-wrap.recording-active.rec-pulse-paused::before {
+      animation-play-state: paused;
     }
     @keyframes recRingPulse {
       50% { transform: scale(1.035); opacity: 0.72; }
@@ -1478,11 +1481,20 @@
       const gap = 6;
       const stackRect = stack.getBoundingClientRect();
       const menuRect = menu.getBoundingClientRect();
+      const composerRect = $('composer')?.getBoundingClientRect();
+      const bottomLimit = composerRect
+        ? composerRect.top - gap
+        : window.innerHeight - pad;
+
       let left = stackRect.left + (stackRect.width - menuRect.width) / 2;
-      let top = stackRect.top - menuRect.height - gap;
-      if (top < pad) top = stackRect.bottom + gap;
       left = Math.max(pad, Math.min(left, window.innerWidth - menuRect.width - pad));
-      top = Math.max(pad, Math.min(top, window.innerHeight - menuRect.height - pad));
+
+      let top = stackRect.bottom + gap;
+      if (top + menuRect.height > bottomLimit) {
+        top = bottomLimit - menuRect.height;
+      }
+      top = Math.max(pad, Math.min(top, bottomLimit - menuRect.height));
+
       menu.style.left = left + 'px';
       menu.style.top = top + 'px';
     }
@@ -2974,25 +2986,27 @@
     function syncVoiceRecPulse() {
       const icon = document.querySelector('#voiceRecRecord .voice-rec-icon');
       if (!icon) return;
-      const active = mediaRecorder?.state === 'recording';
-      icon.classList.toggle('recording-active', active);
+      const state = mediaRecorder?.state;
+      const pulsing = state === 'recording' || state === 'paused';
+      icon.classList.toggle('recording-active', pulsing);
+      icon.classList.toggle('rec-pulse-paused', state === 'paused');
     }
 
     function syncVideoRecPulse() {
       const wrap = $('videoRecPreviewWrap');
       if (!wrap) return;
-      const recording = videoRecorder?.state === 'recording';
-      const paused = videoRecorder?.state === 'paused';
-      wrap.classList.toggle('recording-active', recording);
-      wrap.classList.toggle('rec-paused', paused || (!recording && videoRecStage === 'record'));
+      const state = videoRecorder?.state;
+      const pulsing = state === 'recording' || state === 'paused';
+      wrap.classList.toggle('recording-active', pulsing);
+      wrap.classList.toggle('rec-pulse-paused', state === 'paused');
     }
 
     function resetRecPulseUI() {
       document.querySelector('#voiceRecRecord .voice-rec-icon')
-        ?.classList.remove('recording-active');
+        ?.classList.remove('recording-active', 'rec-pulse-paused');
       const wrap = $('videoRecPreviewWrap');
       if (wrap) {
-        wrap.classList.remove('recording-active', 'rec-paused');
+        wrap.classList.remove('recording-active', 'rec-pulse-paused');
       }
     }
 
