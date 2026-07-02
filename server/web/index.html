@@ -186,6 +186,7 @@
       #composer { gap: 5px; padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); }
       #messages { padding: 12px 10px; }
       .msg-row { max-width: 88%; }
+      .msg-stack { max-width: 88%; }
     }
     .bubble {
       width: fit-content;
@@ -267,8 +268,13 @@
       margin-top: 3px; font-variant-numeric: tabular-nums;
     }
     .msg-foot {
-      display: flex; justify-content: flex-end; margin-top: 5px;
-      gap: 4px; align-items: center;
+      display: flex; justify-content: flex-end; flex-wrap: wrap;
+      margin-top: 5px; gap: 4px; align-items: center;
+    }
+    .msg-time {
+      font-size: 0.68rem; color: rgba(92, 51, 71, 0.48);
+      font-variant-numeric: tabular-nums; white-space: nowrap;
+      margin-right: auto;
     }
     .ticks {
       font-size: 0.78rem; letter-spacing: -3px; line-height: 1;
@@ -279,46 +285,55 @@
       font-size: 0.68rem; color: rgba(92, 51, 71, 0.45);
       margin-right: 6px; user-select: none;
     }
-    .bubble.mine.editable { cursor: default; touch-action: manipulation; }
+    .bubble.mine.editable { cursor: default; }
     .msg-row {
+      width: 100%;
+      max-width: 100%;
       display: flex;
       flex-direction: column;
-      max-width: 82%;
     }
-    .msg-row.mine {
-      align-self: flex-end;
-      margin-left: auto;
-      align-items: flex-end;
-    }
-    .msg-row.theirs {
-      align-self: flex-start;
-      margin-right: auto;
-      align-items: flex-start;
-    }
-    .msg-row-inner {
-      position: relative;
-      width: fit-content;
-      max-width: 100%;
+    .msg-row.mine { align-items: flex-end; }
+    .msg-row.theirs { align-items: flex-start; }
+    .msg-row-line {
+      display: flex;
+      width: 100%;
+      align-items: stretch;
     }
     .msg-hit {
-      position: absolute;
-      right: 100%;
-      top: 0;
-      bottom: 0;
-      width: 40px;
-      margin-right: 0;
+      min-height: 44px;
+      align-self: stretch;
       background: none;
       border: none;
       outline: none;
       box-shadow: none;
+      padding: 0;
+      margin: 0;
       -webkit-tap-highlight-color: transparent;
+      cursor: default;
     }
-    .msg-row.theirs .msg-hit { display: none; }
+    .msg-hit-left { flex: 0 0 44px; }
+    .msg-hit-right { flex: 1 1 0; min-width: 44px; }
+    .msg-row.mine .msg-hit-left { flex: 1 1 0; min-width: 44px; }
+    .msg-row.mine .msg-hit-right { flex: 0 0 44px; }
+    .msg-row.theirs .msg-hit-left { flex: 0 0 44px; }
+    .msg-row.theirs .msg-hit-right { flex: 1 1 0; min-width: 44px; }
+    .msg-stack {
+      flex: 0 1 auto;
+      max-width: min(82%, 340px);
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .msg-row.mine .msg-stack { align-items: flex-end; }
+    .msg-row.theirs .msg-stack { align-items: flex-start; }
+    .msg-row-inner {
+      width: fit-content;
+      max-width: 100%;
+    }
     .msg-reactions {
       display: flex; flex-wrap: wrap; gap: 4px;
       margin-top: 3px;
     }
-    .msg-row.mine .msg-reactions { justify-content: flex-end; }
     .msg-reaction-pill {
       font-size: 0.82rem; padding: 2px 8px; border-radius: 999px;
       background: rgba(255, 255, 255, 0.88);
@@ -872,13 +887,17 @@
       const edited = m.editedAt
         ? `<span class="edited-mark" title="изменено">изм.</span>`
         : '';
+      const when = (m.createdAt && !m._pending)
+        ? `<span class="msg-time">${escapeHtml(fmtMsgDate(m.createdAt))}</span>`
+        : '';
       if (!mine || !m.status) {
-        return edited ? `<div class="msg-foot">${edited}</div>` : '';
+        if (!when && !edited) return '';
+        return `<div class="msg-foot">${when}${edited}</div>`;
       }
       const read = m.status === 'read';
       const cls = read ? 'ticks read' : 'ticks sent';
       const title = read ? 'прочитано' : 'отправлено';
-      return `<div class="msg-foot">${edited}<span class="${cls}" title="${title}">${read ? '✓✓' : '✓'}</span></div>`;
+      return `<div class="msg-foot">${when}${edited}<span class="${cls}" title="${title}">${read ? '✓✓' : '✓'}</span></div>`;
     }
 
     function canEditMessage(m) {
@@ -985,9 +1004,10 @@
       return Boolean(el.closest('.voice-play, .video-note, .file-card, video, audio, img, a'));
     }
 
-    function findMsgRowFromEvent(e) {
-      if (isMsgInteractiveTarget(e.target)) return null;
-      return e.target.closest('.msg-row');
+    function findMsgRowFromHit(e) {
+      const hit = e.target.closest('.msg-hit');
+      if (!hit) return null;
+      return hit.closest('.msg-row');
     }
 
     async function copyMessageText(m) {
@@ -1058,16 +1078,22 @@
           : (m.kind === 'audio' ? ' has-media-audio'
             : (m.kind === 'image' && !m.text ? ' has-image' : '')));
       const pendingCls = m._pending ? ' pending' : '';
-      const editCls = canEditMessage(m) ? ' editable' : '';
-      return `<div class="bubble ${mine ? 'mine' : 'theirs'}${extraCls}${pendingCls}${editCls}">${sender}${renderMessageBody(m)}${renderTicks(m, mine)}</div>`;
+      return `<div class="bubble ${mine ? 'mine' : 'theirs'}${extraCls}${pendingCls}">${sender}${renderMessageBody(m)}${renderTicks(m, mine)}</div>`;
     }
 
     function renderMessageRowHtml(m) {
       const mine = m.senderId === user.id;
       const rowCls = mine ? 'mine' : 'theirs';
-      const hit = mine ? '<div class="msg-hit" aria-hidden="true"></div>' : '';
       const pendingCls = m._pending ? ' pending' : '';
-      return `<div class="msg-row ${rowCls}${pendingCls}" data-id="${m.id}"><div class="msg-row-inner">${hit}${renderBubbleInner(m)}</div>${renderReactionsHtml(m)}</div>`;
+      return `<div class="msg-row ${rowCls}${pendingCls}" data-id="${m.id}">` +
+        `<div class="msg-row-line">` +
+        `<div class="msg-hit msg-hit-left" aria-hidden="true"></div>` +
+        `<div class="msg-stack">` +
+        `<div class="msg-row-inner">${renderBubbleInner(m)}</div>` +
+        `${renderReactionsHtml(m)}` +
+        `</div>` +
+        `<div class="msg-hit msg-hit-right" aria-hidden="true"></div>` +
+        `</div></div>`;
     }
 
     function renderBubbleHtml(m) {
@@ -1342,6 +1368,24 @@
       const m = Math.floor(s / 60);
       const sec = Math.floor(s % 60);
       return `${m}:${String(sec).padStart(2, '0')}`;
+    }
+
+    function fmtMsgDate(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '';
+      const now = new Date();
+      const dayStart = (dt) => new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime();
+      const hm = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      const today = dayStart(now);
+      const msgDay = dayStart(d);
+      if (msgDay === today) return hm;
+      const yesterday = today - 86400000;
+      if (msgDay === yesterday) return 'вчера ' + hm;
+      if (d.getFullYear() === now.getFullYear()) {
+        return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) + ', ' + hm;
+      }
+      return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }) + ', ' + hm;
     }
 
     function fmtFileSize(bytes) {
