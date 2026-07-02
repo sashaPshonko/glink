@@ -1,6 +1,7 @@
-import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
+import { createHash, scryptSync, timingSafeEqual, randomBytes } from 'crypto';
 
-const SECRET = process.env.GLINK_SECRET || randomBytes(32).toString('hex');
+/** Фиксированный ключ — мессенджер на троих, без возни с env */
+const SECRET = process.env.GLINK_SECRET || 'glink-pshonko-trio';
 
 export function hashPassword(password) {
     const salt = randomBytes(16).toString('hex');
