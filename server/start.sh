@@ -2,14 +2,20 @@
 cd "$(dirname "$0")" || exit 1
 mkdir -p data uploads certs
 
+IP="${GLINK_CERT_IP:-31.128.38.147}"
+need_cert=0
 if [ ! -f certs/cert.pem ]; then
+  need_cert=1
+else
+  CN=$(openssl x509 -in certs/cert.pem -noout -subject 2>/dev/null | sed -n 's/.*CN=\([^/]*\).*/\1/p')
+  if [ "$CN" != "$IP" ]; then
+    echo "[glink] старый сертификат CN=$CN — нужен CN=$IP для Android"
+    need_cert=1
+  fi
+fi
+if [ "$need_cert" = 1 ]; then
   echo "[glink] создаю HTTPS-сертификат (для микрофона в браузере)…"
-  IP="${GLINK_CERT_IP:-31.128.38.147}"
-  openssl req -x509 -newkey rsa:2048 \
-    -keyout certs/key.pem -out certs/cert.pem \
-    -days 3650 -nodes \
-    -subj "/CN=${IP}" \
-    -addext "subjectAltName=IP:${IP},DNS:glink,DNS:localhost" 2>/dev/null
+  bash regen-cert.sh
 fi
 
 pkill -f 'node index.mjs' 2>/dev/null || true

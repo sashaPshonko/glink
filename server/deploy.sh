@@ -25,8 +25,9 @@ mkdir -p server/data server/uploads
 [ -n "$BACKUP" ] && printf '%s' "$BACKUP" > server/data/store.json
 
 cd server
-chmod +x start.sh
+chmod +x start.sh regen-cert.sh
 npm install --omit=dev
+bash regen-cert.sh
 bash start.sh
 REMOTE
 

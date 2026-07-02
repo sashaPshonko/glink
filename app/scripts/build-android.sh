@@ -45,6 +45,8 @@ fi
 
 echo "→ JAVA_HOME=$JAVA_HOME"
 echo "→ ANDROID_HOME=$ANDROID_HOME"
+bash scripts/fetch-cert.sh
+node scripts/patch-webview-ssl.js
 echo "→ собираю release APK (JS внутри, Metro не нужен)…"
 
 cd android
