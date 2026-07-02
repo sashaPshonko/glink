@@ -215,16 +215,31 @@
       border-radius: 12px;
       font-size: 1rem;
     }
-    #voiceHint {
-      position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
-      background: #e11d48; color: #fff; padding: 10px 16px; border-radius: 20px;
-      font-size: 0.9rem; z-index: 10; display: flex; align-items: center; gap: 12px;
+    #voiceHint { display: none !important; }
+    .rec-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(92, 51, 71, 0.94);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
     }
-    #voiceHint.hidden { display: none !important; }
-    #voiceCancelBtn {
-      background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.5);
-      color: #fff; border-radius: 10px; padding: 6px 10px; font-size: 0.85rem; cursor: pointer;
+    .rec-overlay.hidden { display: none !important; }
+    .voice-rec-icon {
+      width: min(52vw, 200px); height: min(52vw, 200px);
+      border-radius: 50%; border: 4px solid #fff;
+      background: rgba(255, 255, 255, 0.12);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 4rem;
+      animation: recPulse 1.2s ease-in-out infinite;
     }
+    @keyframes recPulse { 50% { transform: scale(1.05); opacity: 0.85; } }
+    .rec-timer { color: #fbcfe8; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+    .rec-status { color: #fbcfe8; font-size: 0.9rem; min-height: 1.2em; text-align: center; padding: 0 16px; }
+    .rec-actions { display: flex; gap: 28px; margin-top: 8px; }
+    .rec-actions button {
+      width: 56px; height: 56px; border-radius: 50%; border: none;
+      font-size: 1.4rem; cursor: pointer; color: #fff;
+    }
+    .rec-cancel { background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.5); }
+    .rec-send { background: #e879a9; border: 2px solid #fff; }
     .video-note {
       width: 200px; height: 200px; border-radius: 50%;
       overflow: hidden; position: relative; margin-top: 4px;
@@ -303,9 +318,14 @@
       </div>
     </div>
   </div>
-  <div id="voiceHint" class="hidden">
-    <span>🎤 говорите… отпусти</span>
-    <button id="voiceCancelBtn" type="button">✕ отмена</button>
+  <div id="voiceRecOverlay" class="rec-overlay hidden">
+    <div class="voice-rec-icon">🎤</div>
+    <div id="voiceRecTimer" class="rec-timer">0:00</div>
+    <div id="voiceRecStatus" class="rec-status">включаю микрофон…</div>
+    <div class="rec-actions">
+      <button id="voiceCancelBtn" type="button" class="rec-cancel" title="Отмена">✕</button>
+      <button id="voiceSendBtn" type="button" class="rec-send" title="Отправить">✓</button>
+    </div>
   </div>
   <div id="videoRecOverlay" class="hidden">
     <video id="videoRecPreview" autoplay muted playsinline webkit-playsinline></video>
@@ -348,7 +368,8 @@
     let activeVideoEl = null;
     let voiceDiscard = false;
     let voiceStarting = false;
-    let voicePendingStop = false;
+    let voiceRecInterval = null;
+    let voiceRecStarted = 0;
     let videoDiscard = false;
     let videoStarting = false;
     let lastMsgCount = 0;
@@ -1111,6 +1132,8 @@
       pollTimer = setInterval(() => {
         if (voiceAudio && !voiceAudio.paused) return;
         if (activeVideoEl && !activeVideoEl.paused) return;
+        if (mediaRecorder?.state === 'recording') return;
+        if (videoRecorder?.state === 'recording') return;
         loadMessages();
       }, 5000);
     }
@@ -1196,63 +1219,98 @@
       voiceStream = null;
     }
 
+    function stopVoiceRecTimer() {
+      clearInterval(voiceRecInterval);
+      voiceRecInterval = null;
+    }
+
+    function hideVoiceOverlay() {
+      $('voiceRecOverlay').classList.add('hidden');
+      cleanupVoiceStream();
+      stopVoiceRecTimer();
+      $('voiceRecTimer').textContent = '0:00';
+      $('voiceRecStatus').textContent = '';
+      $('voiceBtn').classList.remove('recording');
+    }
+
+    function finishVoiceRecording() {
+      if (mediaRecorder?.state === 'recording') {
+        try { mediaRecorder.requestData(); } catch { /* ignore */ }
+        mediaRecorder.stop();
+      } else {
+        hideVoiceOverlay();
+        mediaRecorder = null;
+        voiceStarting = false;
+      }
+    }
+
     function cancelVoiceRecording() {
       voiceDiscard = true;
-      voicePendingStop = true;
-      $('voiceHint').classList.add('hidden');
-      $('voiceBtn').classList.remove('recording');
-      if (mediaRecorder?.state === 'recording') {
-        stopVoice();
-      } else {
-        cleanupVoiceStream();
-        mediaRecorder = null;
+      finishVoiceRecording();
+      if (voiceStarting) {
+        hideVoiceOverlay();
         voiceStarting = false;
         voiceChunks = [];
       }
     }
 
-    async function startVoice() {
+    async function openVoiceRecorder() {
       if (!activeChat || mediaRecorder || voiceStarting || videoRecorder || videoStarting) return;
+      if (!window.MediaRecorder) {
+        showAppErr('запись голоса не поддерживается — обнови браузер');
+        return;
+      }
       if (!navigator.mediaDevices?.getUserMedia) {
-        showAppErr('микрофон недоступен — нужен HTTPS или Safari/Chrome');
+        showAppErr('микрофон недоступен — нужен HTTPS');
         return;
       }
       if (!window.isSecureContext && location.hostname !== 'localhost') {
-        showAppErr('голосовые работают только по HTTPS (или localhost)');
+        showAppErr('голосовые работают только по HTTPS');
         return;
       }
+
       voiceStarting = true;
       voiceDiscard = false;
-      voicePendingStop = false;
+      voiceChunks = [];
+      $('voiceRecOverlay').classList.remove('hidden');
+      $('voiceRecStatus').textContent = 'включаю микрофон…';
+      $('voiceRecTimer').textContent = '0:00';
+      $('voiceBtn').classList.add('recording');
+
       try {
         voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        if (voiceDiscard || voicePendingStop) {
-          cleanupVoiceStream();
+        if (voiceDiscard) {
+          hideVoiceOverlay();
           voiceStarting = false;
           return;
         }
-        voiceChunks = [];
+
         const mime = voiceMimeType();
-        mediaRecorder = mime
-          ? new MediaRecorder(voiceStream, { mimeType: mime })
-          : new MediaRecorder(voiceStream);
+        if (!mime) {
+          hideVoiceOverlay();
+          voiceStarting = false;
+          showAppErr('браузер не умеет записывать голос');
+          return;
+        }
+
+        mediaRecorder = new MediaRecorder(voiceStream, { mimeType: mime });
         mediaRecorder.ondataavailable = (e) => { if (e.data.size) voiceChunks.push(e.data); };
         mediaRecorder.onstop = async () => {
-          $('voiceBtn').classList.remove('recording');
-          $('voiceHint').classList.add('hidden');
-          cleanupVoiceStream();
+          const discard = voiceDiscard;
+          voiceDiscard = false;
           const rec = mediaRecorder;
           mediaRecorder = null;
           voiceStarting = false;
-          const discard = voiceDiscard;
-          voiceDiscard = false;
-          const chunks = voiceChunks;
+          hideVoiceOverlay();
+          if (discard || !voiceChunks.length) {
+            voiceChunks = [];
+            return;
+          }
+          const type = rec.mimeType || voiceChunks[0]?.type || 'audio/webm';
+          const blob = new Blob(voiceChunks, { type });
           voiceChunks = [];
-          if (discard || !chunks.length) return;
-          const type = rec.mimeType || chunks[0]?.type || 'audio/webm';
-          const blob = new Blob(chunks, { type });
           if (blob.size < 800) {
-            showAppErr('слишком короткое — держи 🎤 дольше');
+            showAppErr('слишком короткое — говори дольше');
             return;
           }
           const ext = voiceExt(type);
@@ -1262,36 +1320,28 @@
             showAppErr(e.message || 'не удалось отправить голосовое');
           }
         };
-        mediaRecorder.start(200);
-        $('voiceBtn').classList.add('recording');
-        $('voiceHint').classList.remove('hidden');
-        if (voicePendingStop) stopVoice();
-      } catch (e) {
+
+        mediaRecorder.start(250);
         voiceStarting = false;
-        cleanupVoiceStream();
-        if (!window.isSecureContext && location.hostname !== 'localhost') {
-          showAppErr('голосовые только по HTTPS — открой https://' + location.host);
-          return;
-        }
+        voiceRecStarted = Date.now();
+        $('voiceRecStatus').textContent = '🎤 идёт запись';
+        voiceRecInterval = setInterval(() => {
+          const sec = Math.floor((Date.now() - voiceRecStarted) / 1000);
+          $('voiceRecTimer').textContent = fmtTime(sec);
+          if (sec >= 120) finishVoiceRecording();
+        }, 200);
+      } catch (e) {
+        hideVoiceOverlay();
+        voiceStarting = false;
+        mediaRecorder = null;
         const n = e?.name || '';
         if (n === 'NotAllowedError' || n === 'PermissionDeniedError') {
-          showAppErr('нет доступа — разреши микрофон в настройках браузера');
+          showAppErr('нет доступа — разреши микрофон');
         } else if (n === 'NotFoundError') {
-          showAppErr('микрофон не найден на этом устройстве');
+          showAppErr('микрофон не найден');
         } else {
-          showAppErr('нет доступа к микрофону');
+          showAppErr('не удалось включить микрофон');
         }
-      }
-    }
-
-    function stopVoice() {
-      if (voiceStarting) {
-        voicePendingStop = true;
-        return;
-      }
-      if (mediaRecorder?.state === 'recording') {
-        try { mediaRecorder.requestData(); } catch { /* ignore */ }
-        mediaRecorder.stop();
       }
     }
 
@@ -1304,14 +1354,14 @@
       clearToken();
       if (ws) ws.close();
       clearInterval(pollTimer);
-      stopVoice();
+      cancelVoiceRecording();
       cancelVideoRecording();
       showLogin();
     };
     $('backBtn').onclick = () => {
       activeChat = null;
       clearInterval(pollTimer);
-      stopVoice();
+      cancelVoiceRecording();
       cancelVideoRecording();
       loadChats();
     };
@@ -1320,14 +1370,9 @@
     $('attachBtn').onclick = () => $('fileInput').click();
     $('fileInput').onchange = onFilePicked;
 
-    $('voiceCancelBtn').onclick = (e) => { e.stopPropagation(); cancelVoiceRecording(); };
-
-    const voiceBtn = $('voiceBtn');
-    voiceBtn.addEventListener('mousedown', (e) => { e.preventDefault(); startVoice(); });
-    voiceBtn.addEventListener('mouseup', (e) => { e.preventDefault(); stopVoice(); });
-    voiceBtn.addEventListener('mouseleave', stopVoice);
-    voiceBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startVoice(); }, { passive: false });
-    voiceBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopVoice(); }, { passive: false });
+    $('voiceBtn').onclick = (e) => { e.preventDefault(); openVoiceRecorder(); };
+    $('voiceCancelBtn').onclick = (e) => { e.preventDefault(); cancelVoiceRecording(); };
+    $('voiceSendBtn').onclick = (e) => { e.preventDefault(); finishVoiceRecording(); };
 
     $('videoBtn').onclick = (e) => { e.preventDefault(); openVideoRecorder(); };
     $('videoCancelBtn').onclick = (e) => { e.preventDefault(); cancelVideoRecording(); };
