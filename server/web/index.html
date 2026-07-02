@@ -213,10 +213,27 @@
     .bubble.has-image {
       padding: 0; background: transparent !important; border: none !important;
       width: fit-content; max-width: min(280px, 88%);
+      overflow: visible;
+      border-radius: 0;
+    }
+    .bubble.has-image.has-caption {
+      padding: 0 0 8px;
+      background: rgba(249, 197, 223, 0.95) !important;
+      border-radius: 28px 28px 12px 28px;
+      overflow: hidden;
+    }
+    .bubble.theirs.has-image.has-caption {
+      background: rgba(255, 255, 255, 0.92) !important;
+      border: 1px solid rgba(252, 231, 243, 0.95) !important;
+      border-radius: 28px 28px 28px 12px;
     }
     .bubble.has-image img {
       margin-top: 0; border-radius: 28px;
       box-shadow: 0 2px 14px rgba(92, 51, 71, 0.1);
+    }
+    .bubble.has-image.has-caption img {
+      border-radius: 28px 28px 0 0;
+      margin-bottom: 4px;
     }
     .voice-msg {
       display: flex; align-items: center; gap: 10px;
@@ -317,9 +334,9 @@
     .msg-row.theirs .msg-hit-left { flex: 0 0 44px; }
     .msg-row.theirs .msg-hit-right { flex: 1 1 0; min-width: 44px; }
     .msg-stack {
-      flex: 0 1 auto;
+      flex: 0 0 auto;
+      width: fit-content;
       max-width: min(82%, 340px);
-      min-width: 0;
       display: flex;
       flex-direction: column;
     }
@@ -329,6 +346,8 @@
       width: fit-content;
       max-width: 100%;
     }
+    .msg-row.mine .msg-row-inner { margin-left: auto; }
+    .msg-row.theirs .msg-row-inner { margin-right: auto; }
     .msg-reactions {
       display: flex; flex-wrap: wrap; gap: 4px;
       margin-top: 3px;
@@ -1078,7 +1097,7 @@
       const extraCls = isVideoNote(m) ? ' has-video'
         : (m.kind === 'video' ? ' has-media-video'
           : (m.kind === 'audio' ? ' has-media-audio'
-            : (m.kind === 'image' && !m.text ? ' has-image' : '')));
+            : (m.kind === 'image' ? (' has-image' + (m.text ? ' has-caption' : '')) : '')));
       const pendingCls = m._pending ? ' pending' : '';
       return `<div class="bubble ${mine ? 'mine' : 'theirs'}${extraCls}${pendingCls}">${sender}${renderMessageBody(m)}${renderTicks(m, mine)}</div>`;
     }
