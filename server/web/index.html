@@ -190,15 +190,24 @@
     .bubble {
       width: fit-content;
       max-width: 100%;
-      padding: 10px 14px; border-radius: 20px;
+      padding: 11px 16px;
       line-height: 1.4; word-break: break-word;
+      overflow: hidden;
+      border-radius: 28px;
     }
-    .mine { background: rgba(249, 197, 223, 0.95); }
-    .theirs { background: rgba(255, 255, 255, 0.92); border: 1px solid rgba(252, 231, 243, 0.95); }
+    .bubble.mine {
+      border-radius: 28px 28px 12px 28px;
+      background: rgba(249, 197, 223, 0.95);
+    }
+    .bubble.theirs {
+      border-radius: 28px 28px 28px 12px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(252, 231, 243, 0.95);
+    }
     .sender { font-size: 0.75rem; color: #db2777; font-weight: 600; margin-bottom: 4px; }
     .bubble a { color: #be185d; text-decoration: underline; }
     .bubble img {
-      max-width: min(280px, 100%); border-radius: 18px; display: block;
+      max-width: min(280px, 100%); border-radius: 22px; display: block;
       margin: 4px 0 0; cursor: pointer; border: none; outline: none;
     }
     .bubble.has-image {
@@ -206,7 +215,7 @@
       width: fit-content; max-width: min(280px, 88%);
     }
     .bubble.has-image img {
-      margin-top: 0; border-radius: 20px;
+      margin-top: 0; border-radius: 28px;
       box-shadow: 0 2px 14px rgba(92, 51, 71, 0.1);
     }
     .voice-msg {
@@ -361,7 +370,7 @@
       display: flex; align-items: center; gap: 10px;
       margin-top: 4px; padding: 10px 12px;
       background: rgba(255, 255, 255, 0.5);
-      border-radius: 16px; color: #9d174d; text-decoration: none;
+      border-radius: 20px; color: #9d174d; text-decoration: none;
       max-width: min(280px, 100%);
     }
     .bubble.mine .file-card { background: rgba(255, 255, 255, 0.35); }

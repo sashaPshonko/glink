@@ -208,6 +208,8 @@ function authFromQueryOrHeader(req, res, next) {
 }
 
 function sendWebApp(res) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
     res.sendFile(join(WEB_DIR, 'index.html'));
 }
 
