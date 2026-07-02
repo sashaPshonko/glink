@@ -484,6 +484,58 @@
     #editBanner.hidden { display: none; }
     #editCancelBtn { padding: 6px 10px; font-size: 0.85rem; }
     #composer.editing #sendBtn { background: #db2777; }
+    #draftAttach {
+      flex: 1 1 100%;
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; border-radius: 14px;
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(232, 121, 169, 0.35);
+    }
+    #draftAttach.hidden { display: none; }
+    .draft-attach-inner {
+      flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
+    }
+    .draft-remove {
+      flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%;
+      border: none; background: rgba(255, 236, 244, 0.95); color: #9d174d;
+      font-size: 1rem; cursor: pointer; line-height: 1;
+    }
+    .draft-img {
+      max-height: 72px; max-width: 120px; border-radius: 12px;
+      object-fit: cover; display: block;
+    }
+    .draft-voice-play {
+      width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+      border: none; background: #ffecf4; color: #9d174d;
+      font-size: 0.95rem; cursor: pointer;
+    }
+    .draft-voice-label { font-size: 0.9rem; color: #9d174d; font-weight: 600; }
+    .draft-voice-dur { font-size: 0.8rem; color: #b07a94; margin-left: auto; }
+    .draft-vnote {
+      position: relative; width: 72px; height: 72px;
+      border-radius: 50%; overflow: hidden; flex-shrink: 0; cursor: pointer;
+      background: #1a1a1a;
+    }
+    .draft-vnote video {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+    .draft-vnote-play {
+      position: absolute; inset: 0; border: none; background: rgba(0, 0, 0, 0.28);
+      color: #fff; font-size: 1.4rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none;
+    }
+    .draft-vnote.playing .draft-vnote-play { opacity: 0; }
+    .draft-video, .draft-audio {
+      max-width: 100%; max-height: 72px; border-radius: 12px;
+    }
+    .draft-file-icon { width: 28px; height: 28px; flex-shrink: 0; color: #be185d; }
+    .draft-file-icon svg { width: 100%; height: 100%; display: block; }
+    .draft-file-name {
+      font-size: 0.88rem; font-weight: 600; color: #9d174d;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .draft-file-size { font-size: 0.75rem; color: #b07a94; flex-shrink: 0; }
     .file-card {
       display: flex; align-items: center; gap: 10px;
       margin-top: 4px; padding: 10px 12px;
@@ -642,6 +694,10 @@
       <div id="messages"></div>
       <button type="button" id="unreadJumpBtn" class="hidden">новые ↓</button>
       <div id="composer">
+        <div id="draftAttach" class="hidden">
+          <div id="draftAttachInner" class="draft-attach-inner"></div>
+          <button type="button" id="draftRemoveBtn" class="draft-remove" title="Убрать">✕</button>
+        </div>
         <div id="editBanner" class="hidden">
           <span>✎ редактирование</span>
           <button id="editCancelBtn" type="button" class="secondary">отмена</button>
@@ -671,7 +727,7 @@
     <div id="voiceRecStatus" class="rec-status">включаю микрофон…</div>
     <div class="rec-actions">
       <button id="voiceCancelBtn" type="button" class="rec-cancel" title="Отмена">✕</button>
-      <button id="voiceSendBtn" type="button" class="rec-send" title="Отправить">✓</button>
+      <button id="voiceSendBtn" type="button" class="rec-send" title="Готово">✓</button>
     </div>
   </div>
   <div id="videoRecOverlay" class="hidden">
@@ -680,7 +736,7 @@
     <div id="videoRecStatus">включаю камеру…</div>
     <div class="video-rec-actions">
       <button id="videoCancelBtn" type="button" title="Отмена">✕</button>
-      <button id="videoSendBtn" type="button" title="Отправить">✓</button>
+      <button id="videoSendBtn" type="button" title="Готово">✓</button>
     </div>
   </div>
 
@@ -716,6 +772,9 @@
     let videoRaf = null;
     let videoRafWrap = null;
     let videoRafVid = null;
+    let draftAttachment = null;
+    let draftPreviewAudio = null;
+    let draftPreviewVideo = null;
     let lastChatActivityAt = Date.now();
     let readPendingTimer = null;
     const notifySeen = new Set();
@@ -1077,6 +1136,7 @@
 
     function startEditMessage(m) {
       if (!canEditMessage(m)) return;
+      clearDraftAttachment();
       editingMessageId = m.id;
       $('msgInput').value = m.text || '';
       $('composer').classList.add('editing');
@@ -1857,6 +1917,125 @@
     }
 
     const FILE_ICON_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.5 6v11.5a4 4 0 01-8 0V5a2.5 2.5 0 015 0v10.5a1 1 0 11-2 0V6H9v9.5a3.5 3.5 0 007 0V5a4 4 0 00-8 0v12.5a5.5 5.5 0 0011 0V6h-1.5z"/></svg>';
+
+    function stopDraftPreview() {
+      if (draftPreviewAudio) {
+        draftPreviewAudio.pause();
+        draftPreviewAudio = null;
+      }
+      if (draftPreviewVideo) {
+        draftPreviewVideo.pause();
+        draftPreviewVideo = null;
+      }
+      $('draftAttachInner')?.querySelector('.draft-vnote')?.classList.remove('playing');
+      const btn = $('draftAttachInner')?.querySelector('.draft-voice-play');
+      if (btn) btn.textContent = '▶';
+    }
+
+    function clearDraftAttachment() {
+      stopDraftPreview();
+      if (draftAttachment?.url) URL.revokeObjectURL(draftAttachment.url);
+      draftAttachment = null;
+      $('draftAttach')?.classList.add('hidden');
+      if ($('draftAttachInner')) $('draftAttachInner').innerHTML = '';
+    }
+
+    function wireDraftVideoNote(wrap) {
+      const vid = wrap.querySelector('video');
+      if (!vid) return;
+      draftPreviewVideo = vid;
+      const sync = () => wrap.classList.toggle('playing', !vid.paused && !vid.ended);
+      wrap.onclick = (e) => {
+        e.preventDefault();
+        if (vid.paused) vid.play().catch(() => {});
+        else vid.pause();
+      };
+      vid.onplay = sync;
+      vid.onpause = sync;
+      vid.onended = () => {
+        vid.currentTime = 0;
+        sync();
+      };
+    }
+
+    function toggleDraftVoice() {
+      if (!draftAttachment || draftAttachment.kind !== 'voice') return;
+      const btn = $('draftAttachInner')?.querySelector('.draft-voice-play');
+      if (!draftPreviewAudio || draftPreviewAudio.src !== draftAttachment.url) {
+        stopDraftPreview();
+        draftPreviewAudio = new Audio(draftAttachment.url);
+        draftPreviewAudio.onended = () => { if (btn) btn.textContent = '▶'; };
+      }
+      if (draftPreviewAudio.paused) {
+        draftPreviewAudio.play().catch(() => showAppErr('не удалось воспроизвести'));
+        if (btn) btn.textContent = '⏸';
+      } else {
+        draftPreviewAudio.pause();
+        if (btn) btn.textContent = '▶';
+      }
+    }
+
+    function preloadDraftVoiceDuration() {
+      if (!draftAttachment || draftAttachment.kind !== 'voice') return;
+      const durEl = $('draftAttachInner')?.querySelector('.draft-voice-dur');
+      if (!durEl) return;
+      const audio = new Audio();
+      audio.preload = 'metadata';
+      audio.src = draftAttachment.url;
+      audio.onloadedmetadata = () => {
+        durEl.textContent = saneDur(audio.duration) ? fmtTime(audio.duration) : '';
+        audio.src = '';
+      };
+    }
+
+    function renderDraftAttachment() {
+      const box = $('draftAttachInner');
+      if (!box || !draftAttachment) return;
+      const { file, kind, url } = draftAttachment;
+      if (kind === 'image') {
+        box.innerHTML = `<img class="draft-img" src="${url}" alt="фото" />`;
+      } else if (kind === 'voice') {
+        box.innerHTML =
+          `<button type="button" class="draft-voice-play">▶</button>` +
+          `<span class="draft-voice-label">🎤 голосовое</span>` +
+          `<span class="draft-voice-dur"></span>`;
+        box.querySelector('.draft-voice-play').onclick = (e) => {
+          e.stopPropagation();
+          toggleDraftVoice();
+        };
+        preloadDraftVoiceDuration();
+      } else if (kind === 'video_note') {
+        box.innerHTML =
+          `<div class="draft-vnote">` +
+          `<video playsinline preload="metadata" src="${url}"></video>` +
+          `<span class="draft-vnote-play">▶</span></div>`;
+        wireDraftVideoNote(box.querySelector('.draft-vnote'));
+      } else if (kind === 'video') {
+        box.innerHTML = `<video class="draft-video" controls playsinline preload="metadata" src="${url}"></video>`;
+      } else if (kind === 'audio') {
+        box.innerHTML = `<audio class="draft-audio" controls preload="metadata" src="${url}"></audio>`;
+      } else {
+        box.innerHTML =
+          `<span class="draft-file-icon">${FILE_ICON_SVG}</span>` +
+          `<span class="draft-file-name">${escapeHtml(file.name || 'файл')}</span>` +
+          `<span class="draft-file-size">${fmtFileSize(file.size)}</span>`;
+      }
+    }
+
+    function setDraftAttachment(file, kind) {
+      if (!file) return;
+      if (editingMessageId) {
+        showAppErr('сначала закончи редактирование');
+        return;
+      }
+      clearDraftAttachment();
+      const url = URL.createObjectURL(file);
+      draftAttachment = { file, kind: kind || uploadKind(file), url };
+      renderDraftAttachment();
+      $('draftAttach').classList.remove('hidden');
+      $('msgInput').focus();
+    }
+
     const VID_RING_R = 96;
     const VID_RING_LEN = 2 * Math.PI * VID_RING_R;
 
@@ -2382,11 +2561,7 @@
             return;
           }
           const ext = videoExt(type);
-          try {
-            await sendFile(new File([blob], 'video' + ext, { type }), 'video_note');
-          } catch (e) {
-            showAppErr(e.message || 'не удалось отправить видео');
-          }
+          setDraftAttachment(new File([blob], 'video' + ext, { type }), 'video_note');
         };
 
         videoRecorder.start(250);
@@ -2459,6 +2634,7 @@
     }
 
     async function openChat(chat, opts = {}) {
+      clearDraftAttachment();
       activeChat = chat;
       touchChatActivity();
       localStorage.setItem('glink_active_chat', chat.id);
@@ -2494,6 +2670,7 @@
     function closeChatUI() {
       cancelEdit();
       closeMsgMenu();
+      clearDraftAttachment();
       activeMessages = [];
       activeChat = null;
       localStorage.removeItem('glink_active_chat');
@@ -2629,8 +2806,27 @@
         return;
       }
       const text = $('msgInput').value.trim();
-      if (!text || !activeChat) return;
+      if (!activeChat || (!text && !draftAttachment)) return;
       touchChatActivity();
+
+      if (draftAttachment) {
+        const file = draftAttachment.file;
+        const kind = draftAttachment.kind;
+        $('msgInput').value = '';
+        resizeMsgInput();
+        clearDraftAttachment();
+        userPinnedBottom = true;
+        try {
+          await sendFile(file, kind, text || undefined);
+        } catch (e) {
+          setDraftAttachment(file, kind);
+          $('msgInput').value = text;
+          resizeMsgInput();
+          showAppErr(e.message || 'не удалось отправить');
+        }
+        return;
+      }
+
       $('msgInput').value = '';
       resizeMsgInput();
       userPinnedBottom = true;
@@ -2695,12 +2891,7 @@
       const file = ev.target.files?.[0];
       ev.target.value = '';
       if (!file) return;
-      try {
-        const kind = uploadKind(file);
-        await sendFile(file, kind);
-      } catch (e) {
-        showAppErr(e.message || 'не удалось отправить файл');
-      }
+      setDraftAttachment(file, uploadKind(file));
     }
 
     function fileFromClipboard(dataTransfer) {
@@ -2728,11 +2919,7 @@
       const file = fileFromClipboard(ev.clipboardData);
       if (!file) return;
       ev.preventDefault();
-      try {
-        await sendFile(file, 'image');
-      } catch (e) {
-        showAppErr(e.message || 'не удалось отправить фото');
-      }
+      setDraftAttachment(file, 'image');
     }
 
     function voiceMimeType() {
@@ -2850,11 +3037,7 @@
             return;
           }
           const ext = voiceExt(type);
-          try {
-            await sendFile(new File([blob], 'voice' + ext, { type }), 'voice');
-          } catch (e) {
-            showAppErr(e.message || 'не удалось отправить голосовое');
-          }
+          setDraftAttachment(new File([blob], 'voice' + ext, { type }), 'voice');
         };
 
         mediaRecorder.start(250);
@@ -2896,6 +3079,7 @@
     };
     $('backBtn').onclick = (e) => { e.preventDefault(); userGoBack(); };
     $('editCancelBtn').onclick = (e) => { e.preventDefault(); cancelEdit(); };
+    $('draftRemoveBtn').onclick = (e) => { e.preventDefault(); clearDraftAttachment(); };
     $('sendBtn').onclick = sendText;
     $('msgInput').onkeydown = (e) => {
       if (e.key === 'ArrowUp' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
