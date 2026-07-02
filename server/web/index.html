@@ -419,9 +419,10 @@
     .rec-cancel { background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.5); }
     .rec-send { background: #e879a9; border: 2px solid #fff; }
     .video-note {
-      width: 200px; height: 200px; position: relative; margin-top: 4px;
+      width: 200px; height: 200px; position: relative; margin-top: 0;
       flex-shrink: 0; touch-action: none; cursor: pointer;
       border-radius: 50%; overflow: hidden;
+      display: block;
     }
     .video-note-hole {
       position: absolute; inset: 0; border-radius: 50%;
@@ -454,6 +455,8 @@
     .bubble.has-video {
       padding: 0; background: transparent !important; border: none !important;
       width: fit-content; max-width: min(200px, 88%);
+      overflow: visible;
+      border-radius: 0;
     }
     .bubble.has-media-video {
       padding: 6px 8px; width: fit-content; max-width: min(320px, 88%);
