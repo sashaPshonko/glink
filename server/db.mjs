@@ -268,22 +268,97 @@ export function addMessage({ chatId, senderId, text, kind = 'text', file = null,
     return msg;
 }
 
-export function editMessage({ messageId, chatId, userId, text }) {
+export function editMessage({ messageId, chatId, userId, text, keepFileIds, newFiles = [] }) {
     const msg = db.messages.find((m) => m.id === messageId && m.chatId === chatId);
     if (!msg) throw new Error('message_not_found');
     if (msg.senderId !== userId) throw new Error('forbidden');
-    if (msg.kind !== 'text' && !msg.text) throw new Error('not_editable');
 
-    const newText = String(text ?? '').trim();
-    if (msg.kind === 'text' && !newText) throw new Error('empty_message');
+    const existing = listMessageFiles(msg);
+    const keepSet = keepFileIds === undefined || keepFileIds === null
+        ? null
+        : new Set(Array.isArray(keepFileIds) ? keepFileIds.map(String).filter(Boolean) : []);
+    let kept;
+    if (keepSet === null) {
+        kept = existing;
+    } else {
+        for (const id of keepSet) {
+            if (!existing.some((f) => f.id === id)) throw new Error('invalid_file');
+        }
+        kept = existing.filter((f) => keepSet.has(f.id));
+    }
+
+    const added = Array.isArray(newFiles) ? newFiles : [];
+    const allEntries = [...kept, ...added];
+    if (allEntries.length > 12) throw new Error('too_many_files');
+
+    const newText = text !== undefined ? String(text).trim() : String(msg.text || '').trim();
+    if (!allEntries.length && !newText) throw new Error('empty_message');
+
+    const msgKind = allEntries.length > 1
+        ? 'album'
+        : allEntries.length === 1
+            ? (allEntries[0].kind || 'file')
+            : 'text';
+
+    if (msgKind === 'text' && !newText) throw new Error('empty_message');
 
     msg.text = newText;
+    msg.kind = msgKind;
     msg.editedAt = new Date().toISOString();
+
+    if (allEntries.length > 1) {
+        msg.files = allEntries.map((f) => ({
+            id: f.id,
+            name: f.name,
+            mime: f.mime || '',
+            size: f.size || 0,
+            kind: f.kind || 'file',
+        }));
+        msg.file = {
+            id: msg.files[0].id,
+            name: msg.files[0].name,
+            mime: msg.files[0].mime,
+            size: msg.files[0].size,
+        };
+    } else if (allEntries.length === 1) {
+        msg.file = {
+            id: allEntries[0].id,
+            name: allEntries[0].name,
+            mime: allEntries[0].mime || '',
+            size: allEntries[0].size || 0,
+        };
+        delete msg.files;
+    } else {
+        msg.file = null;
+        delete msg.files;
+    }
 
     const chat = findChatById(chatId);
     if (chat) chat.updatedAt = msg.editedAt;
     persist();
     return msg;
+}
+
+function listMessageFiles(msg) {
+    if (msg.files?.length) {
+        return msg.files.map((f) => ({
+            id: f.id,
+            name: f.name,
+            mime: f.mime || '',
+            size: f.size || 0,
+            kind: f.kind || 'file',
+        }));
+    }
+    if (msg.file?.id) {
+        return [{
+            id: msg.file.id,
+            name: msg.file.name,
+            mime: msg.file.mime || '',
+            size: msg.file.size || 0,
+            kind: msg.kind || 'file',
+        }];
+    }
+    return [];
 }
 
 const REACTION_KEYS = new Set(['heart', 'thumbs', 'fire', 'strawberry']);

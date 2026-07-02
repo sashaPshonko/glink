@@ -501,7 +501,22 @@ app.post('/chats/:chatId/messages', authMiddleware, maybeUpload, (req, res) => {
     }
 });
 
-app.patch('/chats/:chatId/messages/:messageId', authMiddleware, (req, res) => {
+function parseKeepFileIds(body) {
+    const raw = body?.keepFileIds;
+    if (raw === undefined || raw === null) return undefined;
+    if (Array.isArray(raw)) return raw.map(String).filter(Boolean);
+    if (typeof raw === 'string' && raw) {
+        try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
+        } catch {
+            return raw.split(',').map((s) => s.trim()).filter(Boolean);
+        }
+    }
+    return [];
+}
+
+app.patch('/chats/:chatId/messages/:messageId', authMiddleware, maybeUpload, (req, res) => {
     const { chatId, messageId } = req.params;
     if (chatId.startsWith('pending:')) {
         res.status(400).json({ error: 'waiting_peer' });
@@ -512,12 +527,33 @@ app.patch('/chats/:chatId/messages/:messageId', authMiddleware, (req, res) => {
         return;
     }
     try {
+        const uploads = uploadedFiles(req);
+        const kinds = parseUploadKinds(req.body, uploads.length);
+        const newFiles = uploads.map((uploaded, i) => {
+            const stored = registerFile({
+                storedName: uploaded.filename,
+                originalName: uploaded.originalname,
+                mime: uploaded.mimetype,
+                size: uploaded.size,
+                uploaderId: req.userId,
+            });
+            const kind = guessKind(uploaded.mimetype, kinds[i] || req.body?.kind);
+            return {
+                id: stored.id,
+                name: stored.originalName || stored.name,
+                mime: stored.mime,
+                size: stored.size,
+                kind,
+            };
+        });
         const message = enrichMessage(
             editMessage({
                 messageId,
                 chatId,
                 userId: req.userId,
                 text: req.body?.text,
+                keepFileIds: parseKeepFileIds(req.body),
+                newFiles,
             }),
             req.userId,
         );
@@ -538,6 +574,14 @@ app.patch('/chats/:chatId/messages/:messageId', authMiddleware, (req, res) => {
         }
         if (e.message === 'empty_message') {
             res.status(400).json({ error: 'empty_message' });
+            return;
+        }
+        if (e.message === 'invalid_file') {
+            res.status(400).json({ error: 'invalid_file' });
+            return;
+        }
+        if (e.message === 'too_many_files') {
+            res.status(400).json({ error: 'too_many_files' });
             return;
         }
         throw e;

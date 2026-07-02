@@ -719,13 +719,44 @@
       background: rgba(255, 255, 255, 0.12);
       display: flex; align-items: center; justify-content: center;
       font-size: 4rem; cursor: pointer; color: #fff;
+      flex-shrink: 0;
+    }
+    .review-voice-stack {
+      display: flex; flex-direction: column; align-items: center; gap: 14px;
+      width: min(85vw, 320px);
+    }
+    .review-voice-body { width: 100%; }
+    .review-voice-body .voice-wave {
+      position: relative;
+      height: 28px; cursor: pointer; touch-action: manipulation;
+      --pct: 0%;
+    }
+    .review-voice-body .voice-wave::before {
+      background: rgba(255, 255, 255, 0.18);
+    }
+    .review-voice-body .voice-wave::after {
+      background: #fbcfe8;
+    }
+    .review-voice-body .voice-bars i {
+      background: rgba(255, 255, 255, 0.28);
+    }
+    .review-voice-body .voice-bars i.on {
+      background: rgba(255, 255, 255, 0.92);
+    }
+    .review-voice-body .voice-time {
+      color: #fbcfe8; text-align: center; margin-top: 6px;
+      font-size: 0.85rem;
+    }
+    .review-video-note {
+      width: min(72vw, 280px); height: min(72vw, 280px);
+      touch-action: none; cursor: pointer;
+    }
+    .review-video-note .vid-ring-fill { stroke: #fbcfe8; }
+    .review-video-note.playing .vid-badge { opacity: 0; }
+    .review-video-note .video-note-hole video {
+      width: 100%; height: 100%; object-fit: cover; display: block;
     }
     #videoRecPreview.mirror { transform: scaleX(-1); }
-    #videoRecPlayback {
-      width: min(72vw, 280px); height: min(72vw, 280px);
-      border-radius: 50%; object-fit: cover; background: #000;
-      cursor: pointer;
-    }
     #videoFlipBtn {
       background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.5);
       font-size: 1.2rem;
@@ -888,7 +919,7 @@
           <div id="draftAttachList" class="draft-attach-list"></div>
         </div>
         <div id="editBanner" class="hidden">
-          <span>✎ редактирование</span>
+          <span>✎ редактирование · можно менять файлы</span>
           <button id="editCancelBtn" type="button" class="secondary">отмена</button>
         </div>
         <input id="fileInput" type="file" class="hidden" multiple />
@@ -922,9 +953,13 @@
       </div>
     </div>
     <div id="voiceRecReview" class="rec-stage hidden">
-      <button type="button" id="voiceReviewPlay" class="review-play-btn" title="Слушать">▶</button>
-      <div id="voiceReviewDur" class="rec-timer">0:00</div>
-      <div class="rec-status">прослушай перед отправкой</div>
+      <div class="review-voice-stack">
+        <button type="button" id="voiceReviewPlay" class="review-play-btn" title="Слушать">▶</button>
+        <div id="voiceReviewMsg" class="review-voice-body">
+          <div class="voice-wave"><div class="voice-bars"></div></div>
+          <div class="voice-time"><span class="voice-cur">0:00</span> / <span class="voice-dur">0:00</span></div>
+        </div>
+      </div>
       <div class="rec-actions">
         <button id="voiceReviewCancelBtn" type="button" class="rec-cancel" title="Отмена">✕</button>
         <button id="voiceReviewRedoBtn" type="button" class="rec-cancel" title="Перезаписать">↺</button>
@@ -947,9 +982,16 @@
       </div>
     </div>
     <div id="videoRecReview" class="rec-stage hidden">
-      <video id="videoRecPlayback" playsinline webkit-playsinline></video>
-      <div id="videoReviewDur" class="rec-timer">0:00</div>
-      <div class="rec-status">посмотри перед отправкой</div>
+      <div id="videoReviewNote" class="video-note review-video-note">
+        <svg class="vid-ring" viewBox="0 0 200 200" aria-hidden="true">
+          <circle class="vid-ring-track" cx="100" cy="100" r="96"/>
+          <circle class="vid-ring-fill" cx="100" cy="100" r="96"/>
+        </svg>
+        <div class="video-note-hole">
+          <video id="videoRecPlayback" playsinline webkit-playsinline></video>
+          <div class="vid-badge">▶</div>
+        </div>
+      </div>
       <div class="rec-actions">
         <button id="videoReviewCancelBtn" type="button" class="rec-cancel" title="Отмена">✕</button>
         <button id="videoReviewRedoBtn" type="button" class="rec-cancel" title="Перезаписать">↺</button>
@@ -1009,6 +1051,8 @@
     let voiceReviewBlob = null;
     let voiceReviewUrl = null;
     let voiceReviewAudio = null;
+    let voiceReviewRaf = null;
+    let videoReviewRaf = null;
     let voiceRecAccumPaused = 0;
     let voiceRecPauseStart = 0;
     let videoDiscard = false;
@@ -1056,6 +1100,8 @@
       not_editable: 'это сообщение нельзя редактировать',
       message_not_found: 'сообщение не найдено',
       empty_message: 'сообщение не может быть пустым',
+      too_many_files: 'слишком много файлов',
+      invalid_file: 'не удалось обновить вложения',
     };
 
     function errText(code) {
@@ -1368,9 +1414,7 @@
     }
 
     function canEditMessage(m) {
-      if (!m || m.senderId !== user?.id || m._pending) return false;
-      if (m.kind === 'text') return true;
-      return Boolean(m.text);
+      return Boolean(m && m.senderId === user?.id && !m._pending);
     }
 
     function getMessage(id) {
@@ -1395,13 +1439,41 @@
     function startEditMessage(m) {
       if (!canEditMessage(m)) return;
       persistActiveChatDraft();
+      clearDraftAttachments(true);
       editingMessageId = m.id;
       $('msgInput').value = m.text || '';
+      for (const f of messageFiles(m)) {
+        addEditExistingAttachment(f);
+      }
       $('composer').classList.add('editing');
       $('editBanner').classList.remove('hidden');
       $('msgInput').focus();
       resizeMsgInput();
       $('msgInput').setSelectionRange($('msgInput').value.length, $('msgInput').value.length);
+    }
+
+    function addEditExistingAttachment(f) {
+      if (!f?.id) return;
+      if (draftAttachments.length >= MAX_DRAFT_FILES) {
+        showAppErr(`можно прикрепить не больше ${MAX_DRAFT_FILES} файлов`);
+        return;
+      }
+      draftAttachments.push({
+        id: 'edit-' + f.id,
+        existingFileId: f.id,
+        kind: attachmentKind(f),
+        url: attachmentUrl(f),
+        name: f.name || 'файл',
+      });
+      renderDraftAttachments();
+    }
+
+    function editAttachmentsChanged(m, attachments) {
+      const orig = messageFiles(m);
+      const keepIds = attachments.filter((x) => x.existingFileId).map((x) => x.existingFileId).sort().join(',');
+      const origIds = orig.map((f) => f.id).sort().join(',');
+      const hasNew = attachments.some((x) => x.file);
+      return keepIds !== origIds || hasNew;
     }
 
     function clearMsgPress() {
@@ -1590,6 +1662,7 @@
     function cancelEdit() {
       editingMessageId = null;
       $('msgInput').value = '';
+      clearDraftAttachments(true);
       $('composer').classList.remove('editing');
       $('editBanner').classList.add('hidden');
       resizeMsgInput();
@@ -2466,7 +2539,7 @@
       const idx = draftAttachments.findIndex((x) => x.id === id);
       if (idx < 0) return;
       const [item] = draftAttachments.splice(idx, 1);
-      if (item.url) URL.revokeObjectURL(item.url);
+      if (item.url && item.file) URL.revokeObjectURL(item.url);
       if (draftPreviewAudioId === id) stopDraftPreview();
       renderDraftAttachments();
       syncActiveChatDraftState();
@@ -2474,10 +2547,6 @@
 
     function addDraftAttachment(file, kind) {
       if (!file) return;
-      if (editingMessageId) {
-        showAppErr('сначала закончи редактирование');
-        return;
-      }
       if (draftAttachments.length >= MAX_DRAFT_FILES) {
         showAppErr(`можно прикрепить не больше ${MAX_DRAFT_FILES} файлов`);
         return;
@@ -3020,7 +3089,148 @@
       return Math.max(0, ms);
     }
 
+    function stopVoiceReviewRaf() {
+      if (voiceReviewRaf) cancelAnimationFrame(voiceReviewRaf);
+      voiceReviewRaf = null;
+    }
+
+    function stopVideoReviewRaf() {
+      if (videoReviewRaf) cancelAnimationFrame(videoReviewRaf);
+      videoReviewRaf = null;
+    }
+
+    function trackVoiceReviewProgress() {
+      stopVoiceReviewRaf();
+      const el = $('voiceReviewMsg');
+      const tick = () => {
+        if (!voiceReviewAudio || voiceReviewAudio.paused) return;
+        updateVoiceProgress(el, voiceReviewAudio.currentTime, voiceReviewAudio.duration);
+        voiceReviewRaf = requestAnimationFrame(tick);
+      };
+      voiceReviewRaf = requestAnimationFrame(tick);
+    }
+
+    function trackVideoReviewProgress(wrap, vid) {
+      stopVideoReviewRaf();
+      const tick = () => {
+        if (!vid || vid.paused || vid.ended) return;
+        updateVideoRing(wrap, vid);
+        videoReviewRaf = requestAnimationFrame(tick);
+      };
+      videoReviewRaf = requestAnimationFrame(tick);
+    }
+
+    function seekVoiceReview(pct) {
+      const el = $('voiceReviewMsg');
+      if (!el) return;
+      const dur = saneDur(voiceReviewAudio?.duration) || saneDur(Number(el.dataset.duration));
+      if (!dur) return;
+      const time = Math.max(0, Math.min(dur, pct * dur));
+      if (voiceReviewAudio) voiceReviewAudio.currentTime = time;
+      updateVoiceProgress(el, time, dur);
+    }
+
+    async function prepareVoiceReviewUI() {
+      const el = $('voiceReviewMsg');
+      if (!el || !voiceReviewUrl) return;
+      delete el.dataset.duration;
+      const barsEl = el.querySelector('.voice-bars');
+      barsEl.innerHTML = '';
+      el.querySelector('.voice-cur').textContent = '0:00';
+      el.querySelector('.voice-dur').textContent = '…';
+      try {
+        const { peaks, duration } = await getWaveform(voiceReviewUrl);
+        paintWaveform(barsEl, peaks);
+        if (saneDur(duration)) {
+          el.dataset.duration = String(duration);
+          el.querySelector('.voice-dur').textContent = fmtTime(duration);
+        }
+      } catch {
+        paintWaveform(barsEl, Array.from({ length: 40 }, () => 0.35));
+      }
+      if (!saneDur(Number(el.dataset.duration))) {
+        const duration = await getDuration(voiceReviewUrl);
+        if (duration) {
+          el.dataset.duration = String(duration);
+          el.querySelector('.voice-dur').textContent = fmtTime(duration);
+        }
+      }
+      el.querySelector('.voice-wave').onclick = (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        seekVoiceReview(pct);
+      };
+      updateVoiceProgress(el, 0, Number(el.dataset.duration) || 0);
+    }
+
+    function wireVideoReviewUI() {
+      const wrap = $('videoReviewNote');
+      const vid = $('videoRecPlayback');
+      if (!wrap || !vid || wrap.dataset.reviewWired) return;
+      wrap.dataset.reviewWired = '1';
+      initVideoRing(wrap);
+
+      vid.onloadedmetadata = () => updateVideoRing(wrap, vid);
+      vid.onpause = () => {
+        stopVideoReviewRaf();
+        updateVideoRing(wrap, vid);
+        wrap.classList.remove('playing');
+      };
+      vid.onended = () => {
+        wrap.classList.remove('playing');
+        stopVideoReviewRaf();
+        vid.currentTime = 0;
+        updateVideoRing(wrap, vid);
+      };
+      vid.onplay = () => {
+        wrap.classList.add('playing');
+        trackVideoReviewProgress(wrap, vid);
+      };
+
+      wrap.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        e.preventDefault();
+        if (isOnVideoRing(wrap, e.clientX, e.clientY)) {
+          wrap.setPointerCapture(e.pointerId);
+          wrap.classList.add('seeking');
+          wrap.dataset.seeking = '1';
+          seekVideoNote(wrap, vid, e.clientX, e.clientY);
+          if (vid.paused) {
+            vid.play().catch(() => showAppErr('не удалось воспроизвести'));
+          } else {
+            trackVideoReviewProgress(wrap, vid);
+          }
+        } else {
+          if (!vid.paused) {
+            vid.pause();
+            wrap.classList.remove('playing');
+            stopVideoReviewRaf();
+            updateVideoRing(wrap, vid);
+          } else {
+            vid.play().catch(() => showAppErr('не удалось воспроизвести'));
+          }
+        }
+      });
+
+      wrap.addEventListener('pointermove', (e) => {
+        if (wrap.dataset.seeking !== '1') return;
+        seekVideoNote(wrap, vid, e.clientX, e.clientY);
+      });
+
+      const endSeek = (e) => {
+        if (wrap.dataset.seeking !== '1') return;
+        if (e?.pointerId != null && wrap.hasPointerCapture?.(e.pointerId)) {
+          wrap.releasePointerCapture(e.pointerId);
+        }
+        wrap.dataset.seeking = '';
+        wrap.classList.remove('seeking');
+      };
+      wrap.addEventListener('pointerup', endSeek);
+      wrap.addEventListener('pointercancel', endSeek);
+    }
+
     function clearVoiceReview() {
+      stopVoiceReviewRaf();
       if (voiceReviewAudio) {
         voiceReviewAudio.pause();
         voiceReviewAudio = null;
@@ -3029,10 +3239,30 @@
       voiceReviewUrl = null;
       voiceReviewBlob = null;
       $('voiceReviewPlay').textContent = '▶';
+      const el = $('voiceReviewMsg');
+      if (el) {
+        delete el.dataset.duration;
+        el.querySelector('.voice-bars').innerHTML = '';
+        el.querySelector('.voice-cur').textContent = '0:00';
+        el.querySelector('.voice-dur').textContent = '0:00';
+        updateVoiceProgress(el, 0, 0);
+      }
     }
 
     function clearVideoReview() {
+      stopVideoReviewRaf();
+      const wrap = $('videoReviewNote');
       const pb = $('videoRecPlayback');
+      if (wrap) {
+        wrap.classList.remove('playing', 'seeking', 'viewed');
+        delete wrap.dataset.seeking;
+        delete wrap.dataset.reviewWired;
+        const ring = wrap.querySelector('.vid-ring-fill');
+        if (ring) {
+          delete ring.dataset.ready;
+          ring.style.strokeDashoffset = String(VID_RING_LEN);
+        }
+      }
       if (pb) {
         pb.pause();
         pb.removeAttribute('src');
@@ -3058,18 +3288,25 @@
       $('voiceRecReview').classList.remove('hidden');
       $('voiceRecOverlay').classList.remove('hidden');
       $('mediaBtn').classList.remove('recording');
-      const audio = new Audio();
-      audio.preload = 'metadata';
-      audio.src = voiceReviewUrl;
-      audio.onloadedmetadata = () => {
-        $('voiceReviewDur').textContent = saneDur(audio.duration) ? fmtTime(audio.duration) : '0:00';
-      };
       voiceReviewAudio = new Audio(voiceReviewUrl);
-      voiceReviewAudio.onended = () => { $('voiceReviewPlay').textContent = '▶'; };
+      voiceReviewAudio.onended = () => {
+        $('voiceReviewPlay').textContent = '▶';
+        stopVoiceReviewRaf();
+        updateVoiceProgress($('voiceReviewMsg'), 0, voiceReviewAudio.duration);
+      };
       voiceReviewAudio.onpause = () => {
         if (voiceReviewAudio.ended) return;
         $('voiceReviewPlay').textContent = '▶';
+        stopVoiceReviewRaf();
       };
+      voiceReviewAudio.onplay = () => {
+        $('voiceReviewPlay').textContent = '⏸';
+        trackVoiceReviewProgress();
+      };
+      voiceReviewAudio.ontimeupdate = () => {
+        updateVoiceProgress($('voiceReviewMsg'), voiceReviewAudio.currentTime, voiceReviewAudio.duration);
+      };
+      prepareVoiceReviewUI();
     }
 
     function showVideoRecordUI() {
@@ -3089,10 +3326,8 @@
       $('mediaBtn').classList.remove('recording');
       const pb = $('videoRecPlayback');
       pb.src = videoReviewUrl;
-      pb.onloadedmetadata = () => {
-        $('videoReviewDur').textContent = saneDur(pb.duration) ? fmtTime(pb.duration) : '0:00';
-      };
-      pb.onended = () => { pb.currentTime = 0; };
+      wireVideoReviewUI();
+      updateVideoRing($('videoReviewNote'), pb);
     }
 
     function toggleVoiceReviewPlay() {
@@ -3109,8 +3344,9 @@
     }
 
     function toggleVideoReviewPlay() {
+      const wrap = $('videoReviewNote');
       const pb = $('videoRecPlayback');
-      if (!pb?.src) return;
+      if (!pb?.src || !wrap) return;
       if (pb.paused) pb.play().catch(() => showAppErr('не удалось воспроизвести'));
       else pb.pause();
     }
@@ -3553,25 +3789,72 @@
         cancelEdit();
         return;
       }
-      if (m.kind === 'text' && !text) {
-        showAppErr('сообщение не может быть пустым');
+
+      const snapText = $('msgInput').value;
+      const snapAttachments = draftAttachments.map((x) => ({ ...x }));
+
+      const keepFileIds = draftAttachments
+        .filter((x) => x.existingFileId)
+        .map((x) => x.existingFileId);
+      const newItems = draftAttachments.filter((x) => x.file);
+
+      if (!text && !draftAttachments.length) {
+        showAppErr('нужен текст или хотя бы один файл');
         return;
       }
-      if (text === (m.text || '')) {
+
+      const textSame = text === (m.text || '');
+      const filesSame = !editAttachmentsChanged(m, draftAttachments);
+      if (textSame && filesSame) {
         cancelEdit();
         return;
       }
+
       cancelEdit();
       try {
-        const data = await api('/chats/' + activeChat.id + '/messages/' + id, {
-          method: 'PATCH',
-          body: JSON.stringify({ text }),
-        });
+        let data;
+        if (newItems.length) {
+          const fd = new FormData();
+          fd.append('text', text);
+          fd.append('keepFileIds', JSON.stringify(keepFileIds));
+          for (const item of newItems) {
+            fd.append('files', item.file, item.file.name || 'upload');
+            fd.append('kinds', item.kind || uploadKind(item.file));
+          }
+          data = await api('/chats/' + activeChat.id + '/messages/' + id, {
+            method: 'PATCH',
+            body: fd,
+          });
+        } else if (!filesSame) {
+          data = await api('/chats/' + activeChat.id + '/messages/' + id, {
+            method: 'PATCH',
+            body: JSON.stringify({ text, keepFileIds }),
+          });
+        } else {
+          data = await api('/chats/' + activeChat.id + '/messages/' + id, {
+            method: 'PATCH',
+            body: JSON.stringify({ text }),
+          });
+        }
         replaceMessage(id, data.message);
         refreshChatList();
       } catch (e) {
-        startEditMessage(m);
-        $('msgInput').value = text;
+        editingMessageId = id;
+        $('msgInput').value = snapText;
+        clearDraftAttachments(true);
+        for (const item of snapAttachments) {
+          if (item.existingFileId) {
+            draftAttachments.push({ ...item });
+          } else if (item.file) {
+            draftAttachments.push({
+              ...item,
+              url: URL.createObjectURL(item.file),
+            });
+          }
+        }
+        renderDraftAttachments();
+        $('composer').classList.add('editing');
+        $('editBanner').classList.remove('hidden');
         resizeMsgInput();
         showAppErr(e.message || 'не удалось сохранить');
       }
@@ -3698,7 +3981,7 @@
     }
 
     async function onPasteImage(ev) {
-      if (!activeChat || editingMessageId) return;
+      if (!activeChat) return;
       if ($('app').classList.contains('hidden')) return;
       if (!$('voiceRecOverlay').classList.contains('hidden')) return;
       if (!$('videoRecOverlay').classList.contains('hidden')) return;
@@ -4033,7 +4316,6 @@
     $('videoFlipBtn').onclick = (e) => { e.preventDefault(); flipVideoCamera(); };
     $('videoPauseBtn').onclick = (e) => { e.preventDefault(); toggleVideoRecPause(); };
     $('videoStopBtn').onclick = (e) => { e.preventDefault(); stopVideoRecorder(); };
-    $('videoRecPlayback').onclick = (e) => { e.preventDefault(); toggleVideoReviewPlay(); };
     $('videoReviewCancelBtn').onclick = (e) => { e.preventDefault(); hideVideoOverlay(); };
     $('videoReviewRedoBtn').onclick = (e) => { e.preventDefault(); hideVideoOverlay(); openVideoRecorder(); };
     $('videoReviewAttachBtn').onclick = (e) => { e.preventDefault(); attachVideoReview(); };
