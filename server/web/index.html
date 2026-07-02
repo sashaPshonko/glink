@@ -128,7 +128,18 @@
       max-width: min(280px, 100%); border-radius: 12px; display: block;
       margin-top: 4px; cursor: pointer;
     }
-    .bubble audio { width: min(260px, 100%); margin-top: 4px; height: 36px; }
+    .voice-msg {
+      display: flex; align-items: center; gap: 10px;
+      min-width: 168px; margin-top: 2px;
+    }
+    .voice-play {
+      width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
+      background: rgba(255, 255, 255, 0.55); border: none;
+      font-size: 1rem; cursor: pointer; color: #9d174d;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .bubble.theirs .voice-play { background: #ffecf4; }
+    .voice-label { font-size: 0.92rem; color: inherit; }
     .file-link {
       display: inline-flex; align-items: center; gap: 6px;
       margin-top: 4px; color: #be185d; font-weight: 600;
@@ -209,6 +220,8 @@
     let mediaRecorder = null;
     let voiceStream = null;
     let voiceChunks = [];
+    let voiceAudio = null;
+    let voiceBtnEl = null;
     let selectedUsername = localStorage.getItem('glink_last_user') || '';
     let accounts = [];
 
@@ -358,7 +371,12 @@
       if (kind === 'image' && m.fileUrl) {
         parts.push(`<img src="${fileUrl(m.fileUrl)}" alt="фото" onclick="window.open(this.src,'_blank')" />`);
       } else if (kind === 'voice' && m.fileUrl) {
-        parts.push(`<audio controls preload="metadata" src="${fileUrl(m.fileUrl)}"></audio>`);
+        const src = escapeHtml(fileUrl(m.fileUrl));
+        parts.push(
+          `<div class="voice-msg" data-src="${src}">` +
+          `<button type="button" class="voice-play" aria-label="играть">▶</button>` +
+          `<span class="voice-label">🎤 голосовое</span></div>`,
+        );
       } else if (kind === 'file' && m.fileUrl) {
         const name = escapeHtml(m.file?.name || 'файл');
         parts.push(`<a class="file-link" href="${fileUrl(m.fileUrl)}" target="_blank" rel="noopener">📎 ${name}</a>`);
@@ -414,6 +432,42 @@
         return `<div class="bubble ${mine ? 'mine' : 'theirs'}">${sender}${renderMessageBody(m)}</div>`;
       }).join('');
       box.scrollTop = box.scrollHeight;
+      wireVoicePlayers(box);
+    }
+
+    function wireVoicePlayers(container) {
+      container.querySelectorAll('.voice-msg').forEach((el) => {
+        const btn = el.querySelector('.voice-play');
+        if (!btn || btn.dataset.wired) return;
+        btn.dataset.wired = '1';
+        const src = el.dataset.src;
+        btn.onclick = () => toggleVoice(src, btn);
+      });
+    }
+
+    function toggleVoice(src, btn) {
+      if (voiceAudio?.dataset.glinkSrc === src && !voiceAudio.paused) {
+        voiceAudio.pause();
+        btn.textContent = '▶';
+        return;
+      }
+      if (voiceAudio) {
+        voiceAudio.pause();
+        if (voiceBtnEl) voiceBtnEl.textContent = '▶';
+      }
+      voiceAudio = new Audio(src);
+      voiceAudio.dataset.glinkSrc = src;
+      voiceBtnEl = btn;
+      btn.textContent = '⏸';
+      voiceAudio.onended = () => { btn.textContent = '▶'; voiceBtnEl = null; };
+      voiceAudio.onerror = () => {
+        btn.textContent = '▶';
+        showAppErr('не удалось воспроизвести голосовое');
+      };
+      voiceAudio.play().catch(() => {
+        btn.textContent = '▶';
+        showAppErr('не удалось воспроизвести голосовое');
+      });
     }
 
     function connectWs() {
@@ -508,7 +562,11 @@
     }
 
     function voiceMimeType() {
-      const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
+      const apple = /iPad|iPhone|iPod/.test(navigator.userAgent)
+        || (navigator.userAgent.includes('Mac') && 'ontouchend' in document);
+      const types = apple
+        ? ['audio/mp4', 'audio/aac', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg']
+        : ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
       return types.find((t) => MediaRecorder.isTypeSupported(t)) || '';
     }
 
@@ -577,7 +635,10 @@
     }
 
     function stopVoice() {
-      if (mediaRecorder?.state === 'recording') mediaRecorder.stop();
+      if (mediaRecorder?.state === 'recording') {
+        try { mediaRecorder.requestData(); } catch { /* ignore */ }
+        mediaRecorder.stop();
+      }
     }
 
     $('logoutBtn').onclick = () => {
