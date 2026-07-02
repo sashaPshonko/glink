@@ -326,6 +326,8 @@
       margin: 0;
       -webkit-tap-highlight-color: transparent;
       cursor: default;
+      user-select: none;
+      -webkit-user-select: none;
     }
     .msg-hit-left { flex: 0 0 44px; }
     .msg-hit-right { flex: 1 1 0; min-width: 44px; }
@@ -356,6 +358,12 @@
       font-size: 0.82rem; padding: 2px 8px; border-radius: 999px;
       background: rgba(255, 255, 255, 0.88);
       border: 1px solid rgba(252, 231, 243, 0.95); line-height: 1.35;
+      cursor: pointer; font: inherit; color: inherit;
+      user-select: none; -webkit-user-select: none;
+    }
+    .msg-reaction-pill.mine {
+      background: #ffecf4;
+      border-color: rgba(232, 121, 169, 0.55);
     }
     .msg-menu {
       position: fixed; z-index: 500;
@@ -644,6 +652,7 @@
     let msgMenuDelayTimer = null;
     let appErrTimer = null;
     let lastMsgTap = { id: null, at: 0 };
+    let suppressMsgMenuOpenUntil = 0;
     const REACTION_EMOJI = {
       heart: '❤️',
       thumbs: '👍',
@@ -984,9 +993,11 @@
       if (lastMsgTap.id === id && now - lastMsgTap.at < DBL_TAP_MS) {
         lastMsgTap = { id: null, at: 0 };
         clearMsgMenuDelay();
+        clearTextSelection();
         const m = getMessage(id);
         if (m && !m._pending) {
           closeMsgMenu();
+          blockMsgMenuOpen();
           toggleReaction(id, 'heart');
           return true;
         }
@@ -1000,8 +1011,21 @@
       $('msgMenu').classList.add('hidden');
     }
 
+    function blockMsgMenuOpen(ms = 400) {
+      suppressMsgMenuOpenUntil = Date.now() + ms;
+    }
+
+    function canOpenMsgMenuNow() {
+      return Date.now() >= suppressMsgMenuOpenUntil && $('msgMenu').classList.contains('hidden');
+    }
+
+    function clearTextSelection() {
+      const sel = window.getSelection?.();
+      if (sel?.removeAllRanges) sel.removeAllRanges();
+    }
+
     function openMsgMenu(m, x, y) {
-      if (!m || m._pending) return;
+      if (!m || m._pending || !canOpenMsgMenuNow()) return;
       msgMenuTargetId = m.id;
       const menu = $('msgMenu');
       const reactions = m.reactions || {};
@@ -1029,6 +1053,15 @@
       const hit = e.target.closest('.msg-hit');
       if (!hit) return null;
       return hit.closest('.msg-row');
+    }
+
+    function findMsgRowForContextMenu(e) {
+      if (isMsgInteractiveTarget(e.target)) return null;
+      if (e.target.closest('.msg-reaction-pill')) return null;
+      const row = e.target.closest('.msg-row');
+      if (!row) return null;
+      if (e.target.closest('.msg-hit, .msg-stack')) return row;
+      return null;
     }
 
     async function copyMessageText(m) {
@@ -1077,9 +1110,11 @@
       }
       const keys = Object.keys(counts);
       if (!keys.length) return '';
+      const myReaction = reactions[user?.id];
       return `<div class="msg-reactions">${keys.map((k) => {
         const n = counts[k];
-        return `<span class="msg-reaction-pill">${REACTION_EMOJI[k]}${n > 1 ? ' ' + n : ''}</span>`;
+        const mine = myReaction === k ? ' mine' : '';
+        return `<button type="button" class="msg-reaction-pill${mine}" data-reaction="${k}">${REACTION_EMOJI[k]}${n > 1 ? ' ' + n : ''}</button>`;
       }).join('')}</div>`;
     }
 
@@ -2510,6 +2545,20 @@
       userPinnedBottom = isAtBottom($('messages'));
     }, { passive: true });
 
+    $('messages').addEventListener('selectstart', (e) => {
+      if (e.target.closest('.msg-hit, .msg-reaction-pill')) e.preventDefault();
+    });
+
+    $('messages').addEventListener('click', (e) => {
+      const pill = e.target.closest('.msg-reaction-pill');
+      if (!pill) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const row = pill.closest('.msg-row');
+      const reaction = pill.dataset.reaction;
+      if (row && reaction) toggleReaction(row.dataset.id, reaction);
+    });
+
     $('messages').addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       const hit = e.target.closest('.msg-hit');
@@ -2522,6 +2571,7 @@
       msgPressXY = { x: e.clientX, y: e.clientY };
       msgPressTimer = setTimeout(() => {
         if (msgPressRow !== row) return;
+        if (!canOpenMsgMenuNow()) return;
         openMsgMenu(m, e.clientX, e.clientY);
         clearMsgPress();
       }, MSG_PRESS_MS);
@@ -2536,11 +2586,13 @@
       clearMsgPress();
       if (!row || !sameRow || !wasTimer) return;
       if (tryDoubleTapHeart(row)) return;
+      if (!canOpenMsgMenuNow()) return;
       const rid = row.dataset.id;
       clearMsgMenuDelay();
       msgMenuDelayTimer = setTimeout(() => {
         msgMenuDelayTimer = null;
         if (lastMsgTap.id === rid && Date.now() - lastMsgTap.at < DBL_TAP_MS) return;
+        if (!canOpenMsgMenuNow()) return;
         const m = getMessage(rid);
         if (m) openMsgMenu(m, xy?.x ?? e.clientX, xy?.y ?? e.clientY);
       }, DBL_TAP_MS);
@@ -2558,18 +2610,23 @@
       const row = hit.closest('.msg-row');
       if (!row) return;
       e.preventDefault();
+      clearTextSelection();
       lastMsgTap = { id: null, at: 0 };
       clearMsgMenuDelay();
       closeMsgMenu();
+      blockMsgMenuOpen();
       const m = getMessage(row.dataset.id);
       if (m && !m._pending) toggleReaction(row.dataset.id, 'heart');
     });
     $('messages').addEventListener('contextmenu', (e) => {
-      const hit = e.target.closest('.msg-hit');
-      if (!hit) return;
-      const row = hit.closest('.msg-row');
+      const row = findMsgRowForContextMenu(e);
       if (!row) return;
       e.preventDefault();
+      if (!canOpenMsgMenuNow()) {
+        closeMsgMenu();
+        blockMsgMenuOpen();
+        return;
+      }
       const m = getMessage(row.dataset.id);
       if (m) openMsgMenu(m, e.clientX, e.clientY);
     });
@@ -2601,6 +2658,7 @@
     document.addEventListener('pointerdown', (e) => {
       if (!$('msgMenu').classList.contains('hidden') && !e.target.closest('#msgMenu')) {
         closeMsgMenu();
+        blockMsgMenuOpen();
       }
     }, true);
     document.addEventListener('keydown', (e) => {
