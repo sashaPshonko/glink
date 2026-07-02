@@ -17,21 +17,13 @@ function withGlinkAndroidNetwork(config) {
             fs.mkdirSync(resXml, { recursive: true });
             fs.mkdirSync(resRaw, { recursive: true });
 
-            const certSrc = path.join(projectRoot, 'glink-cert.pem');
-            let domainTrust = `
+            // Не пинним сертификат в APK — после regen-cert на сервере старый pem ломает WebView.
+            // SSL для self-signed закрывает patch-webview-ssl.js (handler.proceed).
+            const domainTrust = `
     <trust-anchors>
       <certificates src="system" />
       <certificates src="user" />
     </trust-anchors>`;
-            if (fs.existsSync(certSrc)) {
-                fs.copyFileSync(certSrc, path.join(resRaw, 'glink_cert.pem'));
-                domainTrust = `
-    <trust-anchors>
-      <certificates src="@raw/glink_cert" />
-      <certificates src="system" />
-      <certificates src="user" />
-    </trust-anchors>`;
-            }
 
             fs.writeFileSync(
                 path.join(resXml, 'network_security_config.xml'),
