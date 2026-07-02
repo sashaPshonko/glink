@@ -32,7 +32,7 @@
       ]
     },
     "extra": {
-      "serverUrl": "http://31.128.38.147:3920",
+      "serverUrl": "https://31.128.38.147:3920",
       "eas": {
         "projectId": "6f9b01a6-a682-4ec8-8ea1-e08f7c481412"
       }

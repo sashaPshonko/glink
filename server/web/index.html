@@ -190,9 +190,15 @@
       </div>
     </div>
   </div>
-  <div id="voiceHint" class="hidden">🎤 говорите… отпустите чтобы отправить</div>
+  <div id="voiceHint" class="hidden">🎤 говорите… отпусти или нажми ещё раз</div>
 
   <script>
+    (function () {
+      if (location.protocol !== 'http:') return;
+      if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return;
+      location.replace('https://' + location.host + location.pathname + location.search);
+    })();
+
     const API = '';
     let token = localStorage.getItem('glink_token') || '';
     let user = null;
@@ -364,28 +370,37 @@
     }
 
     function renderChats() {
-      $('chatList').classList.remove('hidden');
-      $('chatView').classList.add('hidden');
-      if (!chats.length) {
+      if (!chats.length && !activeChat) {
+        $('chatList').classList.remove('hidden');
+        $('chatView').classList.add('hidden');
         $('chatList').innerHTML = '<p class="empty">Чаты не загрузились — обнови страницу</p>';
         return;
       }
-      $('chatList').innerHTML = chats.map((c) => {
-        const wait = c.waiting ? ' wait' : '';
-        const sub = c.waiting ? 'ещё не зарегистрировался' : (c.lastMessage?.text || 'Напиши первым ♡');
-        const av = c.type === 'group' ? '♡' : (chatTitle(c)[0] || '?').toUpperCase();
-        const cls = c.type === 'group' ? 'avatar group' : 'avatar';
-        return `<div class="row${wait}" data-id="${c.id}" data-wait="${c.waiting ? '1' : ''}">
-          <div class="${cls}">${av}</div>
-          <div><strong>${escapeHtml(chatTitle(c))}</strong><div class="preview">${escapeHtml(sub)}</div></div>
-        </div>`;
-      }).join('');
-      $('chatList').querySelectorAll('.row').forEach((el) => {
-        el.onclick = () => {
-          if (el.dataset.wait === '1') return;
-          openChat(chats.find((x) => x.id === el.dataset.id));
-        };
-      });
+      if (chats.length) {
+        $('chatList').innerHTML = chats.map((c) => {
+          const wait = c.waiting ? ' wait' : '';
+          const sub = c.waiting ? 'ещё не зарегистрировался' : (c.lastMessage?.text || 'Напиши первым ♡');
+          const av = c.type === 'group' ? '♡' : (chatTitle(c)[0] || '?').toUpperCase();
+          const cls = c.type === 'group' ? 'avatar group' : 'avatar';
+          return `<div class="row${wait}" data-id="${c.id}" data-wait="${c.waiting ? '1' : ''}">
+            <div class="${cls}">${av}</div>
+            <div><strong>${escapeHtml(chatTitle(c))}</strong><div class="preview">${escapeHtml(sub)}</div></div>
+          </div>`;
+        }).join('');
+        $('chatList').querySelectorAll('.row').forEach((el) => {
+          el.onclick = () => {
+            if (el.dataset.wait === '1') return;
+            openChat(chats.find((x) => x.id === el.dataset.id));
+          };
+        });
+      }
+      if (activeChat) {
+        $('chatList').classList.add('hidden');
+        $('chatView').classList.remove('hidden');
+      } else {
+        $('chatList').classList.remove('hidden');
+        $('chatView').classList.add('hidden');
+      }
     }
 
     async function loadMessages() {
@@ -413,7 +428,7 @@
           const msg = JSON.parse(ev.data);
           if (msg.type === 'message' && activeChat && msg.message?.chatId === activeChat.id) {
             loadMessages();
-            loadChats();
+            refreshChatList();
           }
         } catch (_) {}
       };
@@ -438,6 +453,14 @@
       renderChats();
     }
 
+    async function refreshChatList() {
+      try {
+        const data = await api('/chats');
+        chats = data.chats || [];
+        renderChats();
+      } catch (_) {}
+    }
+
     async function enterApp() {
       showApp();
       connectWs();
@@ -458,7 +481,7 @@
         body: JSON.stringify({ text }),
       });
       await loadMessages();
-      await loadChats();
+      refreshChatList();
     }
 
     async function sendFile(file, kind, caption) {
@@ -469,7 +492,7 @@
       if (caption) fd.append('text', caption);
       await api('/chats/' + activeChat.id + '/messages', { method: 'POST', body: fd });
       await loadMessages();
-      await loadChats();
+      refreshChatList();
     }
 
     async function onFilePicked(ev) {
@@ -484,33 +507,72 @@
       }
     }
 
+    function voiceMimeType() {
+      const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
+      return types.find((t) => MediaRecorder.isTypeSupported(t)) || '';
+    }
+
+    function voiceExt(mime) {
+      if (mime.includes('mp4')) return '.m4a';
+      if (mime.includes('ogg')) return '.ogg';
+      return '.webm';
+    }
+
     async function startVoice() {
       if (!activeChat || mediaRecorder) return;
+      if (!navigator.mediaDevices?.getUserMedia) {
+        showAppErr('микрофон недоступен — нужен HTTPS или Safari/Chrome');
+        return;
+      }
+      if (!window.isSecureContext && location.hostname !== 'localhost') {
+        showAppErr('голосовые работают только по HTTPS (или localhost)');
+        return;
+      }
       try {
         voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         voiceChunks = [];
-        mediaRecorder = new MediaRecorder(voiceStream);
+        const mime = voiceMimeType();
+        mediaRecorder = mime
+          ? new MediaRecorder(voiceStream, { mimeType: mime })
+          : new MediaRecorder(voiceStream);
         mediaRecorder.ondataavailable = (e) => { if (e.data.size) voiceChunks.push(e.data); };
         mediaRecorder.onstop = async () => {
           $('voiceBtn').classList.remove('recording');
           $('voiceHint').classList.add('hidden');
           voiceStream?.getTracks().forEach((t) => t.stop());
           voiceStream = null;
+          const rec = mediaRecorder;
           mediaRecorder = null;
           if (!voiceChunks.length) return;
-          const blob = new Blob(voiceChunks, { type: voiceChunks[0]?.type || 'audio/webm' });
-          if (blob.size < 800) return;
+          const type = rec.mimeType || voiceChunks[0]?.type || 'audio/webm';
+          const blob = new Blob(voiceChunks, { type });
+          if (blob.size < 800) {
+            showAppErr('слишком короткое — держи 🎤 дольше');
+            return;
+          }
+          const ext = voiceExt(type);
           try {
-            await sendFile(new File([blob], 'voice.webm', { type: blob.type }), 'voice');
+            await sendFile(new File([blob], 'voice' + ext, { type }), 'voice');
           } catch (e) {
             showAppErr(e.message || 'не удалось отправить голосовое');
           }
         };
-        mediaRecorder.start();
+        mediaRecorder.start(200);
         $('voiceBtn').classList.add('recording');
         $('voiceHint').classList.remove('hidden');
-      } catch {
-        showAppErr('нет доступа к микрофону');
+      } catch (e) {
+        if (!window.isSecureContext && location.hostname !== 'localhost') {
+          showAppErr('голосовые только по HTTPS — открой https://' + location.host);
+          return;
+        }
+        const n = e?.name || '';
+        if (n === 'NotAllowedError' || n === 'PermissionDeniedError') {
+          showAppErr('нет доступа — разреши микрофон в настройках браузера');
+        } else if (n === 'NotFoundError') {
+          showAppErr('микрофон не найден на этом устройстве');
+        } else {
+          showAppErr('нет доступа к микрофону');
+        }
       }
     }
 
@@ -537,11 +599,11 @@
     $('fileInput').onchange = onFilePicked;
 
     const voiceBtn = $('voiceBtn');
-    voiceBtn.addEventListener('mousedown', startVoice);
-    voiceBtn.addEventListener('mouseup', stopVoice);
+    voiceBtn.addEventListener('mousedown', (e) => { e.preventDefault(); startVoice(); });
+    voiceBtn.addEventListener('mouseup', (e) => { e.preventDefault(); stopVoice(); });
     voiceBtn.addEventListener('mouseleave', stopVoice);
-    voiceBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startVoice(); });
-    voiceBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopVoice(); });
+    voiceBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startVoice(); }, { passive: false });
+    voiceBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopVoice(); }, { passive: false });
 
     (async () => {
       if (!token) return showLogin();

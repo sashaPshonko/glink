@@ -1,6 +1,7 @@
 server/node_modules/
 server/data/
 server/uploads/
+server/certs/
 app/node_modules/
 app/.expo/
 app/android/

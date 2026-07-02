@@ -32,8 +32,8 @@ REMOTE
 
 echo ""
 echo "Проверка:"
-curl -s http://31.128.38.147:3920/ | grep -o 'нажми на себя' | head -1 || echo "FAIL"
-curl -s -X POST http://31.128.38.147:3920/auth/signin \
+curl -sk https://31.128.38.147:3920/ | grep -o 'нажми на себя' | head -1 || echo "FAIL"
+curl -sk -X POST https://31.128.38.147:3920/auth/signin \
   -H 'Content-Type: application/json' \
   -d '{"username":"sasha_pshonko"}' | head -c 120
 echo

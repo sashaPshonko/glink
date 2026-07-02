@@ -1,8 +1,9 @@
 import express from 'express';
-import { createServer } from 'http';
+import { createServer as createHttpServer } from 'http';
+import { createServer as createHttpsServer } from 'https';
 import { WebSocketServer } from 'ws';
 import multer from 'multer';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
@@ -42,8 +43,10 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WEB_DIR = join(__dirname, 'web');
+const CERT_DIR = join(__dirname, 'certs');
 
 const PORT = Number(process.env.PORT || 3920);
+const HTTP_PORT = Number(process.env.GLINK_HTTP_PORT || PORT + 1);
 const app = express();
 
 ensureUploadsDir();
@@ -416,7 +419,7 @@ app.get('/files/:fileId', authFromQueryOrHeader, (req, res) => {
     res.sendFile(path);
 });
 
-const server = createServer(app);
+const server = createAppServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
 wss.on('connection', (ws, req) => {
@@ -457,8 +460,43 @@ wss.on('connection', (ws, req) => {
     });
 });
 
+function tlsFiles() {
+    const key = join(CERT_DIR, 'key.pem');
+    const cert = join(CERT_DIR, 'cert.pem');
+    if (!existsSync(key) || !existsSync(cert)) return null;
+    return {
+        key: readFileSync(key),
+        cert: readFileSync(cert),
+    };
+}
+
+function createAppServer(app) {
+    const tls = tlsFiles();
+    if (tls) {
+        return createHttpsServer(tls, app);
+    }
+    return createHttpServer(app);
+}
+
+function startHttpRedirect() {
+    const tls = tlsFiles();
+    if (!tls) return;
+    const redirect = express();
+    redirect.use((req, res) => {
+        const host = String(req.headers.host || '').split(':')[0] || 'localhost';
+        const target = `https://${host}:${PORT}${req.url}`;
+        res.redirect(301, target);
+    });
+    createHttpServer(redirect).listen(HTTP_PORT, '0.0.0.0', () => {
+        console.log(`[glink] http→https редирект: http://0.0.0.0:${HTTP_PORT}/ → :${PORT}`);
+    });
+}
+
 server.listen(PORT, '0.0.0.0', () => {
+    const tls = tlsFiles();
+    const scheme = tls ? 'https' : 'http';
     console.log(`[glink] ${MEMBERS.join(', ')} + группа «${GROUP_TITLE}»`);
-    console.log(`[glink] веб-клиент: http://0.0.0.0:${PORT}/`);
-    console.log(`[glink] ws://0.0.0.0:${PORT}/ws`);
+    console.log(`[glink] веб-клиент: ${scheme}://0.0.0.0:${PORT}/`);
+    console.log(`[glink] ${scheme === 'https' ? 'wss' : 'ws'}://0.0.0.0:${PORT}/ws`);
+    if (tls) startHttpRedirect();
 });
