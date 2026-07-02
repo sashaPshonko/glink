@@ -406,6 +406,10 @@
     let videoDiscard = false;
     let videoStarting = false;
     let lastMsgCount = 0;
+    let lastMessagesSig = '';
+    let userPinnedBottom = true;
+    let suppressScrollTrack = false;
+    let loadMsgGen = 0;
     let selectedUsername = localStorage.getItem('glink_last_user') || '';
     let accounts = [];
 
@@ -626,11 +630,10 @@
     async function loadMessages(opts = {}) {
       if (!activeChat) return;
 
+      const gen = ++loadMsgGen;
       const box = $('messages');
-      const prevScroll = box.scrollTop;
-      const prevHeight = box.scrollHeight;
-      const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 120;
-      const stick = opts.forceBottom || nearBottom || lastMsgCount === 0;
+      const stick = opts.forceBottom || userPinnedBottom;
+      const anchor = stick ? null : saveScrollAnchor(box);
 
       let restore = null;
       if (voiceAudio) {
@@ -647,8 +650,25 @@
         stopVoiceRaf();
       }
 
-      const data = await api('/chats/' + activeChat.id + '/messages');
+      let data;
+      try {
+        data = opts.messages
+          ? { messages: opts.messages }
+          : await api('/chats/' + activeChat.id + '/messages');
+      } catch (_) {
+        return;
+      }
+      if (gen !== loadMsgGen) return;
+
+      const sig = messagesSig(data.messages);
+      if (!opts.forceBottom && sig === lastMessagesSig && box.querySelector('.bubble')) {
+        applyReadTicks(data.messages, box);
+        markChatRead();
+        return;
+      }
+      lastMessagesSig = sig;
       lastMsgCount = data.messages?.length || 0;
+
       box.innerHTML = data.messages.map((m) => {
         const mine = m.senderId === user.id;
         const sender = activeChat.type === 'group' && !mine
@@ -657,10 +677,13 @@
           : (m.kind === 'image' && !m.text ? ' has-image' : '');
         return `<div class="bubble ${mine ? 'mine' : 'theirs'}${extraCls}" data-id="${m.id}">${sender}${renderMessageBody(m)}${renderTicks(m, mine)}</div>`;
       }).join('');
+      if (gen !== loadMsgGen) return;
+
       if (stick) {
-        box.scrollTop = box.scrollHeight;
+        scrollToBottom(box);
       } else {
-        box.scrollTop = Math.max(0, prevScroll + (box.scrollHeight - prevHeight));
+        restoreScrollAnchor(box, anchor);
+        maintainScrollAnchor(box, anchor);
       }
       wireVoicePlayers(box);
       wireVideoNotes(box);
@@ -679,22 +702,91 @@
       }
     }
 
+    function isAtBottom(box, threshold = 80) {
+      return box.scrollHeight - box.scrollTop - box.clientHeight < threshold;
+    }
+
+    function setScrollTop(box, top) {
+      suppressScrollTrack = true;
+      box.scrollTop = top;
+      requestAnimationFrame(() => { suppressScrollTrack = false; });
+    }
+
+    function scrollToBottom(box) {
+      setScrollTop(box, box.scrollHeight);
+      requestAnimationFrame(() => setScrollTop(box, box.scrollHeight));
+    }
+
+    function saveScrollAnchor(box) {
+      const scrollTop = box.scrollTop;
+      for (const b of box.querySelectorAll('.bubble')) {
+        if (b.offsetTop + b.offsetHeight > scrollTop + 2) {
+          return { id: b.dataset.id, offset: scrollTop - b.offsetTop };
+        }
+      }
+      return { bottom: true };
+    }
+
+    function restoreScrollAnchor(box, anchor) {
+      if (!anchor) return;
+      if (anchor.bottom) {
+        scrollToBottom(box);
+        return;
+      }
+      const el = box.querySelector('.bubble[data-id="' + anchor.id + '"]');
+      if (el) setScrollTop(box, el.offsetTop + anchor.offset);
+    }
+
+    function maintainScrollAnchor(box, anchor) {
+      if (!anchor || anchor.bottom) return;
+      const reapply = () => restoreScrollAnchor(box, anchor);
+      box.querySelectorAll('img').forEach((img) => {
+        if (!img.complete) img.addEventListener('load', reapply, { once: true });
+      });
+      box.querySelectorAll('.video-note video').forEach((vid) => {
+        if (vid.readyState < 1) vid.addEventListener('loadedmetadata', reapply, { once: true });
+      });
+    }
+
+    function messagesSig(messages) {
+      if (!messages?.length) return '0';
+      const last = messages[messages.length - 1];
+      return messages.length + ':' + last.id;
+    }
+
+    function applyReadTicks(messages, box = $('messages')) {
+      for (const m of messages) {
+        if (m.senderId !== user.id) continue;
+        const bubble = box.querySelector('.bubble[data-id="' + m.id + '"]');
+        if (!bubble) continue;
+        const html = renderTicks(m, true);
+        const foot = bubble.querySelector('.msg-foot');
+        if (html) {
+          if (foot) foot.outerHTML = html;
+          else bubble.insertAdjacentHTML('beforeend', html);
+        } else if (foot) foot.remove();
+      }
+    }
+
+    async function syncMessages() {
+      if (!activeChat) return;
+      try {
+        const data = await api('/chats/' + activeChat.id + '/messages');
+        const sig = messagesSig(data.messages);
+        if (sig !== lastMessagesSig) {
+          await loadMessages({ forceBottom: userPinnedBottom, messages: data.messages });
+        } else {
+          applyReadTicks(data.messages);
+          markChatRead();
+        }
+      } catch (_) {}
+    }
+
     async function refreshReadTicks() {
       if (!activeChat) return;
       try {
         const data = await api('/chats/' + activeChat.id + '/messages');
-        const box = $('messages');
-        for (const m of data.messages) {
-          if (m.senderId !== user.id) continue;
-          const bubble = box.querySelector('.bubble[data-id="' + m.id + '"]');
-          if (!bubble) continue;
-          const html = renderTicks(m, true);
-          const foot = bubble.querySelector('.msg-foot');
-          if (html) {
-            if (foot) foot.outerHTML = html;
-            else bubble.insertAdjacentHTML('beforeend', html);
-          } else if (foot) foot.remove();
-        }
+        applyReadTicks(data.messages);
       } catch (_) {}
     }
 
@@ -1144,9 +1236,7 @@
         try {
           const msg = JSON.parse(ev.data);
           if (msg.type === 'message' && activeChat && msg.message?.chatId === activeChat.id) {
-            const box = $('messages');
-            const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 120;
-            loadMessages({ forceBottom: nearBottom });
+            loadMessages({ forceBottom: userPinnedBottom });
             refreshChatList();
           }
           if (msg.type === 'read' && msg.chatId) {
@@ -1161,6 +1251,8 @@
     async function openChat(chat) {
       activeChat = chat;
       lastMsgCount = 0;
+      lastMessagesSig = '';
+      userPinnedBottom = true;
       $('chatList').classList.add('hidden');
       $('chatView').classList.remove('hidden');
       $('chatTitle').textContent = chatTitle(chat);
@@ -1173,8 +1265,7 @@
         if (activeVideoEl && !activeVideoEl.paused) return;
         if (mediaRecorder?.state === 'recording') return;
         if (videoRecorder?.state === 'recording') return;
-        refreshReadTicks();
-        loadMessages();
+        syncMessages();
       }, 5000);
     }
 
@@ -1494,6 +1585,11 @@
     $('voiceSendBtn').onclick = (e) => { e.preventDefault(); finishVoiceRecording(); };
     $('videoCancelBtn').onclick = (e) => { e.preventDefault(); cancelVideoRecording(); };
     $('videoSendBtn').onclick = (e) => { e.preventDefault(); finishVideoRecording(); };
+
+    $('messages').addEventListener('scroll', () => {
+      if (suppressScrollTrack || !activeChat) return;
+      userPinnedBottom = isAtBottom($('messages'));
+    }, { passive: true });
 
     (async () => {
       if (!token) return showLogin();
