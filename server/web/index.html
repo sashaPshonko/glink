@@ -2190,6 +2190,38 @@
       }
     }
 
+    function fileFromClipboard(dataTransfer) {
+      if (!dataTransfer?.items?.length) return null;
+      for (const item of dataTransfer.items) {
+        if (item.kind !== 'file') continue;
+        const type = (item.type || '').toLowerCase();
+        if (!type.startsWith('image/')) continue;
+        const blob = item.getAsFile();
+        if (!blob) continue;
+        let ext = '.png';
+        if (type.includes('jpeg') || type.includes('jpg')) ext = '.jpg';
+        else if (type.includes('webp')) ext = '.webp';
+        else if (type.includes('gif')) ext = '.gif';
+        return new File([blob], 'photo' + ext, { type: type || blob.type || 'image/png' });
+      }
+      return null;
+    }
+
+    async function onPasteImage(ev) {
+      if (!activeChat || editingMessageId) return;
+      if ($('app').classList.contains('hidden')) return;
+      if (!$('voiceRecOverlay').classList.contains('hidden')) return;
+      if (!$('videoRecOverlay').classList.contains('hidden')) return;
+      const file = fileFromClipboard(ev.clipboardData);
+      if (!file) return;
+      ev.preventDefault();
+      try {
+        await sendFile(file, 'image');
+      } catch (e) {
+        showAppErr(e.message || 'не удалось отправить фото');
+      }
+    }
+
     function voiceMimeType() {
       const apple = /iPad|iPhone|iPod/.test(navigator.userAgent)
         || (navigator.userAgent.includes('Mac') && 'ontouchend' in document);
@@ -2368,6 +2400,7 @@
       if (e.key === 'Escape' && editingMessageId) cancelEdit();
     };
     $('fileInput').onchange = onFilePicked;
+    document.addEventListener('paste', onPasteImage);
 
     const MEDIA_ICONS = {
       attach: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.5 6v11.5a4 4 0 01-8 0V5a2.5 2.5 0 015 0v10.5a1 1 0 11-2 0V6H9v9.5a3.5 3.5 0 007 0V5a4 4 0 00-8 0v12.5a5.5 5.5 0 0011 0V6h-1.5z"/></svg>',
