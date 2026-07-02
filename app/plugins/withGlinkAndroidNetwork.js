@@ -2,11 +2,37 @@ const { withAndroidManifest, withDangerousMod, AndroidConfig } = require('@expo/
 const fs = require('fs');
 const path = require('path');
 
+const GLINK_HOST = '31.128.38.147';
+
+function patchWebViewSsl(projectRoot) {
+    const clientPath = path.join(
+        projectRoot,
+        'node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java',
+    );
+    if (!fs.existsSync(clientPath)) return;
+    let src = fs.readFileSync(clientPath, 'utf8');
+    if (src.includes(`failingUrl.contains("${GLINK_HOST}")`)) return;
+    const needle = `        handler.cancel();
+
+        if (!topWindowUrl.equalsIgnoreCase(failingUrl)) {`;
+    const replacement = `        if (failingUrl != null && failingUrl.contains("${GLINK_HOST}")) {
+            handler.proceed();
+            return;
+        }
+        handler.cancel();
+
+        if (!topWindowUrl.equalsIgnoreCase(failingUrl)) {`;
+    if (!src.includes(needle)) return;
+    src = src.replace(needle, replacement);
+    fs.writeFileSync(clientPath, src);
+}
+
 function withGlinkAndroidNetwork(config) {
     config = withDangerousMod(config, [
         'android',
         async (cfg) => {
             const projectRoot = cfg.modRequest.projectRoot;
+            patchWebViewSsl(projectRoot);
             const resXml = path.join(cfg.modRequest.platformProjectRoot, 'app/src/main/res/xml');
             const resRaw = path.join(cfg.modRequest.platformProjectRoot, 'app/src/main/res/raw');
             fs.mkdirSync(resXml, { recursive: true });
@@ -33,7 +59,7 @@ function withGlinkAndroidNetwork(config) {
                 `<?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
   <domain-config cleartextTrafficPermitted="true">
-    <domain includeSubdomains="true">31.128.38.147</domain>
+    <domain includeSubdomains="true">${GLINK_HOST}</domain>
     <domain includeSubdomains="true">localhost</domain>
     <domain includeSubdomains="true">10.0.2.2</domain>
     ${domainTrust}

@@ -4,9 +4,12 @@ mkdir -p data uploads certs
 
 if [ ! -f certs/cert.pem ]; then
   echo "[glink] создаю HTTPS-сертификат (для микрофона в браузере)…"
+  IP="${GLINK_CERT_IP:-31.128.38.147}"
   openssl req -x509 -newkey rsa:2048 \
     -keyout certs/key.pem -out certs/cert.pem \
-    -days 3650 -nodes -subj "/CN=glink" 2>/dev/null
+    -days 3650 -nodes \
+    -subj "/CN=${IP}" \
+    -addext "subjectAltName=IP:${IP},DNS:glink,DNS:localhost" 2>/dev/null
 fi
 
 pkill -f 'node index.mjs' 2>/dev/null || true

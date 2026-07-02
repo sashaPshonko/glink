@@ -6,3 +6,5 @@ app/node_modules/
 app/.expo/
 app/android/
 app/ios/
+*.apk
+app/glink-cert.pem

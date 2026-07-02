@@ -7,6 +7,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "cert": "bash scripts/fetch-cert.sh",
+    "prebuild:android": "bash scripts/fetch-cert.sh && npx expo prebuild --platform android --no-install",
+    "build:android": "bash scripts/build-android.sh",
     "build:apk": "bash scripts/fetch-cert.sh && eas build --platform android --profile preview",
     "build:apk:local": "bash scripts/fetch-cert.sh && eas build --platform android --profile preview --local"
   },

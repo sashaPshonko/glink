@@ -217,6 +217,15 @@ app.get('/app', (_req, res) => {
     sendWebApp(res);
 });
 
+app.get('/icon.png', (_req, res) => {
+    res.sendFile(join(WEB_DIR, 'icon.png'));
+});
+
+app.get('/favicon.ico', (_req, res) => {
+    res.type('png');
+    res.sendFile(join(WEB_DIR, 'icon.png'));
+});
+
 app.get('/health', (_req, res) => {
     res.json({
         ok: true,
