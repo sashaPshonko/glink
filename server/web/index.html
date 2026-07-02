@@ -7,19 +7,16 @@
   <style>
     * { box-sizing: border-box; }
     :root {
-      --glink-bg: #fff0f6;
-      --glink-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='%23e879a9' fill-opacity='0.09'%3E%3Cpath d='M40 58s-22-14-22-32c0-8 6-14 14-14 5 0 9 3 11 7 2-4 6-7 11-7 8 0 14 6 14 14 0 18-22 32-22 32z'/%3E%3C/g%3E%3Cg fill='%23f472b6' fill-opacity='0.06' transform='translate(40 40)'%3E%3Ccircle cx='0' cy='0' r='3'/%3E%3C/g%3E%3C/svg%3E");
-      --glink-dots: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Ccircle cx='2' cy='2' r='1.2' fill='%23db2777' fill-opacity='0.07'/%3E%3C/svg%3E");
+      --glink-bg: #fff5f9;
+      --glink-dots: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='1.5' cy='1.5' r='1' fill='%23e879a9' fill-opacity='0.04'/%3E%3C/svg%3E");
     }
     .glink-pattern {
       background-color: var(--glink-bg);
       background-image:
-        radial-gradient(ellipse 90% 70% at 10% 0%, rgba(251, 207, 232, 0.55), transparent 55%),
-        radial-gradient(ellipse 80% 60% at 95% 100%, rgba(244, 114, 182, 0.35), transparent 50%),
-        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.4), transparent 70%),
-        var(--glink-pattern),
+        radial-gradient(ellipse 110% 80% at 0% 0%, rgba(251, 207, 232, 0.28), transparent 52%),
+        radial-gradient(ellipse 90% 70% at 100% 100%, rgba(244, 114, 182, 0.14), transparent 48%),
         var(--glink-dots);
-      background-size: 100% 100%, 100% 100%, 100% 100%, 80px 80px, 20px 20px;
+      background-size: 100% 100%, 100% 100%, 24px 24px;
       background-attachment: fixed;
     }
     body {
@@ -179,8 +176,15 @@
     .sender { font-size: 0.75rem; color: #db2777; font-weight: 600; margin-bottom: 4px; }
     .bubble a { color: #be185d; text-decoration: underline; }
     .bubble img {
-      max-width: min(280px, 100%); border-radius: 12px; display: block;
-      margin-top: 4px; cursor: pointer;
+      max-width: min(280px, 100%); border-radius: 14px; display: block;
+      margin-top: 4px; cursor: pointer; border: none; outline: none;
+    }
+    .bubble.has-image {
+      padding: 0; background: transparent !important; border: none !important;
+    }
+    .bubble.has-image img {
+      margin-top: 0; border-radius: 16px;
+      box-shadow: 0 2px 14px rgba(92, 51, 71, 0.1);
     }
     .voice-msg {
       display: flex; align-items: center; gap: 10px;
@@ -647,7 +651,9 @@
         const mine = m.senderId === user.id;
         const sender = activeChat.type === 'group' && !mine
           ? `<div class="sender">${escapeHtml(m.senderName || '?')}</div>` : '';
-        return `<div class="bubble ${mine ? 'mine' : 'theirs'}${m.kind === 'video' ? ' has-video' : ''}" data-id="${m.id}">${sender}${renderMessageBody(m)}${renderTicks(m, mine)}</div>`;
+        const extraCls = m.kind === 'video' ? ' has-video'
+          : (m.kind === 'image' && !m.text ? ' has-image' : '');
+        return `<div class="bubble ${mine ? 'mine' : 'theirs'}${extraCls}" data-id="${m.id}">${sender}${renderMessageBody(m)}${renderTicks(m, mine)}</div>`;
       }).join('');
       if (stick) {
         box.scrollTop = box.scrollHeight;
