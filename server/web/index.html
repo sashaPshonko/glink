@@ -156,6 +156,7 @@
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       max-width: 100%;
     }
+    .preview.draft { color: #db2777; font-style: italic; }
     .row-body { flex: 1; min-width: 0; }
     .row-top {
       display: flex; align-items: center; justify-content: space-between; gap: 8px;
@@ -549,15 +550,122 @@
     }
     .draft-file-size { font-size: 0.75rem; color: #b07a94; flex-shrink: 0; }
     .msg-album {
-      display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px;
+      display: grid;
+      gap: 2px;
+      border-radius: 14px;
+      overflow: hidden;
+      width: min(280px, 100%);
+      max-width: 100%;
     }
-    .msg-album-item { flex: 0 0 auto; max-width: 100%; }
+    .msg-album.album-mixed {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      overflow: visible;
+      border-radius: 0;
+      width: auto;
+    }
+    .msg-album-item {
+      position: relative;
+      overflow: hidden;
+      min-width: 0;
+    }
+    .msg-album.album-mixed .msg-album-item {
+      flex: 0 0 auto;
+      max-width: min(140px, 100%);
+      border-radius: 14px;
+      overflow: hidden;
+    }
     .msg-album-item img {
-      max-width: min(140px, 100%); max-height: 140px;
-      border-radius: 16px; display: block; cursor: pointer;
+      width: 100%;
+      display: block;
+      cursor: pointer;
+      object-fit: cover;
     }
-    .bubble.has-album { padding: 8px 10px; }
-    .bubble.has-album.has-caption { padding-bottom: 8px; }
+    .msg-album.album-grid-1 .msg-album-item img {
+      max-height: 280px;
+      border-radius: 14px;
+    }
+    .msg-album.album-grid-2 {
+      grid-template-columns: 1fr 1fr;
+    }
+    .msg-album.album-grid-2 .msg-album-item img {
+      height: 136px;
+    }
+    .msg-album.album-grid-3 {
+      grid-template-columns: 1.05fr 0.95fr;
+      grid-template-rows: 1fr 1fr;
+    }
+    .msg-album.album-grid-3 .msg-album-item:first-child {
+      grid-row: 1 / span 2;
+    }
+    .msg-album.album-grid-3 .msg-album-item:first-child img {
+      height: 100%;
+      min-height: 184px;
+    }
+    .msg-album.album-grid-3 .msg-album-item:not(:first-child) img {
+      height: 91px;
+    }
+    .msg-album.album-grid-4,
+    .msg-album.album-grid-many {
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+    }
+    .msg-album.album-grid-4 .msg-album-item img,
+    .msg-album.album-grid-many .msg-album-item img {
+      height: 118px;
+    }
+    .msg-album-item.more-overlay::after {
+      content: attr(data-more);
+      position: absolute;
+      inset: 0;
+      background: rgba(92, 51, 71, 0.52);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.45rem;
+      font-weight: 700;
+      pointer-events: none;
+    }
+    .msg-album.album-mixed .msg-album-item img {
+      max-width: min(140px, 100%);
+      max-height: 140px;
+      border-radius: 14px;
+    }
+    .msg-album .album-pending {
+      width: 100%;
+      height: 100%;
+      min-height: 72px;
+      min-width: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 0;
+    }
+    .bubble.has-album { padding: 4px; }
+    .bubble.has-album.has-caption { padding: 4px 8px 8px; }
+    .bubble.has-album.has-caption .msg-album { margin-bottom: 4px; }
+    .bubble.has-album-photos:not(.has-caption) {
+      padding: 0;
+      background: transparent !important;
+      border: none !important;
+      overflow: visible;
+      border-radius: 0;
+    }
+    .bubble.has-album-photos.has-caption {
+      padding: 0 0 8px;
+      overflow: hidden;
+    }
+    .bubble.mine.has-album-photos.has-caption {
+      background: rgba(249, 197, 223, 0.95) !important;
+      border-radius: 28px 28px 12px 28px;
+    }
+    .bubble.theirs.has-album-photos.has-caption {
+      background: rgba(255, 255, 255, 0.92) !important;
+      border: 1px solid rgba(252, 231, 243, 0.95) !important;
+      border-radius: 28px 28px 28px 12px;
+    }
     .album-pending {
       font-size: 0.85rem; color: #9d174d; padding: 6px 10px;
       background: rgba(255,255,255,0.45); border-radius: 12px;
@@ -588,6 +696,8 @@
       background: rgba(255, 255, 255, 0.12);
       display: flex; align-items: center; justify-content: center;
       font-size: 4rem;
+    }
+    .voice-rec-icon.recording-active {
       animation: recPulse 1.2s ease-in-out infinite;
     }
     @keyframes recPulse { 50% { transform: scale(1.05); opacity: 0.85; } }
@@ -694,10 +804,40 @@
     }
     #videoRecOverlay.hidden { display: none !important; }
     #videoRecOverlay .rec-actions { display: flex; gap: 28px; margin-top: 8px; }
+    .video-rec-preview-wrap {
+      position: relative;
+      width: min(72vw, 280px);
+      height: min(72vw, 280px);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .video-rec-preview-wrap::before {
+      content: '';
+      position: absolute;
+      inset: -5px;
+      border-radius: 50%;
+      border: 4px solid rgba(255, 255, 255, 0.45);
+      pointer-events: none;
+      z-index: 1;
+      transition: opacity 0.2s ease, border-color 0.2s ease;
+    }
+    .video-rec-preview-wrap.recording-active::before {
+      border-color: #fff;
+      animation: recRingPulse 1.2s ease-in-out infinite;
+    }
+    .video-rec-preview-wrap.rec-paused::before {
+      animation: none;
+      border-color: rgba(255, 255, 255, 0.42);
+      opacity: 0.75;
+    }
+    @keyframes recRingPulse {
+      50% { transform: scale(1.035); opacity: 0.72; }
+    }
     #videoRecPreview {
-      width: min(72vw, 280px); height: min(72vw, 280px);
+      width: 100%; height: 100%;
       border-radius: 50%; object-fit: cover;
       border: none; background: #000;
+      display: block;
     }
     #videoRecTimer { color: #fbcfe8; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
     #videoRecStatus { color: #fbcfe8; font-size: 0.9rem; min-height: 1.2em; }
@@ -791,7 +931,9 @@
   </div>
   <div id="videoRecOverlay" class="hidden">
     <div id="videoRecRecord" class="rec-stage">
-      <video id="videoRecPreview" autoplay muted playsinline webkit-playsinline class="mirror"></video>
+      <div id="videoRecPreviewWrap" class="video-rec-preview-wrap">
+        <video id="videoRecPreview" autoplay muted playsinline webkit-playsinline class="mirror"></video>
+      </div>
       <div id="videoRecTimer">0:00</div>
       <div id="videoRecStatus">включаю камеру…</div>
       <div class="rec-actions">
@@ -846,6 +988,8 @@
     let videoRafWrap = null;
     let videoRafVid = null;
     let draftAttachments = [];
+    const chatDrafts = new Map();
+    const DRAFTS_TEXT_LS = 'glink_chat_drafts_text';
     let draftPreviewAudio = null;
     let draftPreviewAudioId = null;
     let draftPreviewVideo = null;
@@ -1143,15 +1287,39 @@
       return '<div class="album-pending">📎</div>';
     }
 
+    function isImageAttachment(f) {
+      return attachmentKind(f) === 'image';
+    }
+
+    function albumGridClass(attachments) {
+      if (!attachments.every(isImageAttachment)) return 'album-mixed';
+      const n = attachments.length;
+      if (n <= 1) return 'album-grid-1';
+      if (n === 2) return 'album-grid-2';
+      if (n === 3) return 'album-grid-3';
+      if (n === 4) return 'album-grid-4';
+      return 'album-grid-many';
+    }
+
+    function renderAlbumHtml(attachments, pending, m) {
+      const cls = albumGridClass(attachments);
+      const allImages = attachments.every(isImageAttachment);
+      const showMore = allImages && attachments.length > 4;
+      const visible = showMore ? attachments.slice(0, 4) : attachments;
+      const moreCount = attachments.length - 4;
+      return `<div class="msg-album ${cls}">${visible.map((f, i) => {
+        const more = showMore && i === 3;
+        return `<div class="msg-album-item${more ? ' more-overlay' : ''}"${more ? ` data-more="+${moreCount}"` : ''}>${renderAttachmentPart(f, pending, m)}</div>`;
+      }).join('')}</div>`;
+    }
+
     function renderMessageBody(m) {
       const parts = [];
       const attachments = messageFiles(m);
       const pending = Boolean(m._pending);
 
       if (attachments.length > 1 || m.kind === 'album') {
-        parts.push(`<div class="msg-album">${attachments.map((f) =>
-          `<div class="msg-album-item">${renderAttachmentPart(f, pending, m)}</div>`,
-        ).join('')}</div>`);
+        parts.push(renderAlbumHtml(attachments, pending, m));
       } else if (attachments.length === 1) {
         parts.push(renderAttachmentPart(attachments[0], pending, m));
       } else {
@@ -1223,7 +1391,7 @@
 
     function startEditMessage(m) {
       if (!canEditMessage(m)) return;
-      clearDraftAttachment();
+      persistActiveChatDraft();
       editingMessageId = m.id;
       $('msgInput').value = m.text || '';
       $('composer').classList.add('editing');
@@ -1423,8 +1591,9 @@
       const multi = attachments.length > 1 || m.kind === 'album';
       const single = attachments[0];
       const sk = single ? attachmentKind(single) : m.kind;
+      const allPhotos = multi && attachments.length > 0 && attachments.every(isImageAttachment);
       const extraCls = multi
-        ? (' has-album' + (m.text ? ' has-caption' : ''))
+        ? (' has-album' + (allPhotos ? ' has-album-photos' : '') + (m.text ? ' has-caption' : ''))
         : (sk === 'video_note' ? ' has-video'
           : (sk === 'video' ? ' has-media-video'
             : (sk === 'audio' ? ' has-media-audio'
@@ -1518,9 +1687,11 @@
       if (chats.length) {
         $('chatList').innerHTML = chats.map((c) => {
           const wait = c.waiting ? ' wait' : '';
+          const draftPrev = chatDraftPreview(c.id);
           const sub = c.waiting
             ? 'ещё не зарегистрировался'
-            : truncatePreview(c.lastMessage?.text || 'Напиши первым ♡');
+            : (draftPrev?.text || truncatePreview(c.lastMessage?.text || 'Напиши первым ♡'));
+          const previewCls = draftPrev?.draft ? 'preview draft' : 'preview';
           const av = c.type === 'group' ? '♡' : (chatTitle(c)[0] || '?').toUpperCase();
           const cls = c.type === 'group' ? 'avatar group' : 'avatar';
           const unread = c.unreadCount || 0;
@@ -1536,7 +1707,7 @@
               <div class="row-top">
                 <strong>${escapeHtml(chatTitle(c))}</strong>
               </div>
-              <div class="preview">${escapeHtml(sub)}</div>
+              <div class="${previewCls}">${escapeHtml(sub)}</div>
             </div>
           </div>`;
         }).join('');
@@ -2048,10 +2219,12 @@
       document.querySelectorAll('.draft-voice-play').forEach((btn) => { btn.textContent = '▶'; });
     }
 
-    function clearDraftAttachments() {
+    function clearDraftAttachments(revoke = true) {
       stopDraftPreview();
-      for (const item of draftAttachments) {
-        if (item.url) URL.revokeObjectURL(item.url);
+      if (revoke) {
+        for (const item of draftAttachments) {
+          if (item.url) URL.revokeObjectURL(item.url);
+        }
       }
       draftAttachments = [];
       $('draftAttach')?.classList.add('hidden');
@@ -2059,7 +2232,119 @@
     }
 
     function clearDraftAttachment() {
-      clearDraftAttachments();
+      clearDraftAttachments(true);
+    }
+
+    function detachDraftAttachments() {
+      stopDraftPreview();
+      const items = draftAttachments;
+      draftAttachments = [];
+      $('draftAttach')?.classList.add('hidden');
+      if ($('draftAttachList')) $('draftAttachList').innerHTML = '';
+      return items;
+    }
+
+    function attachDraftItems(items) {
+      stopDraftPreview();
+      draftAttachments = items || [];
+      renderDraftAttachments();
+    }
+
+    function syncDraftTextStorage() {
+      const obj = {};
+      for (const [id, d] of chatDrafts) {
+        if (d.text?.trim()) obj[id] = d.text;
+      }
+      if (Object.keys(obj).length) localStorage.setItem(DRAFTS_TEXT_LS, JSON.stringify(obj));
+      else localStorage.removeItem(DRAFTS_TEXT_LS);
+    }
+
+    function loadDraftTextStorage() {
+      try {
+        const raw = localStorage.getItem(DRAFTS_TEXT_LS);
+        if (!raw) return;
+        const obj = JSON.parse(raw);
+        for (const [id, text] of Object.entries(obj)) {
+          if (!text?.trim()) continue;
+          const prev = chatDrafts.get(id) || { text: '', attachments: [] };
+          chatDrafts.set(id, { ...prev, text });
+        }
+      } catch { /* ignore */ }
+    }
+
+    function hasChatDraft(chatId) {
+      const d = chatDrafts.get(chatId);
+      return Boolean(d && (d.text?.trim() || d.attachments?.length));
+    }
+
+    function chatDraftPreview(chatId) {
+      const d = chatDrafts.get(chatId);
+      if (!d) return null;
+      const text = d.text?.trim() || '';
+      const n = d.attachments?.length || 0;
+      if (text) return { text: 'Черновик: ' + truncatePreview(text), draft: true };
+      if (n) {
+        const kinds = d.attachments.map((x) => x.kind);
+        const icon = kinds.every((k) => k === 'image') ? '📷'
+          : kinds.every((k) => k === 'voice') ? '🎤'
+          : kinds.every((k) => k === 'video_note') ? '⭕'
+          : '📎';
+        return { text: `Черновик: ${icon} ${n}`, draft: true };
+      }
+      return null;
+    }
+
+    function persistActiveChatDraft() {
+      if (!activeChat || editingMessageId) return;
+      const text = $('msgInput').value;
+      const attachments = detachDraftAttachments();
+      if (!text.trim() && !attachments.length) {
+        chatDrafts.delete(activeChat.id);
+      } else {
+        chatDrafts.set(activeChat.id, { text, attachments });
+      }
+      syncDraftTextStorage();
+    }
+
+    function restoreChatComposerDraft(chatId) {
+      $('msgInput').value = '';
+      const saved = chatDrafts.get(chatId);
+      if (saved) {
+        $('msgInput').value = saved.text || '';
+        attachDraftItems(saved.attachments || []);
+      } else {
+        attachDraftItems([]);
+      }
+      resizeMsgInput();
+    }
+
+    function noteChatDraftText() {
+      if (!activeChat || editingMessageId) return;
+      const text = $('msgInput').value;
+      const prev = chatDrafts.get(activeChat.id);
+      if (!text.trim() && !draftAttachments.length) {
+        if (prev?.attachments?.length) {
+          chatDrafts.set(activeChat.id, { text: '', attachments: prev.attachments });
+        } else {
+          chatDrafts.delete(activeChat.id);
+        }
+      } else {
+        chatDrafts.set(activeChat.id, {
+          text,
+          attachments: draftAttachments.length ? draftAttachments : (prev?.attachments || []),
+        });
+      }
+      syncDraftTextStorage();
+    }
+
+    function syncActiveChatDraftState() {
+      noteChatDraftText();
+    }
+
+    function clearActiveChatDraft() {
+      if (!activeChat) return;
+      chatDrafts.delete(activeChat.id);
+      syncDraftTextStorage();
     }
 
     function hasDraftAttachments() {
@@ -2172,6 +2457,7 @@
       if (item.url) URL.revokeObjectURL(item.url);
       if (draftPreviewAudioId === id) stopDraftPreview();
       renderDraftAttachments();
+      syncActiveChatDraftState();
     }
 
     function addDraftAttachment(file, kind) {
@@ -2192,6 +2478,7 @@
         url,
       });
       renderDraftAttachments();
+      syncActiveChatDraftState();
       $('msgInput').focus();
     }
 
@@ -2684,6 +2971,31 @@
       $('videoRecPreview').classList.toggle('mirror', videoFacingMode === 'user');
     }
 
+    function syncVoiceRecPulse() {
+      const icon = document.querySelector('#voiceRecRecord .voice-rec-icon');
+      if (!icon) return;
+      const active = mediaRecorder?.state === 'recording';
+      icon.classList.toggle('recording-active', active);
+    }
+
+    function syncVideoRecPulse() {
+      const wrap = $('videoRecPreviewWrap');
+      if (!wrap) return;
+      const recording = videoRecorder?.state === 'recording';
+      const paused = videoRecorder?.state === 'paused';
+      wrap.classList.toggle('recording-active', recording);
+      wrap.classList.toggle('rec-paused', paused || (!recording && videoRecStage === 'record'));
+    }
+
+    function resetRecPulseUI() {
+      document.querySelector('#voiceRecRecord .voice-rec-icon')
+        ?.classList.remove('recording-active');
+      const wrap = $('videoRecPreviewWrap');
+      if (wrap) {
+        wrap.classList.remove('recording-active', 'rec-paused');
+      }
+    }
+
     function mediaRecorderCanPause() {
       return typeof MediaRecorder !== 'undefined' && typeof MediaRecorder.prototype.pause === 'function';
     }
@@ -2819,6 +3131,7 @@
       $('videoRecTimer').textContent = '0:00';
       $('videoRecStatus').textContent = '';
       $('videoPauseBtn').textContent = '⏸';
+      resetRecPulseUI();
       showVideoRecordUI();
       $('mediaBtn').classList.remove('recording');
     }
@@ -2848,6 +3161,7 @@
         $('videoPauseBtn').textContent = '⏸';
         $('videoRecStatus').textContent = '⭕ идёт запись';
       }
+      syncVideoRecPulse();
     }
 
     async function flipVideoCamera() {
@@ -2878,6 +3192,7 @@
               } else if (state === 'paused') {
                 $('videoRecStatus').textContent = '⏸ пауза';
               }
+              syncVideoRecPulse();
               return;
             }
           } catch { /* fall through to track swap */ }
@@ -2905,6 +3220,7 @@
       } catch (e) {
         showAppErr('не удалось переключить камеру');
       }
+      syncVideoRecPulse();
     }
 
     function attachVideoReview() {
@@ -3005,6 +3321,7 @@
         videoRecStage = 'record';
         videoRecStarted = Date.now();
         $('videoRecStatus').textContent = '⭕ идёт запись';
+        syncVideoRecPulse();
         videoRecTimer = setInterval(() => {
           updateVideoRecTimerDisplay();
           const sec = Math.floor(recElapsedMs(videoRecStarted, videoRecAccumPaused, videoRecPauseStart, videoRecorder?.state) / 1000);
@@ -3075,7 +3392,10 @@
     }
 
     async function openChat(chat, opts = {}) {
-      clearDraftAttachment();
+      if (activeChat?.id !== chat.id) {
+        persistActiveChatDraft();
+        cancelEdit();
+      }
       activeChat = chat;
       touchChatActivity();
       localStorage.setItem('glink_active_chat', chat.id);
@@ -3086,6 +3406,7 @@
       $('chatView').classList.remove('hidden');
       $('chatTitle').textContent = chatTitle(chat);
       $('chatSub').textContent = chat.type === 'group' ? 'группа ♡' : 'личный чат';
+      restoreChatComposerDraft(chat.id);
       if (!opts.skipHistory) {
         history.pushState(
           { glink: 'chat', chatId: chat.id },
@@ -3109,9 +3430,9 @@
     }
 
     function closeChatUI() {
+      persistActiveChatDraft();
       cancelEdit();
       closeMsgMenu();
-      clearDraftAttachment();
       activeMessages = [];
       activeChat = null;
       localStorage.removeItem('glink_active_chat');
@@ -3177,6 +3498,7 @@
 
     async function loadChats() {
       showAppErr('');
+      loadDraftTextStorage();
       const data = await api('/chats');
       chats = data.chats || [];
       renderChats();
@@ -3254,7 +3576,8 @@
         const items = draftAttachments.map((x) => ({ file: x.file, kind: x.kind }));
         $('msgInput').value = '';
         resizeMsgInput();
-        clearDraftAttachments();
+        clearDraftAttachments(true);
+        clearActiveChatDraft();
         userPinnedBottom = true;
         try {
           await sendFiles(items, text || undefined);
@@ -3270,6 +3593,7 @@
       $('msgInput').value = '';
       resizeMsgInput();
       userPinnedBottom = true;
+      clearActiveChatDraft();
       const pendingId = 'pending-' + Date.now();
       appendMessage({
         id: pendingId,
@@ -3406,6 +3730,7 @@
       $('voiceRecTimer').textContent = '0:00';
       $('voiceRecStatus').textContent = '';
       $('voicePauseBtn').textContent = '⏸';
+      resetRecPulseUI();
       showVoiceRecordUI();
       $('mediaBtn').classList.remove('recording');
     }
@@ -3435,6 +3760,7 @@
         $('voicePauseBtn').textContent = '⏸';
         $('voiceRecStatus').textContent = '🎤 идёт запись';
       }
+      syncVoiceRecPulse();
     }
 
     function attachVoiceReview() {
@@ -3536,6 +3862,7 @@
         voiceRecStage = 'record';
         voiceRecStarted = Date.now();
         $('voiceRecStatus').textContent = '🎤 идёт запись';
+        syncVoiceRecPulse();
         voiceRecInterval = setInterval(() => {
           updateVoiceRecTimerDisplay();
           const sec = Math.floor(recElapsedMs(voiceRecStarted, voiceRecAccumPaused, voiceRecPauseStart, mediaRecorder?.state) / 1000);
@@ -3562,7 +3889,10 @@
     }
 
     $('logoutBtn').onclick = () => {
+      persistActiveChatDraft();
       clearToken();
+      chatDrafts.clear();
+      localStorage.removeItem(DRAFTS_TEXT_LS);
       if (ws) ws.close();
       clearInterval(pollTimer);
       cancelVoiceRecording();
@@ -3594,6 +3924,7 @@
     $('msgInput').addEventListener('input', () => {
       showAppErr('');
       resizeMsgInput();
+      syncActiveChatDraftState();
     });
     $('fileInput').onchange = onFilePicked;
     document.addEventListener('paste', onPasteImage);
