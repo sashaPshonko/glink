@@ -141,6 +141,7 @@
     .bubble.theirs .voice-play { background: #ffecf4; }
     .voice-body { flex: 1; min-width: 0; }
     .voice-wave {
+      position: relative;
       height: 40px; cursor: pointer; touch-action: manipulation;
     }
     .voice-bars {
@@ -149,11 +150,23 @@
     .voice-bars i {
       flex: 1; min-width: 2px; max-width: 5px; border-radius: 2px;
       background: rgba(157, 23, 77, 0.22); display: block; align-self: center;
-      transition: background 0.08s;
     }
     .voice-bars i.on { background: rgba(157, 23, 77, 0.88); }
     .bubble.theirs .voice-bars i { background: rgba(232, 121, 169, 0.28); }
     .bubble.theirs .voice-bars i.on { background: rgba(219, 39, 119, 0.85); }
+    .voice-track {
+      height: 4px; border-radius: 2px; margin-top: 6px;
+      background: rgba(157, 23, 77, 0.15); overflow: hidden;
+    }
+    .bubble.theirs .voice-track { background: rgba(232, 121, 169, 0.2); }
+    .voice-track-fill {
+      height: 100%; width: 0%; border-radius: 2px;
+      background: linear-gradient(90deg, #db2777, #9d174d);
+      transition: width 0.12s linear;
+    }
+    .bubble.theirs .voice-track-fill {
+      background: linear-gradient(90deg, #f472b6, #db2777);
+    }
     .voice-time {
       font-size: 0.72rem; color: rgba(92, 51, 71, 0.65);
       margin-top: 3px; font-variant-numeric: tabular-nums;
@@ -251,6 +264,7 @@
     let voiceMsgEl = null;
     let voiceRaf = null;
     const waveCache = new Map();
+    const voicePos = new Map();
     let selectedUsername = localStorage.getItem('glink_last_user') || '';
     let accounts = [];
 
@@ -406,6 +420,7 @@
           `<button type="button" class="voice-play" aria-label="играть">▶</button>` +
           `<div class="voice-body">` +
           `<div class="voice-wave"><div class="voice-bars"></div></div>` +
+          `<div class="voice-track"><div class="voice-track-fill"></div></div>` +
           `<div class="voice-time"><span class="voice-cur">0:00</span> / <span class="voice-dur">…</span></div>` +
           `</div></div>`,
         );
@@ -463,6 +478,22 @@
 
     async function loadMessages() {
       if (!activeChat) return;
+
+      let restore = null;
+      if (voiceAudio) {
+        restore = {
+          src: voiceAudio.dataset.glinkSrc,
+          time: voiceAudio.currentTime,
+          playing: !voiceAudio.paused && !voiceAudio.ended,
+        };
+        voicePos.set(restore.src, restore.time);
+        voiceAudio.pause();
+        voiceAudio = null;
+        voiceBtnEl = null;
+        voiceMsgEl = null;
+        stopVoiceRaf();
+      }
+
       const data = await api('/chats/' + activeChat.id + '/messages');
       const box = $('messages');
       box.innerHTML = data.messages.map((m) => {
@@ -474,6 +505,18 @@
       box.scrollTop = box.scrollHeight;
       wireVoicePlayers(box);
       markChatRead();
+
+      if (restore) {
+        const el = [...box.querySelectorAll('.voice-msg')].find((n) => n.dataset.src === restore.src);
+        if (el) {
+          voicePos.set(restore.src, restore.time);
+          updateVoiceProgress(el, restore.time, Number(el.dataset.duration) || 0);
+          if (restore.playing) {
+            const btn = el.querySelector('.voice-play');
+            if (btn) toggleVoice(restore.src, btn, el);
+          }
+        }
+      }
     }
 
     async function markChatRead() {
@@ -488,6 +531,16 @@
       const m = Math.floor(s / 60);
       const sec = Math.floor(s % 60);
       return `${m}:${String(sec).padStart(2, '0')}`;
+    }
+
+    function getDuration(src) {
+      return new Promise((resolve) => {
+        const a = new Audio();
+        a.preload = 'metadata';
+        a.onloadedmetadata = () => resolve(a.duration || 0);
+        a.onerror = () => resolve(0);
+        a.src = src;
+      });
     }
 
     async function getWaveform(src) {
@@ -526,12 +579,28 @@
     }
 
     function updateVoiceProgress(el, current, duration) {
-      const pct = duration > 0 ? current / duration : 0;
+      const dur = duration > 0 ? duration : Number(el.dataset.duration) || 0;
+      const cur = Math.max(0, current || 0);
+      const pct = dur > 0 ? Math.min(100, (cur / dur) * 100) : 0;
+      const fill = el.querySelector('.voice-track-fill');
+      if (fill) fill.style.width = pct + '%';
       const bars = el.querySelectorAll('.voice-bars i');
-      const active = Math.floor(pct * bars.length);
+      const active = bars.length ? Math.floor((pct / 100) * bars.length) : 0;
       bars.forEach((bar, i) => bar.classList.toggle('on', i < active));
-      const cur = el.querySelector('.voice-cur');
-      if (cur) cur.textContent = fmtTime(current);
+      const curEl = el.querySelector('.voice-cur');
+      if (curEl) curEl.textContent = fmtTime(cur);
+    }
+
+    function voiceDuration(el, audio) {
+      return Number(el?.dataset.duration) || audio?.duration || 0;
+    }
+
+    function seekVoice(el, src, pct) {
+      const dur = voiceDuration(el, voiceAudio?.dataset.glinkSrc === src ? voiceAudio : null);
+      const time = Math.max(0, Math.min(dur, pct * dur));
+      voicePos.set(src, time);
+      updateVoiceProgress(el, time, dur);
+      if (voiceAudio?.dataset.glinkSrc === src) voiceAudio.currentTime = time;
     }
 
     function stopVoiceRaf() {
@@ -542,11 +611,41 @@
     function trackVoiceProgress(el) {
       stopVoiceRaf();
       const tick = () => {
-        if (!voiceAudio || voiceAudio.paused) return;
-        updateVoiceProgress(el, voiceAudio.currentTime, voiceAudio.duration);
+        if (!voiceAudio || voiceAudio.paused || voiceMsgEl !== el) return;
+        const t = voiceAudio.currentTime;
+        voicePos.set(voiceAudio.dataset.glinkSrc, t);
+        updateVoiceProgress(el, t, voiceAudio.duration);
         voiceRaf = requestAnimationFrame(tick);
       };
       voiceRaf = requestAnimationFrame(tick);
+    }
+
+    function bindVoiceAudio(el, src, btn) {
+      voiceAudio.onloadedmetadata = () => {
+        el.dataset.duration = String(voiceAudio.duration);
+        el.querySelector('.voice-dur').textContent = fmtTime(voiceAudio.duration);
+        const saved = voicePos.get(src) || 0;
+        if (saved > 0 && saved < voiceAudio.duration) voiceAudio.currentTime = saved;
+        updateVoiceProgress(el, voiceAudio.currentTime, voiceAudio.duration);
+      };
+      voiceAudio.ontimeupdate = () => {
+        if (voiceMsgEl !== el) return;
+        voicePos.set(src, voiceAudio.currentTime);
+        updateVoiceProgress(el, voiceAudio.currentTime, voiceAudio.duration);
+      };
+      voiceAudio.onended = () => {
+        btn.textContent = '▶';
+        stopVoiceRaf();
+        voicePos.set(src, 0);
+        updateVoiceProgress(el, 0, voiceDuration(el, voiceAudio));
+        voiceBtnEl = null;
+        voiceMsgEl = null;
+      };
+      voiceAudio.onerror = () => {
+        btn.textContent = '▶';
+        stopVoiceRaf();
+        showAppErr('не удалось воспроизвести голосовое');
+      };
     }
 
     async function prepareVoiceEl(el) {
@@ -560,15 +659,22 @@
         el.dataset.duration = String(duration);
       } catch {
         paintWaveform(barsEl, Array.from({ length: 40 }, () => 0.35));
-        el.querySelector('.voice-dur').textContent = '—';
+        const duration = await getDuration(src);
+        el.querySelector('.voice-dur').textContent = duration ? fmtTime(duration) : '—';
+        if (duration) el.dataset.duration = String(duration);
       }
+      const saved = voicePos.get(src) || 0;
+      if (saved > 0) updateVoiceProgress(el, saved, Number(el.dataset.duration) || 0);
       el.dataset.ready = '1';
       el.querySelector('.voice-wave').onclick = (e) => {
-        if (!voiceAudio || voiceAudio.dataset.glinkSrc !== src) return;
         const rect = e.currentTarget.getBoundingClientRect();
         const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-        voiceAudio.currentTime = pct * voiceAudio.duration;
-        updateVoiceProgress(el, voiceAudio.currentTime, voiceAudio.duration);
+        seekVoice(el, src, pct);
+      };
+      el.querySelector('.voice-track').onclick = (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        seekVoice(el, src, pct);
       };
     }
 
@@ -584,39 +690,37 @@
     }
 
     function toggleVoice(src, btn, el) {
-      if (voiceAudio?.dataset.glinkSrc === src && !voiceAudio.paused) {
-        voiceAudio.pause();
-        btn.textContent = '▶';
-        stopVoiceRaf();
+      if (voiceAudio?.dataset.glinkSrc === src) {
+        if (!voiceAudio.paused) {
+          voicePos.set(src, voiceAudio.currentTime);
+          voiceAudio.pause();
+          btn.textContent = '▶';
+          stopVoiceRaf();
+          return;
+        }
+        btn.textContent = '⏸';
+        voiceBtnEl = btn;
+        voiceMsgEl = el;
+        voiceAudio.play().then(() => trackVoiceProgress(el)).catch(() => {
+          btn.textContent = '▶';
+          showAppErr('не удалось воспроизвести голосовое');
+        });
         return;
       }
+
       if (voiceAudio) {
+        voicePos.set(voiceAudio.dataset.glinkSrc, voiceAudio.currentTime);
         voiceAudio.pause();
         stopVoiceRaf();
         if (voiceBtnEl) voiceBtnEl.textContent = '▶';
-        if (voiceMsgEl) updateVoiceProgress(voiceMsgEl, 0, Number(voiceMsgEl.dataset.duration) || voiceAudio.duration);
       }
+
       voiceAudio = new Audio(src);
       voiceAudio.dataset.glinkSrc = src;
       voiceBtnEl = btn;
       voiceMsgEl = el;
       btn.textContent = '⏸';
-      voiceAudio.onended = () => {
-        btn.textContent = '▶';
-        stopVoiceRaf();
-        updateVoiceProgress(el, 0, Number(el.dataset.duration) || voiceAudio.duration);
-        voiceBtnEl = null;
-        voiceMsgEl = null;
-      };
-      voiceAudio.onerror = () => {
-        btn.textContent = '▶';
-        stopVoiceRaf();
-        showAppErr('не удалось воспроизвести голосовое');
-      };
-      voiceAudio.onloadedmetadata = () => {
-        el.querySelector('.voice-dur').textContent = fmtTime(voiceAudio.duration);
-        el.dataset.duration = String(voiceAudio.duration);
-      };
+      bindVoiceAudio(el, src, btn);
       voiceAudio.play().then(() => trackVoiceProgress(el)).catch(() => {
         btn.textContent = '▶';
         showAppErr('не удалось воспроизвести голосовое');
