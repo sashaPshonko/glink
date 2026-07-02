@@ -58,7 +58,11 @@
       display: flex; align-items: center; justify-content: center;
       font-size: 1.2rem; flex-shrink: 0;
     }
-    button.icon.recording { background: #e11d48; animation: pulse 1s infinite; }
+    button.icon.recording { background: #e11d48; color: #fff; animation: pulse 1s infinite; }
+    button.icon.holding { background: #fce7f3; transform: scale(0.94); }
+    #mediaBtn { touch-action: none; user-select: none; -webkit-user-select: none; }
+    #mediaBtn .media-icon { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; }
+    #mediaBtn .media-icon svg { width: 100%; height: 100%; display: block; }
     @keyframes pulse { 50% { opacity: 0.7; } }
     #login {
       flex: 1;
@@ -341,9 +345,7 @@
       <div id="messages"></div>
       <div id="composer">
         <input id="fileInput" type="file" class="hidden" accept="image/*,*/*" />
-        <button id="attachBtn" class="icon secondary" title="Фото или файл">📎</button>
-        <button id="voiceBtn" class="icon secondary" title="Голосовое">🎤</button>
-        <button id="videoBtn" class="icon secondary" title="Видео-кружок">⭕</button>
+        <button id="mediaBtn" type="button" class="icon secondary" title="Файл" aria-label="Файл"></button>
         <input id="msgInput" type="text" placeholder="Сообщение…" />
         <button id="sendBtn" class="icon">♡</button>
       </div>
@@ -1016,7 +1018,7 @@
       stopVideoRecTimer();
       $('videoRecTimer').textContent = '0:00';
       $('videoRecStatus').textContent = '';
-      $('videoBtn').classList.remove('recording');
+      $('mediaBtn').classList.remove('recording');
     }
 
     function finishVideoRecording() {
@@ -1051,7 +1053,7 @@
       $('videoRecOverlay').classList.remove('hidden');
       $('videoRecStatus').textContent = 'включаю камеру…';
       $('videoRecTimer').textContent = '0:00';
-      $('videoBtn').classList.add('recording');
+      $('mediaBtn').classList.add('recording');
 
       try {
         videoStream = await navigator.mediaDevices.getUserMedia({
@@ -1270,7 +1272,7 @@
       stopVoiceRecTimer();
       $('voiceRecTimer').textContent = '0:00';
       $('voiceRecStatus').textContent = '';
-      $('voiceBtn').classList.remove('recording');
+      $('mediaBtn').classList.remove('recording');
     }
 
     function finishVoiceRecording() {
@@ -1315,7 +1317,7 @@
       $('voiceRecOverlay').classList.remove('hidden');
       $('voiceRecStatus').textContent = 'включаю микрофон…';
       $('voiceRecTimer').textContent = '0:00';
-      $('voiceBtn').classList.add('recording');
+      $('mediaBtn').classList.add('recording');
 
       try {
         voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1407,14 +1409,89 @@
     };
     $('sendBtn').onclick = sendText;
     $('msgInput').onkeydown = (e) => { if (e.key === 'Enter') sendText(); };
-    $('attachBtn').onclick = () => $('fileInput').click();
     $('fileInput').onchange = onFilePicked;
 
-    $('voiceBtn').onclick = (e) => { e.preventDefault(); openVoiceRecorder(); };
+    const MEDIA_ICONS = {
+      attach: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.5 6v11.5a4 4 0 01-8 0V5a2.5 2.5 0 015 0v10.5a1 1 0 11-2 0V6H9v9.5a3.5 3.5 0 007 0V5a4 4 0 00-8 0v12.5a5.5 5.5 0 0011 0V6h-1.5z"/></svg>',
+      voice: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 14a3 3 0 003-3V5a3 3 0 10-6 0v6a3 3 0 003 3zm5-3a5 5 0 01-5 5 5 5 0 01-5-5H5a7 7 0 0014 0h-2zM11 21h2v-2h-2v2z"/></svg>',
+      video: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 3 7.17 5H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V7a2 2 0 00-2-2h-3.17L15 3H9zm3 15a4 4 0 110-8 4 4 0 010 8z"/></svg>',
+    };
+
+    const MEDIA_MODES = [
+      { id: 'attach', title: 'Файл · нажми — сменить, зажми — выбрать' },
+      { id: 'voice', title: 'Голос · нажми — сменить, зажми — записать' },
+      { id: 'video', title: 'Кружок · нажми — сменить, зажми — записать' },
+    ];
+    let mediaModeIndex = 0;
+    let mediaHoldTimer = null;
+    let mediaHoldFired = false;
+    let mediaPointerId = null;
+    const MEDIA_HOLD_MS = 420;
+
+    function updateMediaBtn() {
+      const m = MEDIA_MODES[mediaModeIndex];
+      const btn = $('mediaBtn');
+      btn.innerHTML = '<span class="media-icon">' + MEDIA_ICONS[m.id] + '</span>';
+      btn.title = m.title;
+      btn.setAttribute('aria-label', m.title.split(' · ')[0]);
+    }
+
+    function cycleMediaMode() {
+      mediaModeIndex = (mediaModeIndex + 1) % MEDIA_MODES.length;
+      updateMediaBtn();
+    }
+
+    function activateMediaMode() {
+      const mode = MEDIA_MODES[mediaModeIndex].id;
+      if (mode === 'attach') $('fileInput').click();
+      else if (mode === 'voice') openVoiceRecorder();
+      else if (mode === 'video') openVideoRecorder();
+    }
+
+    function clearMediaHold() {
+      clearTimeout(mediaHoldTimer);
+      mediaHoldTimer = null;
+      $('mediaBtn').classList.remove('holding');
+    }
+
+    function onMediaPointerDown(e) {
+      if (mediaPointerId !== null) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      mediaPointerId = e.pointerId;
+      mediaHoldFired = false;
+      $('mediaBtn').setPointerCapture(e.pointerId);
+      $('mediaBtn').classList.add('holding');
+      mediaHoldTimer = setTimeout(() => {
+        if (mediaPointerId !== e.pointerId) return;
+        mediaHoldFired = true;
+        clearMediaHold();
+        activateMediaMode();
+      }, MEDIA_HOLD_MS);
+    }
+
+    function onMediaPointerUp(e) {
+      if (e.pointerId !== mediaPointerId) return;
+      mediaPointerId = null;
+      clearMediaHold();
+      if (!mediaHoldFired) cycleMediaMode();
+    }
+
+    function onMediaPointerCancel(e) {
+      if (e.pointerId !== mediaPointerId) return;
+      mediaPointerId = null;
+      mediaHoldFired = true;
+      clearMediaHold();
+    }
+
+    const mediaBtnEl = $('mediaBtn');
+    mediaBtnEl.addEventListener('pointerdown', onMediaPointerDown);
+    mediaBtnEl.addEventListener('pointerup', onMediaPointerUp);
+    mediaBtnEl.addEventListener('pointercancel', onMediaPointerCancel);
+    mediaBtnEl.addEventListener('contextmenu', (e) => e.preventDefault());
+    updateMediaBtn();
+
     $('voiceCancelBtn').onclick = (e) => { e.preventDefault(); cancelVoiceRecording(); };
     $('voiceSendBtn').onclick = (e) => { e.preventDefault(); finishVoiceRecording(); };
-
-    $('videoBtn').onclick = (e) => { e.preventDefault(); openVideoRecorder(); };
     $('videoCancelBtn').onclick = (e) => { e.preventDefault(); cancelVideoRecording(); };
     $('videoSendBtn').onclick = (e) => { e.preventDefault(); finishVideoRecording(); };
 
