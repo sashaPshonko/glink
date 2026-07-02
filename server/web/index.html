@@ -191,20 +191,20 @@
       box-shadow: 0 2px 14px rgba(92, 51, 71, 0.1);
     }
     .voice-msg {
-      display: flex; align-items: center; gap: 7px;
-      min-width: 118px; max-width: min(168px, 72vw); margin-top: 2px;
+      display: flex; align-items: center; gap: 10px;
+      min-width: 200px; max-width: min(280px, 100%); margin-top: 2px;
     }
     .voice-play {
-      width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+      width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
       background: rgba(255, 255, 255, 0.55); border: none;
-      font-size: 0.85rem; cursor: pointer; color: #9d174d;
+      font-size: 1rem; cursor: pointer; color: #9d174d;
       display: flex; align-items: center; justify-content: center;
     }
     .bubble.theirs .voice-play { background: #ffecf4; }
-    .voice-body { flex: 1; min-width: 0; max-width: 118px; }
+    .voice-body { flex: 1; min-width: 0; }
     .voice-wave {
       position: relative;
-      height: 32px; cursor: pointer; touch-action: manipulation;
+      height: 22px; cursor: pointer; touch-action: manipulation;
       --pct: 0%;
     }
     .voice-wave::before {
@@ -216,7 +216,7 @@
     }
     .voice-wave::after {
       content: '';
-      position: absolute; top: 4px; bottom: 4px;
+      position: absolute; top: 2px; bottom: 2px;
       left: var(--pct); z-index: 2; pointer-events: none;
       width: 3px; margin-left: -1px;
       background: #db2777; border-radius: 2px;
@@ -225,10 +225,10 @@
     .bubble.theirs .voice-wave::after { background: #db2777; }
     .voice-bars {
       position: relative; z-index: 0;
-      display: flex; align-items: center; gap: 1px; height: 100%;
+      display: flex; align-items: center; gap: 2px; height: 100%;
     }
     .voice-bars i {
-      flex: 1; min-width: 1px; max-width: 3px; border-radius: 1px;
+      flex: 1; min-width: 2px; max-width: 5px; border-radius: 2px;
       background: rgba(157, 23, 77, 0.22); display: block; align-self: center;
     }
     .voice-bars i.on { background: rgba(157, 23, 77, 0.88); }
@@ -316,6 +316,25 @@
     }
     .video-note.playing .vid-badge { opacity: 0; }
     .bubble.has-video { padding: 4px; background: transparent !important; border: none !important; }
+    .bubble.has-media-video { padding: 6px 8px; }
+    .bubble.has-media-audio { padding: 8px 10px; }
+    .media-video {
+      max-width: min(320px, 100%); margin-top: 2px;
+    }
+    .media-video video {
+      width: 100%; max-height: 240px; border-radius: 12px;
+      background: #1a1a1a; display: block;
+    }
+    .media-video-name, .media-audio-name {
+      font-size: 0.72rem; color: #b07a94; margin-top: 4px;
+      word-break: break-all; line-height: 1.25;
+    }
+    .media-audio {
+      max-width: min(300px, 100%); margin-top: 2px;
+    }
+    .media-audio audio {
+      width: 100%; height: 36px; display: block;
+    }
     .bubble.pending { opacity: 0.7; }
     #videoRecOverlay {
       position: fixed; inset: 0; z-index: 200;
@@ -578,6 +597,21 @@
       );
     }
 
+    function isVideoNote(m) {
+      if (m.kind === 'video_note') return true;
+      if (m.kind !== 'video') return false;
+      const name = m.file?.name || '';
+      return /^video\.(webm|mp4|mov)$/i.test(name);
+    }
+
+    function uploadKind(file) {
+      const t = (file.type || '').toLowerCase();
+      if (t.startsWith('image/')) return 'image';
+      if (t.startsWith('video/')) return 'video';
+      if (t.startsWith('audio/')) return 'audio';
+      return 'file';
+    }
+
     function renderMessageBody(m) {
       const parts = [];
       const kind = m.kind || 'text';
@@ -598,7 +632,7 @@
         );
       } else if (kind === 'voice' && m._pending) {
         parts.push('<div>🎤 …</div>');
-      } else if (kind === 'video' && m.fileUrl && !m._pending) {
+      } else if (isVideoNote(m) && m.fileUrl && !m._pending) {
         const src = escapeHtml(fileUrl(m.fileUrl));
         parts.push(
           `<div class="video-note" data-src="${src}">` +
@@ -611,8 +645,30 @@
           `<div class="vid-badge">▶</div>` +
           `</div></div>`,
         );
-      } else if (kind === 'video' && m._pending) {
+      } else if (kind === 'video_note' && m._pending) {
         parts.push('<div>⭕ …</div>');
+      } else if (kind === 'video' && m.fileUrl && !m._pending) {
+        const src = escapeHtml(fileUrl(m.fileUrl));
+        const name = escapeHtml(m.file?.name || 'видео');
+        parts.push(
+          `<div class="media-video">` +
+          `<video controls playsinline preload="metadata" src="${src}"></video>` +
+          `<div class="media-video-name">${name}</div>` +
+          `</div>`,
+        );
+      } else if (kind === 'video' && m._pending) {
+        parts.push('<div>🎬 …</div>');
+      } else if (kind === 'audio' && m.fileUrl && !m._pending) {
+        const src = escapeHtml(fileUrl(m.fileUrl));
+        const name = escapeHtml(m.file?.name || 'аудио');
+        parts.push(
+          `<div class="media-audio">` +
+          `<audio controls preload="metadata" src="${src}"></audio>` +
+          `<div class="media-audio-name">${name}</div>` +
+          `</div>`,
+        );
+      } else if (kind === 'audio' && m._pending) {
+        parts.push('<div>🎵 …</div>');
       } else if (kind === 'file' && m._pending) {
         const name = escapeHtml(m.file?.name || 'файл');
         parts.push(
@@ -653,8 +709,10 @@
       const mine = m.senderId === user.id;
       const sender = activeChat?.type === 'group' && !mine
         ? `<div class="sender">${escapeHtml(m.senderName || '?')}</div>` : '';
-      const extraCls = m.kind === 'video' ? ' has-video'
-        : (m.kind === 'image' && !m.text ? ' has-image' : '');
+      const extraCls = isVideoNote(m) ? ' has-video'
+        : (m.kind === 'video' ? ' has-media-video'
+          : (m.kind === 'audio' ? ' has-media-audio'
+            : (m.kind === 'image' && !m.text ? ' has-image' : '')));
       const pendingCls = m._pending ? ' pending' : '';
       return `<div class="bubble ${mine ? 'mine' : 'theirs'}${extraCls}${pendingCls}" data-id="${m.id}">${sender}${renderMessageBody(m)}${renderTicks(m, mine)}</div>`;
     }
@@ -675,6 +733,7 @@
       if (opts.forceBottom || userPinnedBottom) scrollToBottom(box);
       wireVoicePlayers(box);
       wireVideoNotes(box);
+      wireInlineMedia(box);
       if (!m._pending) markChatRead();
     }
 
@@ -689,6 +748,7 @@
       if (userPinnedBottom) scrollToBottom(box);
       wireVoicePlayers(box);
       wireVideoNotes(box);
+      wireInlineMedia(box);
       markChatRead();
     }
 
@@ -797,6 +857,7 @@
       }
       wireVoicePlayers(box);
       wireVideoNotes(box);
+      wireInlineMedia(box);
       markChatRead();
 
       if (restore) {
@@ -985,7 +1046,7 @@
         const ctx = new Ctx();
         const audio = await ctx.decodeAudioData(buf.slice(0));
         const data = audio.getChannelData(0);
-        const bars = 28;
+        const bars = 52;
         const block = Math.max(1, Math.floor(data.length / bars));
         const peaks = [];
         for (let i = 0; i < bars; i++) {
@@ -1006,7 +1067,7 @@
 
     function paintWaveform(barsEl, peaks) {
       barsEl.innerHTML = peaks.map((p) => {
-        const h = Math.max(14, Math.round(p * 100));
+        const h = Math.max(18, Math.round(p * 48));
         return `<i style="height:${h}%"></i>`;
       }).join('');
     }
@@ -1088,7 +1149,7 @@
         paintWaveform(barsEl, peaks);
         if (saneDur(duration)) el.dataset.duration = String(duration);
       } catch {
-        paintWaveform(barsEl, Array.from({ length: 28 }, () => 0.35));
+        paintWaveform(barsEl, Array.from({ length: 40 }, () => 0.35));
       }
       if (!saneDur(Number(el.dataset.duration))) {
         const duration = await getDuration(src);
@@ -1211,6 +1272,28 @@
         if (activeVideoEl === vid) updateVideoRing(wrap, vid);
       };
       vid.onloadedmetadata = () => updateVideoRing(wrap, vid);
+    }
+
+    function wireInlineMedia(container) {
+      container.querySelectorAll('.media-video video, .media-audio audio').forEach((el) => {
+        if (el.dataset.wired) return;
+        el.dataset.wired = '1';
+        el.addEventListener('play', () => {
+          if (voiceAudio && !voiceAudio.paused) {
+            voicePos.set(voiceAudio.dataset.glinkSrc, voiceAudio.currentTime);
+            voiceAudio.pause();
+            if (voiceBtnEl) voiceBtnEl.textContent = '▶';
+            stopVoiceRaf();
+          }
+          if (activeVideoEl && activeVideoEl !== el) {
+            activeVideoEl.pause();
+            activeVideoEl.closest('.video-note')?.classList.remove('playing');
+          }
+          container.querySelectorAll('.media-video video, .media-audio audio').forEach((other) => {
+            if (other !== el && !other.paused) other.pause();
+          });
+        });
+      });
     }
 
     function wireVideoNotes(container) {
@@ -1405,7 +1488,7 @@
           }
           const ext = videoExt(type);
           try {
-            await sendFile(new File([blob], 'video' + ext, { type }), 'video');
+            await sendFile(new File([blob], 'video' + ext, { type }), 'video_note');
           } catch (e) {
             showAppErr(e.message || 'не удалось отправить видео');
           }
@@ -1573,7 +1656,7 @@
       ev.target.value = '';
       if (!file) return;
       try {
-        const kind = file.type.startsWith('image/') ? 'image' : 'file';
+        const kind = uploadKind(file);
         await sendFile(file, kind);
       } catch (e) {
         showAppErr(e.message || 'не удалось отправить файл');

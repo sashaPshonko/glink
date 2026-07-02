@@ -143,7 +143,9 @@ export function messagePreview(msg) {
     if (!msg) return '';
     if (msg.kind === 'image') return msg.text ? `📷 ${msg.text}` : '📷 фото';
     if (msg.kind === 'voice') return '🎤 голосовое';
-    if (msg.kind === 'video') return '🎬 видео';
+    if (msg.kind === 'video_note') return '🎬 кружок';
+    if (msg.kind === 'video') return msg.file?.name ? `🎬 ${msg.file.name}` : '🎬 видео';
+    if (msg.kind === 'audio') return msg.file?.name ? `🎵 ${msg.file.name}` : '🎵 аудио';
     if (msg.kind === 'file') return `📎 ${msg.file?.name || 'файл'}`;
     return msg.text || '';
 }

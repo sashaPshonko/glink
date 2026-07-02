@@ -23,12 +23,14 @@ export function guessKind(mime, hint = '') {
     const m = String(mime || '').toLowerCase();
     const h = String(hint || '').toLowerCase();
     if (h === 'file') return 'file';
-    if (h === 'voice' || h === 'audio') return 'voice';
-    if (h === 'video' || h === 'video_note') return 'video';
+    if (h === 'video_note') return 'video_note';
+    if (h === 'voice') return 'voice';
+    if (h === 'audio') return 'audio';
+    if (h === 'video') return 'video';
     if (h === 'image') return 'image';
     if (m.startsWith('image/')) return 'image';
     if (m.startsWith('video/')) return 'video';
-    if (m.startsWith('audio/')) return 'voice';
+    if (m.startsWith('audio/')) return 'audio';
     return 'file';
 }
 
