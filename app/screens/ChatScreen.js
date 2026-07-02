@@ -12,7 +12,7 @@ import {
     TextInput,
     View,
 } from 'react-native';
-import { Audio } from 'expo-av';
+import { Audio, Video } from 'expo-av';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import {
@@ -57,6 +57,9 @@ function MessageBody({ item, isGroup, mine }) {
             ) : null}
             {kind === 'voice' && src ? (
                 <VoicePlayer uri={src} />
+            ) : null}
+            {kind === 'video' && src ? (
+                <VideoNote uri={src} />
             ) : null}
             {kind === 'file' && src ? (
                 <Pressable onPress={() => Linking.openURL(src)}>
@@ -133,6 +136,44 @@ function VoicePlayer({ uri }) {
                 <View style={[styles.voiceFill, { width: `${pct * 100}%` }]} />
             </View>
             <Text style={styles.voiceTime}>{fmtTime(pos)} / {fmtTime(dur)}</Text>
+        </Pressable>
+    );
+}
+
+function VideoNote({ uri }) {
+    const ref = useRef(null);
+    const [playing, setPlaying] = useState(false);
+
+    async function toggle() {
+        const v = ref.current;
+        if (!v) return;
+        if (playing) {
+            await v.pauseAsync();
+            setPlaying(false);
+            return;
+        }
+        await v.playAsync();
+        setPlaying(true);
+    }
+
+    return (
+        <Pressable onPress={toggle} style={styles.videoCircle}>
+            <Video
+                ref={ref}
+                source={{ uri }}
+                style={styles.videoCircleInner}
+                resizeMode="cover"
+                isLooping={false}
+                useNativeControls={false}
+                onPlaybackStatusUpdate={(st) => {
+                    if (st.didJustFinish) setPlaying(false);
+                }}
+            />
+            {!playing ? (
+                <View style={styles.videoBadge} pointerEvents="none">
+                    <Text style={styles.videoBadgeText}>▶</Text>
+                </View>
+            ) : null}
         </Pressable>
     );
 }
@@ -265,6 +306,26 @@ export default function ChatScreen({ chat, user, onBack }) {
         appendMessage(message);
     }
 
+    async function recordVideoNote() {
+        const cam = await ImagePicker.requestCameraPermissionsAsync();
+        if (!cam.granted) return;
+        const picked = await ImagePicker.launchCameraAsync({
+            mediaTypes: ['videos'],
+            videoMaxDuration: 60,
+            quality: 0.6,
+            cameraType: ImagePicker.CameraType.front,
+        });
+        if (picked.canceled || !picked.assets?.[0]) return;
+        const asset = picked.assets[0];
+        const { message } = await sendMediaMessage(chat.id, {
+            uri: asset.uri,
+            name: 'video.mp4',
+            mime: asset.mimeType || 'video/mp4',
+            kind: 'video',
+        });
+        appendMessage(message);
+    }
+
     if (loading) {
         return (
             <View style={styles.center}>
@@ -300,8 +361,13 @@ export default function ChatScreen({ chat, user, onBack }) {
                 onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
                 renderItem={({ item }) => {
                     const mine = item.senderId === user.id;
+                    const isVideo = item.kind === 'video';
                     return (
-                        <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
+                        <View style={[
+                            styles.bubble,
+                            mine ? styles.mine : styles.theirs,
+                            isVideo && styles.videoBubble,
+                        ]}>
                             <MessageBody item={item} isGroup={isGroup} mine={mine} />
                         </View>
                     );
@@ -321,6 +387,9 @@ export default function ChatScreen({ chat, user, onBack }) {
                     onPressOut={stopVoice}
                 >
                     <Text style={styles.toolText}>🎤</Text>
+                </Pressable>
+                <Pressable style={styles.toolBtn} onPress={recordVideoNote}>
+                    <Text style={styles.toolText}>⭕</Text>
                 </Pressable>
                 <TextInput
                     style={styles.input}
@@ -418,6 +487,30 @@ const styles = StyleSheet.create({
         borderRadius: 2,
     },
     voiceTime: { color: theme.textMuted, fontSize: 11, fontVariant: ['tabular-nums'] },
+    videoBubble: {
+        backgroundColor: 'transparent',
+        borderWidth: 0,
+        paddingHorizontal: 4,
+        paddingVertical: 4,
+    },
+    videoCircle: {
+        width: 200,
+        height: 200,
+        borderRadius: 100,
+        overflow: 'hidden',
+        backgroundColor: '#111',
+    },
+    videoCircleInner: {
+        width: 200,
+        height: 200,
+    },
+    videoBadge: {
+        ...StyleSheet.absoluteFillObject,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0,0,0,0.28)',
+    },
+    videoBadgeText: { color: '#fff', fontSize: 36 },
     ticksRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4 },
     ticks: { color: theme.textMuted, fontSize: 12, letterSpacing: -2 },
     ticksRead: { color: '#2563eb' },

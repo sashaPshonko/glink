@@ -143,6 +143,7 @@ export function messagePreview(msg) {
     if (!msg) return '';
     if (msg.kind === 'image') return msg.text ? `📷 ${msg.text}` : '📷 фото';
     if (msg.kind === 'voice') return '🎤 голосовое';
+    if (msg.kind === 'video') return '🎬 видео';
     if (msg.kind === 'file') return `📎 ${msg.file?.name || 'файл'}`;
     return msg.text || '';
 }

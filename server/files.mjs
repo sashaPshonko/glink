@@ -23,7 +23,9 @@ export function guessKind(mime, hint = '') {
     const m = String(mime || '').toLowerCase();
     const h = String(hint || '').toLowerCase();
     if (h === 'voice' || h === 'audio') return 'voice';
+    if (h === 'video' || h === 'video_note') return 'video';
     if (h === 'image' || m.startsWith('image/')) return 'image';
+    if (m.startsWith('video/')) return 'video';
     if (m.startsWith('audio/')) return 'voice';
     return 'file';
 }
@@ -32,13 +34,18 @@ export function safeExt(name, mime) {
     const fromName = extname(String(name || '')).toLowerCase();
     if (fromName && fromName.length <= 8) return fromName;
     const m = String(mime || '').toLowerCase();
+    if (m.startsWith('video/')) {
+        if (m.includes('webm')) return '.webm';
+        if (m.includes('quicktime')) return '.mov';
+        return '.mp4';
+    }
     if (m.includes('jpeg') || m.includes('jpg')) return '.jpg';
     if (m.includes('png')) return '.png';
     if (m.includes('webp')) return '.webp';
     if (m.includes('gif')) return '.gif';
     if (m.includes('webm')) return '.webm';
     if (m.includes('ogg')) return '.ogg';
-    if (m.includes('mp4') || m.includes('m4a')) return '.m4a';
+    if (m.includes('mp4') || m.includes('m4a')) return m.startsWith('audio/') ? '.m4a' : '.mp4';
     if (m.includes('mpeg') || m.includes('mp3')) return '.mp3';
     if (m.includes('pdf')) return '.pdf';
     return '';

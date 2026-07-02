@@ -220,6 +220,34 @@
       background: #e11d48; color: #fff; padding: 10px 16px; border-radius: 20px;
       font-size: 0.9rem; z-index: 10;
     }
+    .video-note {
+      width: 200px; height: 200px; border-radius: 50%;
+      overflow: hidden; position: relative; margin-top: 4px;
+      background: #1a1a1a; cursor: pointer; flex-shrink: 0;
+    }
+    .video-note video {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+    .video-note .vid-badge {
+      position: absolute; inset: 0; display: flex;
+      align-items: center; justify-content: center;
+      background: rgba(0, 0, 0, 0.28); color: #fff;
+      font-size: 2.2rem; pointer-events: none;
+    }
+    .video-note.playing .vid-badge { opacity: 0; }
+    .bubble.has-video { padding: 4px; background: transparent !important; border: none !important; }
+    #videoRecOverlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(92, 51, 71, 0.94);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+    }
+    #videoRecPreview {
+      width: min(72vw, 280px); height: min(72vw, 280px);
+      border-radius: 50%; object-fit: cover;
+      border: 4px solid #fff; background: #000;
+    }
+    #videoRecHint { color: #fff; font-size: 0.95rem; }
+    #videoRecTimer { color: #fbcfe8; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
   </style>
 </head>
 <body>
@@ -255,12 +283,18 @@
         <input id="fileInput" type="file" class="hidden" accept="image/*,*/*" />
         <button id="attachBtn" class="icon secondary" title="Фото или файл">📎</button>
         <button id="voiceBtn" class="icon secondary" title="Голосовое">🎤</button>
+        <button id="videoBtn" class="icon secondary" title="Видео-кружок">⭕</button>
         <input id="msgInput" type="text" placeholder="Сообщение…" />
         <button id="sendBtn" class="icon">♡</button>
       </div>
     </div>
   </div>
   <div id="voiceHint" class="hidden">🎤 говорите… отпусти или нажми ещё раз</div>
+  <div id="videoRecOverlay" class="hidden">
+    <video id="videoRecPreview" autoplay muted playsinline></video>
+    <div id="videoRecTimer">0:00</div>
+    <div id="videoRecHint">⭕ снимаешь… отпусти</div>
+  </div>
 
   <script>
     (function () {
@@ -285,6 +319,12 @@
     let voiceRaf = null;
     const waveCache = new Map();
     const voicePos = new Map();
+    let videoRecorder = null;
+    let videoStream = null;
+    let videoChunks = [];
+    let videoRecTimer = null;
+    let videoRecStarted = 0;
+    let activeVideoEl = null;
     let selectedUsername = localStorage.getItem('glink_last_user') || '';
     let accounts = [];
 
@@ -444,6 +484,13 @@
           `<div class="voice-time"><span class="voice-cur">0:00</span> / <span class="voice-dur">…</span></div>` +
           `</div></div>`,
         );
+      } else if (kind === 'video' && m.fileUrl) {
+        const src = escapeHtml(fileUrl(m.fileUrl));
+        parts.push(
+          `<div class="video-note" data-src="${src}">` +
+          `<video playsinline preload="metadata" src="${src}"></video>` +
+          `<div class="vid-badge">▶</div></div>`,
+        );
       } else if (kind === 'file' && m.fileUrl) {
         const name = escapeHtml(m.file?.name || 'файл');
         parts.push(`<a class="file-link" href="${fileUrl(m.fileUrl)}" target="_blank" rel="noopener">📎 ${name}</a>`);
@@ -520,10 +567,11 @@
         const mine = m.senderId === user.id;
         const sender = activeChat.type === 'group' && !mine
           ? `<div class="sender">${escapeHtml(m.senderName || '?')}</div>` : '';
-        return `<div class="bubble ${mine ? 'mine' : 'theirs'}" data-id="${m.id}">${sender}${renderMessageBody(m)}${renderTicks(m, mine)}</div>`;
+        return `<div class="bubble ${mine ? 'mine' : 'theirs'}${m.kind === 'video' ? ' has-video' : ''}" data-id="${m.id}">${sender}${renderMessageBody(m)}${renderTicks(m, mine)}</div>`;
       }).join('');
       box.scrollTop = box.scrollHeight;
       wireVoicePlayers(box);
+      wireVideoNotes(box);
       markChatRead();
 
       if (restore) {
@@ -793,6 +841,141 @@
       });
     }
 
+    function wireVideoNotes(container) {
+      container.querySelectorAll('.video-note').forEach((wrap) => {
+        if (wrap.dataset.wired) return;
+        wrap.dataset.wired = '1';
+        const vid = wrap.querySelector('video');
+        const src = wrap.dataset.src;
+        wrap.onclick = () => toggleVideoNote(wrap, vid, src);
+        vid.onended = () => {
+          wrap.classList.remove('playing');
+          if (activeVideoEl === vid) activeVideoEl = null;
+        };
+      });
+    }
+
+    function toggleVideoNote(wrap, vid, src) {
+      if (activeVideoEl && activeVideoEl !== vid) {
+        activeVideoEl.pause();
+        activeVideoEl.closest('.video-note')?.classList.remove('playing');
+      }
+      if (!vid.paused) {
+        vid.pause();
+        wrap.classList.remove('playing');
+        activeVideoEl = null;
+        return;
+      }
+      if (voiceAudio && !voiceAudio.paused) {
+        voiceAudio.pause();
+        if (voiceBtnEl) voiceBtnEl.textContent = '▶';
+        stopVoiceRaf();
+      }
+      if (!vid.src) vid.src = src;
+      vid.play().then(() => {
+        wrap.classList.add('playing');
+        activeVideoEl = vid;
+      }).catch(() => showAppErr('не удалось воспроизвести видео'));
+    }
+
+    function videoMimeType() {
+      const types = [
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp8,opus',
+        'video/webm',
+        'video/mp4',
+      ];
+      return types.find((t) => MediaRecorder.isTypeSupported(t)) || '';
+    }
+
+    function videoExt(mime) {
+      if (mime.includes('mp4')) return '.mp4';
+      return '.webm';
+    }
+
+    function stopVideoRecTimer() {
+      clearInterval(videoRecTimer);
+      videoRecTimer = null;
+    }
+
+    function hideVideoOverlay() {
+      $('videoRecOverlay').classList.add('hidden');
+      const preview = $('videoRecPreview');
+      preview.srcObject = null;
+      stopVideoRecTimer();
+      $('videoRecTimer').textContent = '0:00';
+    }
+
+    async function startVideo() {
+      if (!activeChat || videoRecorder || mediaRecorder) return;
+      if (!navigator.mediaDevices?.getUserMedia) {
+        showAppErr('камера недоступна — нужен HTTPS');
+        return;
+      }
+      if (!window.isSecureContext && location.hostname !== 'localhost') {
+        showAppErr('видео работает только по HTTPS');
+        return;
+      }
+      try {
+        videoStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 640 } },
+          audio: true,
+        });
+        const preview = $('videoRecPreview');
+        preview.srcObject = videoStream;
+        $('videoRecOverlay').classList.remove('hidden');
+        videoChunks = [];
+        const mime = videoMimeType();
+        videoRecorder = mime
+          ? new MediaRecorder(videoStream, { mimeType: mime })
+          : new MediaRecorder(videoStream);
+        videoRecorder.ondataavailable = (e) => { if (e.data.size) videoChunks.push(e.data); };
+        videoRecorder.onstop = async () => {
+          hideVideoOverlay();
+          videoStream?.getTracks().forEach((t) => t.stop());
+          videoStream = null;
+          const rec = videoRecorder;
+          videoRecorder = null;
+          $('videoBtn').classList.remove('recording');
+          if (!videoChunks.length) return;
+          const type = rec.mimeType || videoChunks[0]?.type || 'video/webm';
+          const blob = new Blob(videoChunks, { type });
+          if (blob.size < 2000) {
+            showAppErr('слишком короткое видео');
+            return;
+          }
+          const ext = videoExt(type);
+          try {
+            await sendFile(new File([blob], 'video' + ext, { type }), 'video');
+          } catch (e) {
+            showAppErr(e.message || 'не удалось отправить видео');
+          }
+        };
+        videoRecorder.start(250);
+        videoRecStarted = Date.now();
+        videoRecTimer = setInterval(() => {
+          const sec = Math.floor((Date.now() - videoRecStarted) / 1000);
+          $('videoRecTimer').textContent = fmtTime(sec);
+          if (sec >= 60) stopVideo();
+        }, 200);
+        $('videoBtn').classList.add('recording');
+      } catch (e) {
+        hideVideoOverlay();
+        videoStream?.getTracks().forEach((t) => t.stop());
+        videoStream = null;
+        const n = e?.name || '';
+        if (n === 'NotAllowedError') showAppErr('нет доступа к камере');
+        else showAppErr('не удалось включить камеру');
+      }
+    }
+
+    function stopVideo() {
+      if (videoRecorder?.state === 'recording') {
+        try { videoRecorder.requestData(); } catch { /* ignore */ }
+        videoRecorder.stop();
+      }
+    }
+
     function connectWs() {
       if (ws) ws.close();
       const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -825,6 +1008,7 @@
       clearInterval(pollTimer);
       pollTimer = setInterval(() => {
         if (voiceAudio && !voiceAudio.paused) return;
+        if (activeVideoEl && !activeVideoEl.paused) return;
         loadMessages();
       }, 5000);
     }
@@ -975,12 +1159,14 @@
       if (ws) ws.close();
       clearInterval(pollTimer);
       stopVoice();
+      stopVideo();
       showLogin();
     };
     $('backBtn').onclick = () => {
       activeChat = null;
       clearInterval(pollTimer);
       stopVoice();
+      stopVideo();
       loadChats();
     };
     $('sendBtn').onclick = sendText;
@@ -994,6 +1180,13 @@
     voiceBtn.addEventListener('mouseleave', stopVoice);
     voiceBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startVoice(); }, { passive: false });
     voiceBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopVoice(); }, { passive: false });
+
+    const videoBtn = $('videoBtn');
+    videoBtn.addEventListener('mousedown', (e) => { e.preventDefault(); startVideo(); });
+    videoBtn.addEventListener('mouseup', (e) => { e.preventDefault(); stopVideo(); });
+    videoBtn.addEventListener('mouseleave', stopVideo);
+    videoBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startVideo(); }, { passive: false });
+    videoBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopVideo(); }, { passive: false });
 
     (async () => {
       if (!token) return showLogin();
