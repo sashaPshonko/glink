@@ -185,14 +185,16 @@
       }
       #composer { gap: 5px; padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); }
       #messages { padding: 12px 10px; }
-      .bubble { max-width: 88%; }
+      .msg-row { max-width: 88%; }
     }
     .bubble {
-      max-width: 82%; padding: 10px 14px; border-radius: 16px;
+      width: fit-content;
+      max-width: 100%;
+      padding: 10px 14px; border-radius: 16px;
       line-height: 1.4; word-break: break-word;
     }
-    .mine { align-self: flex-end; margin-left: auto; background: rgba(249, 197, 223, 0.95); }
-    .theirs { align-self: flex-start; margin-right: auto; background: rgba(255, 255, 255, 0.92); border: 1px solid rgba(252, 231, 243, 0.95); }
+    .mine { background: rgba(249, 197, 223, 0.95); }
+    .theirs { background: rgba(255, 255, 255, 0.92); border: 1px solid rgba(252, 231, 243, 0.95); }
     .sender { font-size: 0.75rem; color: #db2777; font-weight: 600; margin-bottom: 4px; }
     .bubble a { color: #be185d; text-decoration: underline; }
     .bubble img {
@@ -270,14 +272,23 @@
     }
     .bubble.mine.editable { cursor: default; touch-action: manipulation; }
     .msg-row {
-      width: 100%; max-width: 100%;
-      display: flex; flex-direction: column; align-items: flex-start;
+      display: flex;
+      flex-direction: column;
+      max-width: 82%;
     }
-    .msg-row.mine { align-items: flex-end; }
+    .msg-row.mine {
+      align-self: flex-end;
+      margin-left: auto;
+      align-items: flex-end;
+    }
+    .msg-row.theirs {
+      align-self: flex-start;
+      margin-right: auto;
+      align-items: flex-start;
+    }
     .msg-row-inner {
       position: relative;
-      display: inline-flex;
-      align-items: flex-end;
+      width: fit-content;
       max-width: 100%;
     }
     .msg-hit {
@@ -285,17 +296,18 @@
       right: 100%;
       top: 0;
       bottom: 0;
-      width: 44px;
-      margin-right: 2px;
-      background: transparent;
+      width: 40px;
+      margin-right: 0;
+      background: none;
       border: none;
       outline: none;
+      box-shadow: none;
       -webkit-tap-highlight-color: transparent;
     }
     .msg-row.theirs .msg-hit { display: none; }
     .msg-reactions {
       display: flex; flex-wrap: wrap; gap: 4px;
-      margin-top: 3px; max-width: min(320px, 88%);
+      margin-top: 3px;
     }
     .msg-row.mine .msg-reactions { justify-content: flex-end; }
     .msg-reaction-pill {
