@@ -1118,7 +1118,8 @@
         if (m && !m._pending) {
           closeMsgMenu();
           blockMsgMenuOpen();
-          toggleReaction(id, 'heart');
+          const existing = (m.reactions || {})[user?.id];
+          if (!existing || existing === 'heart') toggleReaction(id, 'heart');
           return true;
         }
       }
@@ -3083,7 +3084,10 @@
       closeMsgMenu();
       blockMsgMenuOpen();
       const m = getMessage(row.dataset.id);
-      if (m && !m._pending) toggleReaction(row.dataset.id, 'heart');
+      const existing = m && (m.reactions || {})[user?.id];
+      if (m && !m._pending && (!existing || existing === 'heart')) {
+        toggleReaction(row.dataset.id, 'heart');
+      }
     });
     $('messages').addEventListener('contextmenu', (e) => {
       const row = findMsgRowForContextMenu(e);
