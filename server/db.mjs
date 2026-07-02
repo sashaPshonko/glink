@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
+import { MEMBERS } from './config.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.GLINK_DATA || join(__dirname, 'data');
@@ -11,27 +12,38 @@ const empty = () => ({
     users: [],
     chats: [],
     messages: [],
+    files: [],
 });
 
-function load() {
+export function readDb() {
     if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
     if (!existsSync(DB_FILE)) {
         const db = empty();
-        save(db);
+        writeDb(db);
         return db;
     }
-    return JSON.parse(readFileSync(DB_FILE, 'utf8'));
+    const db = JSON.parse(readFileSync(DB_FILE, 'utf8'));
+    if (!db.files) db.files = [];
+    return db;
 }
 
-function save(db) {
+export function writeDb(db) {
     writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
 }
 
-let db = load();
+let db = readDb();
+
+function persist() {
+    writeDb(db);
+}
+
+export function reloadDb() {
+    db = readDb();
+}
 
 export function resetDb() {
     db = empty();
-    save(db);
+    persist();
 }
 
 export function countUsers() {
@@ -50,7 +62,7 @@ export function createUser({ username, passwordHash, displayName }) {
         createdAt: new Date().toISOString(),
     };
     db.users.push(user);
-    save(db);
+    persist();
     return user;
 }
 
@@ -87,18 +99,18 @@ export function getOrCreateMainGroup(memberIds, title) {
             updatedAt: new Date().toISOString(),
         };
         db.chats.push(chat);
-        save(db);
+        persist();
         return chat;
     }
     const merged = [...new Set([...chat.memberIds, ...sorted])].sort();
     if (merged.join(',') !== chat.memberIds.slice().sort().join(',')) {
         chat.memberIds = merged;
         chat.updatedAt = new Date().toISOString();
-        save(db);
+        persist();
     }
     if (chat.title !== title) {
         chat.title = title;
-        save(db);
+        persist();
     }
     return chat;
 }
@@ -116,9 +128,23 @@ export function getOrCreateDm(userId, peerId) {
             updatedAt: new Date().toISOString(),
         };
         db.chats.push(chat);
-        save(db);
+        persist();
     }
     return chat;
+}
+
+function lastMessageFor(chatId) {
+    return db.messages
+        .filter((m) => m.chatId === chatId)
+        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+}
+
+export function messagePreview(msg) {
+    if (!msg) return '';
+    if (msg.kind === 'image') return msg.text ? `📷 ${msg.text}` : '📷 фото';
+    if (msg.kind === 'voice') return '🎤 голосовое';
+    if (msg.kind === 'file') return `📎 ${msg.file?.name || 'файл'}`;
+    return msg.text || '';
 }
 
 export function listChatsForUser(userId) {
@@ -128,19 +154,18 @@ export function listChatsForUser(userId) {
         .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
 }
 
-function lastMessageFor(chatId) {
-    return db.messages
-        .filter((m) => m.chatId === chatId)
-        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
-}
-
 function formatChatRow(chat, userId) {
     const last = lastMessageFor(chat.id);
     const base = {
         id: chat.id,
         type: chat.type,
         lastMessage: last
-            ? { text: last.text, createdAt: last.createdAt, senderId: last.senderId }
+            ? {
+                text: messagePreview(last),
+                kind: last.kind || 'text',
+                createdAt: last.createdAt,
+                senderId: last.senderId,
+            }
             : null,
         updatedAt: last?.createdAt || chat.updatedAt,
     };
@@ -178,19 +203,33 @@ export function listMessages(chatId, after = null) {
     return rows.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
 }
 
-export function addMessage({ chatId, senderId, text }) {
+export function addMessage({ chatId, senderId, text, kind = 'text', file = null }) {
     const chat = db.chats.find((c) => c.id === chatId);
     if (!chat) throw new Error('chat_not_found');
+
+    const msgKind = kind || 'text';
     const msg = {
         id: randomUUID(),
         chatId,
         senderId,
+        kind: msgKind,
         text: String(text || '').trim(),
+        file: file
+            ? {
+                id: file.id,
+                name: file.originalName || file.name,
+                mime: file.mime,
+                size: file.size,
+            }
+            : null,
         createdAt: new Date().toISOString(),
     };
-    if (!msg.text) throw new Error('empty_message');
+
+    if (msgKind === 'text' && !msg.text) throw new Error('empty_message');
+    if (msgKind !== 'text' && !msg.file) throw new Error('empty_message');
+
     db.messages.push(msg);
     chat.updatedAt = msg.createdAt;
-    save(db);
+    persist();
     return msg;
 }

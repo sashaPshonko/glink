@@ -1,0 +1,7 @@
+server/node_modules/
+server/data/
+server/uploads/
+app/node_modules/
+app/.expo/
+app/android/
+app/ios/

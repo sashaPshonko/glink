@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Glink</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #fff5f9;
+      color: #5c3347;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+    .hidden { display: none !important; }
+    header {
+      padding: 16px 20px;
+      background: #ffecf4;
+      border-bottom: 1px solid #fce7f3;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { margin: 0; color: #e879a9; font-size: 1.4rem; }
+    header small { color: #b07a94; }
+    button, .btn {
+      background: #e879a9;
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    button.secondary { background: transparent; color: #e879a9; }
+    button.icon {
+      width: 44px; height: 44px; padding: 0; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; flex-shrink: 0;
+    }
+    button.icon.recording { background: #e11d48; animation: pulse 1s infinite; }
+    @keyframes pulse { 50% { opacity: 0.7; } }
+    #login {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+      background: linear-gradient(160deg, #fff5f9 0%, #ffecf4 50%, #fce7f3 100%);
+    }
+    .login-card {
+      width: 100%;
+      max-width: 420px;
+      background: #fff;
+      border-radius: 24px;
+      padding: 28px 24px 24px;
+      box-shadow: 0 8px 32px rgba(232, 121, 169, 0.15);
+      border: 1px solid #fce7f3;
+    }
+    .login-logo { color: #e879a9; font-size: 2rem; font-weight: 800; margin: 0 0 4px; text-align: center; }
+    .login-sub { color: #b07a94; text-align: center; margin: 0 0 24px; font-size: 0.95rem; }
+    .login-label { color: #9d647d; font-size: 0.85rem; font-weight: 600; margin-bottom: 10px; }
+    .who-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+    .who-btn {
+      background: #fff5f9;
+      border: 2px solid #fce7f3;
+      border-radius: 16px;
+      padding: 14px 8px;
+      cursor: pointer;
+      text-align: center;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .who-btn:hover { border-color: #f9a8d4; }
+    .who-btn.sel { border-color: #e879a9; background: #ffecf4; }
+    .who-btn .av {
+      width: 48px; height: 48px; border-radius: 50%; margin: 0 auto 8px;
+      background: #fbcfe8; color: #e879a9; font-weight: 700; font-size: 1.2rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .who-btn .name { color: #5c3347; font-weight: 700; font-size: 0.95rem; }
+    .who-btn .hint { color: #b07a94; font-size: 0.72rem; margin-top: 4px; }
+    .login-card input[type="password"] {
+      width: 100%;
+      margin-bottom: 16px;
+      border: 2px solid #fce7f3;
+      border-radius: 14px;
+      padding: 14px 16px;
+    }
+    .login-card input[type="password"]:focus {
+      outline: none;
+      border-color: #e879a9;
+    }
+    .who-btn.busy { opacity: 0.6; pointer-events: none; }
+    .err { color: #e11d48; margin: 12px 0 0; text-align: center; font-size: 0.9rem; }
+    #chatList { flex: 1; overflow: auto; min-height: 0; }
+    #appErr { padding: 12px 16px; background: #fff0f3; color: #e11d48; border-bottom: 1px solid #fce7f3; }
+    .empty { padding: 24px 16px; color: #b07a94; text-align: center; }
+    .row {
+      display: flex; gap: 12px; padding: 14px 16px;
+      border-bottom: 1px solid #fce7f3; background: #fff; cursor: pointer;
+    }
+    .row.wait { opacity: 0.5; cursor: default; }
+    .avatar {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: #fbcfe8; display: flex; align-items: center; justify-content: center;
+      color: #e879a9; font-weight: 700;
+    }
+    .avatar.group { background: #f9a8d4; }
+    .preview { color: #b07a94; font-size: 0.9rem; margin-top: 4px; }
+    #chatView { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    #messages {
+      flex: 1; overflow: auto; padding: 16px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .bubble {
+      max-width: 82%; padding: 10px 14px; border-radius: 16px;
+      line-height: 1.4; word-break: break-word;
+    }
+    .mine { align-self: flex-end; background: #f9c5df; }
+    .theirs { align-self: flex-start; background: #fff; border: 1px solid #fce7f3; }
+    .sender { font-size: 0.75rem; color: #db2777; font-weight: 600; margin-bottom: 4px; }
+    .bubble a { color: #be185d; text-decoration: underline; }
+    .bubble img {
+      max-width: min(280px, 100%); border-radius: 12px; display: block;
+      margin-top: 4px; cursor: pointer;
+    }
+    .bubble audio { width: min(260px, 100%); margin-top: 4px; height: 36px; }
+    .file-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 4px; color: #be185d; font-weight: 600;
+    }
+    #composer {
+      display: flex; gap: 8px; padding: 12px; align-items: center;
+      border-top: 1px solid #fce7f3; background: #ffecf4;
+    }
+    #composer input[type="text"] {
+      margin: 0; flex: 1; min-width: 0;
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #fce7f3;
+      border-radius: 12px;
+      font-size: 1rem;
+    }
+    #voiceHint {
+      position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+      background: #e11d48; color: #fff; padding: 10px 16px; border-radius: 20px;
+      font-size: 0.9rem; z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <div id="login">
+    <div class="login-card">
+      <h1 class="login-logo">Glink ♡</h1>
+      <p class="login-sub">нажми на себя — и в чат</p>
+      <div id="whoGrid" class="who-grid"></div>
+      <p id="loginErr" class="err hidden"></p>
+    </div>
+  </div>
+
+  <div id="app" class="hidden" style="display:flex;flex-direction:column;height:100dvh">
+    <header>
+      <div>
+        <h1 id="hdrTitle">Glink</h1>
+        <small id="hdrSub">@user</small>
+      </div>
+      <button id="logoutBtn" class="secondary">выход</button>
+    </header>
+    <p id="appErr" class="hidden"></p>
+    <div id="chatList"></div>
+    <div id="chatView" class="hidden">
+      <header>
+        <button id="backBtn" class="secondary">← назад</button>
+        <div>
+          <h1 id="chatTitle">Чат</h1>
+          <small id="chatSub"></small>
+        </div>
+      </header>
+      <div id="messages"></div>
+      <div id="composer">
+        <input id="fileInput" type="file" class="hidden" accept="image/*,*/*" />
+        <button id="attachBtn" class="icon secondary" title="Фото или файл">📎</button>
+        <button id="voiceBtn" class="icon secondary" title="Голосовое">🎤</button>
+        <input id="msgInput" type="text" placeholder="Сообщение…" />
+        <button id="sendBtn" class="icon">♡</button>
+      </div>
+    </div>
+  </div>
+  <div id="voiceHint" class="hidden">🎤 говорите… отпустите чтобы отправить</div>
+
+  <script>
+    const API = '';
+    let token = localStorage.getItem('glink_token') || '';
+    let user = null;
+    let chats = [];
+    let activeChat = null;
+    let ws = null;
+    let pollTimer = null;
+    let mediaRecorder = null;
+    let voiceStream = null;
+    let voiceChunks = [];
+    let selectedUsername = localStorage.getItem('glink_last_user') || '';
+    let accounts = [];
+
+    const $ = (id) => document.getElementById(id);
+
+    let signingIn = false;
+
+    const ERR_RU = {
+      unauthorized: 'сессия истекла — нажми на себя снова',
+      full: 'все 3 места заняты',
+      not_allowed: 'выбери одного из троих',
+    };
+
+    function errText(code) {
+      return ERR_RU[code] || code || 'ошибка';
+    }
+
+    function clearToken() {
+      token = '';
+      user = null;
+      localStorage.removeItem('glink_token');
+    }
+
+    async function api(path, opts = {}) {
+      const headers = { ...(opts.headers || {}) };
+      const isForm = opts.body instanceof FormData;
+      if (!isForm) headers['Content-Type'] = 'application/json';
+      if (token) headers.Authorization = 'Bearer ' + token;
+      const res = await fetch(API + path, { ...opts, headers });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const err = new Error(errText(data.error));
+        err.code = data.error;
+        throw err;
+      }
+      return data;
+    }
+
+    function fileUrl(path) {
+      const sep = path.includes('?') ? '&' : '?';
+      return path + sep + 'token=' + encodeURIComponent(token);
+    }
+
+    function chatTitle(c) {
+      if (c.type === 'group') return c.title || 'Группа';
+      return c.peer?.displayName || c.peer?.username || '?';
+    }
+
+    function showLogin(err) {
+      $('login').classList.remove('hidden');
+      $('app').classList.add('hidden');
+      $('loginErr').textContent = err || '';
+      $('loginErr').classList.toggle('hidden', !err);
+      loadWhoGrid();
+    }
+
+    async function pickAndSignin(username) {
+      if (signingIn) return;
+      signingIn = true;
+      selectedUsername = username;
+      localStorage.setItem('glink_last_user', username);
+      $('loginErr').classList.add('hidden');
+      showAppErr('');
+      document.querySelectorAll('.who-btn').forEach((el) => {
+        el.classList.toggle('sel', el.dataset.user === username);
+        el.classList.toggle('busy', true);
+      });
+      try {
+        const data = await api('/auth/signin', {
+          method: 'POST',
+          body: JSON.stringify({ username }),
+        });
+        token = data.token;
+        user = data.user;
+        localStorage.setItem('glink_token', token);
+        await enterApp();
+      } catch (e) {
+        $('loginErr').textContent = e.message;
+        $('loginErr').classList.remove('hidden');
+      } finally {
+        signingIn = false;
+        document.querySelectorAll('.who-btn').forEach((el) => el.classList.remove('busy'));
+      }
+    }
+
+    function selectWho(username) {
+      pickAndSignin(username);
+    }
+
+    async function loadWhoGrid() {
+      try {
+        const res = await fetch(API + '/health');
+        const data = await res.json();
+        accounts = data.accounts || (data.members || []).map((u) => ({
+          username: u,
+          displayName: u,
+          taken: false,
+        }));
+      } catch {
+        accounts = [
+          { username: 'sasha_pshonko', displayName: 'Саша', taken: false },
+          { username: 'dasha_pshonko', displayName: 'Даша', taken: false },
+          { username: 'senya', displayName: 'Сеня', taken: false },
+        ];
+      }
+      $('whoGrid').innerHTML = accounts.map((a) => {
+        const letter = (a.displayName || a.username)[0].toUpperCase();
+        return `<button type="button" class="who-btn${a.username === selectedUsername ? ' sel' : ''}" data-user="${a.username}">
+          <div class="av">${letter}</div>
+          <div class="name">${escapeHtml(a.displayName)}</div>
+        </button>`;
+      }).join('');
+      $('whoGrid').querySelectorAll('.who-btn').forEach((el) => {
+        el.onclick = () => selectWho(el.dataset.user);
+      });
+    }
+
+    function showApp() {
+      $('login').classList.add('hidden');
+      $('app').classList.remove('hidden');
+      $('hdrSub').textContent = '@' + user.username;
+    }
+
+    function showAppErr(msg) {
+      const el = $('appErr');
+      if (!msg) { el.textContent = ''; el.classList.add('hidden'); return; }
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function linkify(text) {
+      const escaped = escapeHtml(text);
+      return escaped.replace(
+        /(https?:\/\/[^\s<]+[^\s<.,;:!?)}\]'"])/g,
+        '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>',
+      );
+    }
+
+    function renderMessageBody(m) {
+      const parts = [];
+      const kind = m.kind || 'text';
+
+      if (kind === 'image' && m.fileUrl) {
+        parts.push(`<img src="${fileUrl(m.fileUrl)}" alt="фото" onclick="window.open(this.src,'_blank')" />`);
+      } else if (kind === 'voice' && m.fileUrl) {
+        parts.push(`<audio controls preload="metadata" src="${fileUrl(m.fileUrl)}"></audio>`);
+      } else if (kind === 'file' && m.fileUrl) {
+        const name = escapeHtml(m.file?.name || 'файл');
+        parts.push(`<a class="file-link" href="${fileUrl(m.fileUrl)}" target="_blank" rel="noopener">📎 ${name}</a>`);
+      }
+
+      if (m.text) parts.push(`<div>${linkify(m.text)}</div>`);
+      if (!parts.length) parts.push('<div>…</div>');
+      return parts.join('');
+    }
+
+    function renderChats() {
+      $('chatList').classList.remove('hidden');
+      $('chatView').classList.add('hidden');
+      if (!chats.length) {
+        $('chatList').innerHTML = '<p class="empty">Чаты не загрузились — обнови страницу</p>';
+        return;
+      }
+      $('chatList').innerHTML = chats.map((c) => {
+        const wait = c.waiting ? ' wait' : '';
+        const sub = c.waiting ? 'ещё не зарегистрировался' : (c.lastMessage?.text || 'Напиши первым ♡');
+        const av = c.type === 'group' ? '♡' : (chatTitle(c)[0] || '?').toUpperCase();
+        const cls = c.type === 'group' ? 'avatar group' : 'avatar';
+        return `<div class="row${wait}" data-id="${c.id}" data-wait="${c.waiting ? '1' : ''}">
+          <div class="${cls}">${av}</div>
+          <div><strong>${escapeHtml(chatTitle(c))}</strong><div class="preview">${escapeHtml(sub)}</div></div>
+        </div>`;
+      }).join('');
+      $('chatList').querySelectorAll('.row').forEach((el) => {
+        el.onclick = () => {
+          if (el.dataset.wait === '1') return;
+          openChat(chats.find((x) => x.id === el.dataset.id));
+        };
+      });
+    }
+
+    async function loadMessages() {
+      if (!activeChat) return;
+      const data = await api('/chats/' + activeChat.id + '/messages');
+      const box = $('messages');
+      box.innerHTML = data.messages.map((m) => {
+        const mine = m.senderId === user.id;
+        const sender = activeChat.type === 'group' && !mine
+          ? `<div class="sender">${escapeHtml(m.senderName || '?')}</div>` : '';
+        return `<div class="bubble ${mine ? 'mine' : 'theirs'}">${sender}${renderMessageBody(m)}</div>`;
+      }).join('');
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function connectWs() {
+      if (ws) ws.close();
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(proto + '//' + location.host + '/ws?token=' + encodeURIComponent(token));
+      ws.onopen = () => {
+        if (activeChat) ws.send(JSON.stringify({ type: 'join', chatId: activeChat.id }));
+      };
+      ws.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === 'message' && activeChat && msg.message?.chatId === activeChat.id) {
+            loadMessages();
+            loadChats();
+          }
+        } catch (_) {}
+      };
+    }
+
+    async function openChat(chat) {
+      activeChat = chat;
+      $('chatList').classList.add('hidden');
+      $('chatView').classList.remove('hidden');
+      $('chatTitle').textContent = chatTitle(chat);
+      $('chatSub').textContent = chat.type === 'group' ? 'группа ♡' : 'личный чат';
+      await loadMessages();
+      if (ws?.readyState === 1) ws.send(JSON.stringify({ type: 'join', chatId: chat.id }));
+      clearInterval(pollTimer);
+      pollTimer = setInterval(loadMessages, 5000);
+    }
+
+    async function loadChats() {
+      showAppErr('');
+      const data = await api('/chats');
+      chats = data.chats || [];
+      renderChats();
+    }
+
+    async function enterApp() {
+      showApp();
+      connectWs();
+      try {
+        await loadChats();
+      } catch (e) {
+        showAppErr(e.message || 'не удалось загрузить чаты');
+        throw e;
+      }
+    }
+
+    async function sendText() {
+      const text = $('msgInput').value.trim();
+      if (!text || !activeChat) return;
+      $('msgInput').value = '';
+      await api('/chats/' + activeChat.id + '/messages', {
+        method: 'POST',
+        body: JSON.stringify({ text }),
+      });
+      await loadMessages();
+      await loadChats();
+    }
+
+    async function sendFile(file, kind, caption) {
+      if (!activeChat || !file) return;
+      const fd = new FormData();
+      fd.append('file', file, file.name || 'upload');
+      if (kind) fd.append('kind', kind);
+      if (caption) fd.append('text', caption);
+      await api('/chats/' + activeChat.id + '/messages', { method: 'POST', body: fd });
+      await loadMessages();
+      await loadChats();
+    }
+
+    async function onFilePicked(ev) {
+      const file = ev.target.files?.[0];
+      ev.target.value = '';
+      if (!file) return;
+      try {
+        const kind = file.type.startsWith('image/') ? 'image' : 'file';
+        await sendFile(file, kind);
+      } catch (e) {
+        showAppErr(e.message || 'не удалось отправить файл');
+      }
+    }
+
+    async function startVoice() {
+      if (!activeChat || mediaRecorder) return;
+      try {
+        voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        voiceChunks = [];
+        mediaRecorder = new MediaRecorder(voiceStream);
+        mediaRecorder.ondataavailable = (e) => { if (e.data.size) voiceChunks.push(e.data); };
+        mediaRecorder.onstop = async () => {
+          $('voiceBtn').classList.remove('recording');
+          $('voiceHint').classList.add('hidden');
+          voiceStream?.getTracks().forEach((t) => t.stop());
+          voiceStream = null;
+          mediaRecorder = null;
+          if (!voiceChunks.length) return;
+          const blob = new Blob(voiceChunks, { type: voiceChunks[0]?.type || 'audio/webm' });
+          if (blob.size < 800) return;
+          try {
+            await sendFile(new File([blob], 'voice.webm', { type: blob.type }), 'voice');
+          } catch (e) {
+            showAppErr(e.message || 'не удалось отправить голосовое');
+          }
+        };
+        mediaRecorder.start();
+        $('voiceBtn').classList.add('recording');
+        $('voiceHint').classList.remove('hidden');
+      } catch {
+        showAppErr('нет доступа к микрофону');
+      }
+    }
+
+    function stopVoice() {
+      if (mediaRecorder?.state === 'recording') mediaRecorder.stop();
+    }
+
+    $('logoutBtn').onclick = () => {
+      clearToken();
+      if (ws) ws.close();
+      clearInterval(pollTimer);
+      stopVoice();
+      showLogin();
+    };
+    $('backBtn').onclick = () => {
+      activeChat = null;
+      clearInterval(pollTimer);
+      stopVoice();
+      loadChats();
+    };
+    $('sendBtn').onclick = sendText;
+    $('msgInput').onkeydown = (e) => { if (e.key === 'Enter') sendText(); };
+    $('attachBtn').onclick = () => $('fileInput').click();
+    $('fileInput').onchange = onFilePicked;
+
+    const voiceBtn = $('voiceBtn');
+    voiceBtn.addEventListener('mousedown', startVoice);
+    voiceBtn.addEventListener('mouseup', stopVoice);
+    voiceBtn.addEventListener('mouseleave', stopVoice);
+    voiceBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startVoice(); });
+    voiceBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopVoice(); });
+
+    (async () => {
+      if (!token) return showLogin();
+      try {
+        const me = await api('/me');
+        user = me.user;
+        await enterApp();
+      } catch (e) {
+        if (e.code === 'unauthorized') {
+          clearToken();
+          showLogin('сессия истекла — нажми на себя');
+          return;
+        }
+        if (user) { showApp(); showAppErr(e?.message || 'ошибка'); return; }
+        showLogin(e?.message);
+      }
+    })();
+  </script>
+</body>
+</html>
