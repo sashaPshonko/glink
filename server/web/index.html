@@ -130,7 +130,7 @@
     }
     .voice-msg {
       display: flex; align-items: center; gap: 10px;
-      min-width: 168px; margin-top: 2px;
+      min-width: 200px; max-width: min(280px, 100%); margin-top: 2px;
     }
     .voice-play {
       width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
@@ -139,7 +139,33 @@
       display: flex; align-items: center; justify-content: center;
     }
     .bubble.theirs .voice-play { background: #ffecf4; }
-    .voice-label { font-size: 0.92rem; color: inherit; }
+    .voice-body { flex: 1; min-width: 0; }
+    .voice-wave {
+      height: 40px; cursor: pointer; touch-action: manipulation;
+    }
+    .voice-bars {
+      display: flex; align-items: center; gap: 2px; height: 100%;
+    }
+    .voice-bars i {
+      flex: 1; min-width: 2px; max-width: 5px; border-radius: 2px;
+      background: rgba(157, 23, 77, 0.22); display: block; align-self: center;
+      transition: background 0.08s;
+    }
+    .voice-bars i.on { background: rgba(157, 23, 77, 0.88); }
+    .bubble.theirs .voice-bars i { background: rgba(232, 121, 169, 0.28); }
+    .bubble.theirs .voice-bars i.on { background: rgba(219, 39, 119, 0.85); }
+    .voice-time {
+      font-size: 0.72rem; color: rgba(92, 51, 71, 0.65);
+      margin-top: 3px; font-variant-numeric: tabular-nums;
+    }
+    .msg-foot {
+      display: flex; justify-content: flex-end; margin-top: 5px;
+    }
+    .ticks {
+      font-size: 0.78rem; letter-spacing: -3px; line-height: 1;
+      color: rgba(92, 51, 71, 0.42); user-select: none;
+    }
+    .ticks.read { color: #2563eb; }
     .file-link {
       display: inline-flex; align-items: center; gap: 6px;
       margin-top: 4px; color: #be185d; font-weight: 600;
@@ -222,6 +248,9 @@
     let voiceChunks = [];
     let voiceAudio = null;
     let voiceBtnEl = null;
+    let voiceMsgEl = null;
+    let voiceRaf = null;
+    const waveCache = new Map();
     let selectedUsername = localStorage.getItem('glink_last_user') || '';
     let accounts = [];
 
@@ -375,7 +404,10 @@
         parts.push(
           `<div class="voice-msg" data-src="${src}">` +
           `<button type="button" class="voice-play" aria-label="играть">▶</button>` +
-          `<span class="voice-label">🎤 голосовое</span></div>`,
+          `<div class="voice-body">` +
+          `<div class="voice-wave"><div class="voice-bars"></div></div>` +
+          `<div class="voice-time"><span class="voice-cur">0:00</span> / <span class="voice-dur">…</span></div>` +
+          `</div></div>`,
         );
       } else if (kind === 'file' && m.fileUrl) {
         const name = escapeHtml(m.file?.name || 'файл');
@@ -385,6 +417,14 @@
       if (m.text) parts.push(`<div>${linkify(m.text)}</div>`);
       if (!parts.length) parts.push('<div>…</div>');
       return parts.join('');
+    }
+
+    function renderTicks(m, mine) {
+      if (!mine || !m.status) return '';
+      const read = m.status === 'read';
+      const cls = read ? 'ticks read' : 'ticks sent';
+      const title = read ? 'прочитано' : 'отправлено';
+      return `<div class="msg-foot"><span class="${cls}" title="${title}">${read ? '✓✓' : '✓'}</span></div>`;
     }
 
     function renderChats() {
@@ -429,10 +469,107 @@
         const mine = m.senderId === user.id;
         const sender = activeChat.type === 'group' && !mine
           ? `<div class="sender">${escapeHtml(m.senderName || '?')}</div>` : '';
-        return `<div class="bubble ${mine ? 'mine' : 'theirs'}">${sender}${renderMessageBody(m)}</div>`;
+        return `<div class="bubble ${mine ? 'mine' : 'theirs'}" data-id="${m.id}">${sender}${renderMessageBody(m)}${renderTicks(m, mine)}</div>`;
       }).join('');
       box.scrollTop = box.scrollHeight;
       wireVoicePlayers(box);
+      markChatRead();
+    }
+
+    async function markChatRead() {
+      if (!activeChat) return;
+      try {
+        await api('/chats/' + activeChat.id + '/read', { method: 'POST', body: '{}' });
+      } catch (_) {}
+    }
+
+    function fmtTime(s) {
+      if (!s || !Number.isFinite(s)) return '0:00';
+      const m = Math.floor(s / 60);
+      const sec = Math.floor(s % 60);
+      return `${m}:${String(sec).padStart(2, '0')}`;
+    }
+
+    async function getWaveform(src) {
+      if (waveCache.has(src)) return waveCache.get(src);
+      const promise = (async () => {
+        const res = await fetch(src);
+        const buf = await res.arrayBuffer();
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        const ctx = new Ctx();
+        const audio = await ctx.decodeAudioData(buf.slice(0));
+        const data = audio.getChannelData(0);
+        const bars = 52;
+        const block = Math.max(1, Math.floor(data.length / bars));
+        const peaks = [];
+        for (let i = 0; i < bars; i++) {
+          let max = 0;
+          const start = i * block;
+          for (let j = 0; j < block && start + j < data.length; j++) {
+            max = Math.max(max, Math.abs(data[start + j]));
+          }
+          peaks.push(max);
+        }
+        const top = Math.max(...peaks, 0.001);
+        ctx.close();
+        return { peaks: peaks.map((p) => p / top), duration: audio.duration };
+      })();
+      waveCache.set(src, promise);
+      return promise;
+    }
+
+    function paintWaveform(barsEl, peaks) {
+      barsEl.innerHTML = peaks.map((p) => {
+        const h = Math.max(14, Math.round(p * 100));
+        return `<i style="height:${h}%"></i>`;
+      }).join('');
+    }
+
+    function updateVoiceProgress(el, current, duration) {
+      const pct = duration > 0 ? current / duration : 0;
+      const bars = el.querySelectorAll('.voice-bars i');
+      const active = Math.floor(pct * bars.length);
+      bars.forEach((bar, i) => bar.classList.toggle('on', i < active));
+      const cur = el.querySelector('.voice-cur');
+      if (cur) cur.textContent = fmtTime(current);
+    }
+
+    function stopVoiceRaf() {
+      if (voiceRaf) cancelAnimationFrame(voiceRaf);
+      voiceRaf = null;
+    }
+
+    function trackVoiceProgress(el) {
+      stopVoiceRaf();
+      const tick = () => {
+        if (!voiceAudio || voiceAudio.paused) return;
+        updateVoiceProgress(el, voiceAudio.currentTime, voiceAudio.duration);
+        voiceRaf = requestAnimationFrame(tick);
+      };
+      voiceRaf = requestAnimationFrame(tick);
+    }
+
+    async function prepareVoiceEl(el) {
+      if (el.dataset.ready) return;
+      const src = el.dataset.src;
+      const barsEl = el.querySelector('.voice-bars');
+      try {
+        const { peaks, duration } = await getWaveform(src);
+        paintWaveform(barsEl, peaks);
+        el.querySelector('.voice-dur').textContent = fmtTime(duration);
+        el.dataset.duration = String(duration);
+      } catch {
+        paintWaveform(barsEl, Array.from({ length: 40 }, () => 0.35));
+        el.querySelector('.voice-dur').textContent = '—';
+      }
+      el.dataset.ready = '1';
+      el.querySelector('.voice-wave').onclick = (e) => {
+        if (!voiceAudio || voiceAudio.dataset.glinkSrc !== src) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        voiceAudio.currentTime = pct * voiceAudio.duration;
+        updateVoiceProgress(el, voiceAudio.currentTime, voiceAudio.duration);
+      };
     }
 
     function wireVoicePlayers(container) {
@@ -441,30 +578,46 @@
         if (!btn || btn.dataset.wired) return;
         btn.dataset.wired = '1';
         const src = el.dataset.src;
-        btn.onclick = () => toggleVoice(src, btn);
+        prepareVoiceEl(el);
+        btn.onclick = () => toggleVoice(src, btn, el);
       });
     }
 
-    function toggleVoice(src, btn) {
+    function toggleVoice(src, btn, el) {
       if (voiceAudio?.dataset.glinkSrc === src && !voiceAudio.paused) {
         voiceAudio.pause();
         btn.textContent = '▶';
+        stopVoiceRaf();
         return;
       }
       if (voiceAudio) {
         voiceAudio.pause();
+        stopVoiceRaf();
         if (voiceBtnEl) voiceBtnEl.textContent = '▶';
+        if (voiceMsgEl) updateVoiceProgress(voiceMsgEl, 0, Number(voiceMsgEl.dataset.duration) || voiceAudio.duration);
       }
       voiceAudio = new Audio(src);
       voiceAudio.dataset.glinkSrc = src;
       voiceBtnEl = btn;
+      voiceMsgEl = el;
       btn.textContent = '⏸';
-      voiceAudio.onended = () => { btn.textContent = '▶'; voiceBtnEl = null; };
+      voiceAudio.onended = () => {
+        btn.textContent = '▶';
+        stopVoiceRaf();
+        updateVoiceProgress(el, 0, Number(el.dataset.duration) || voiceAudio.duration);
+        voiceBtnEl = null;
+        voiceMsgEl = null;
+      };
       voiceAudio.onerror = () => {
         btn.textContent = '▶';
+        stopVoiceRaf();
         showAppErr('не удалось воспроизвести голосовое');
       };
-      voiceAudio.play().catch(() => {
+      voiceAudio.onloadedmetadata = () => {
+        el.querySelector('.voice-dur').textContent = fmtTime(voiceAudio.duration);
+        el.dataset.duration = String(voiceAudio.duration);
+      };
+      voiceAudio.play().then(() => trackVoiceProgress(el)).catch(() => {
         btn.textContent = '▶';
         showAppErr('не удалось воспроизвести голосовое');
       });
@@ -483,6 +636,9 @@
           if (msg.type === 'message' && activeChat && msg.message?.chatId === activeChat.id) {
             loadMessages();
             refreshChatList();
+          }
+          if (msg.type === 'read' && activeChat && msg.chatId === activeChat.id) {
+            loadMessages();
           }
         } catch (_) {}
       };

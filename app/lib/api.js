@@ -110,6 +110,11 @@ export async function fetchMessages(chatId, after = null) {
     return api(`/chats/${chatId}/messages${q}`, { token });
 }
 
+export async function markChatRead(chatId) {
+    const token = await getToken();
+    return api(`/chats/${chatId}/read`, { method: 'POST', token, body: {} });
+}
+
 export async function sendMessage(chatId, text) {
     const token = await getToken();
     return api(`/chats/${chatId}/messages`, {

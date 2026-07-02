@@ -13,10 +13,13 @@ import {
     createUser,
     findUserById,
     findUserByUsername,
+    findChatById,
     getOrCreateDm,
     getOrCreateMainGroup,
     listMessages,
+    markMessagesRead,
     messagePreview,
+    readStatusFor,
     userInChat,
 } from './db.mjs';
 import {
@@ -89,8 +92,9 @@ function publicUser(user) {
     return { id: user.id, username: user.username, displayName: user.displayName };
 }
 
-function enrichMessage(msg) {
+function enrichMessage(msg, viewerId = null) {
     const sender = findUserById(msg.senderId);
+    const chat = findChatById(msg.chatId);
     const base = {
         ...msg,
         kind: msg.kind || 'text',
@@ -98,6 +102,9 @@ function enrichMessage(msg) {
     };
     if (msg.file?.id) {
         base.fileUrl = `/files/${msg.file.id}`;
+    }
+    if (viewerId && chat) {
+        base.status = readStatusFor(msg, chat, viewerId);
     }
     return base;
 }
@@ -326,8 +333,30 @@ app.get('/chats/:chatId/messages', authMiddleware, (req, res) => {
         return;
     }
     const after = req.query.after ? String(req.query.after) : null;
-    const messages = listMessages(chatId, after).map(enrichMessage);
+    const messages = listMessages(chatId, after).map((m) => enrichMessage(m, req.userId));
     res.json({ messages });
+});
+
+app.post('/chats/:chatId/read', authMiddleware, (req, res) => {
+    const { chatId } = req.params;
+    if (chatId.startsWith('pending:')) {
+        res.status(400).json({ error: 'waiting_peer' });
+        return;
+    }
+    if (!userInChat(req.userId, chatId)) {
+        res.status(403).json({ error: 'forbidden' });
+        return;
+    }
+    const messageIds = markMessagesRead(chatId, req.userId);
+    if (messageIds.length) {
+        broadcast(chatId, {
+            type: 'read',
+            chatId,
+            readerId: req.userId,
+            messageIds,
+        });
+    }
+    res.json({ ok: true, messageIds });
 });
 
 function maybeUpload(req, res, next) {
@@ -378,6 +407,7 @@ app.post('/chats/:chatId/messages', authMiddleware, maybeUpload, (req, res) => {
                     kind,
                     file: stored,
                 }),
+                req.userId,
             );
         } else {
             message = enrichMessage(
@@ -387,6 +417,7 @@ app.post('/chats/:chatId/messages', authMiddleware, maybeUpload, (req, res) => {
                     text: req.body?.text,
                     kind: 'text',
                 }),
+                req.userId,
             );
         }
         broadcast(chatId, { type: 'message', message });

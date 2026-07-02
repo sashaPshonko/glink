@@ -223,6 +223,7 @@ export function addMessage({ chatId, senderId, text, kind = 'text', file = null 
             }
             : null,
         createdAt: new Date().toISOString(),
+        readBy: [],
     };
 
     if (msgKind === 'text' && !msg.text) throw new Error('empty_message');
@@ -232,4 +233,36 @@ export function addMessage({ chatId, senderId, text, kind = 'text', file = null 
     chat.updatedAt = msg.createdAt;
     persist();
     return msg;
+}
+
+export function findChatById(chatId) {
+    return db.chats.find((c) => c.id === chatId) || null;
+}
+
+/** @returns {string[]} ids of messages newly marked read */
+export function markMessagesRead(chatId, readerId) {
+    const chat = findChatById(chatId);
+    if (!chat?.memberIds.includes(readerId)) return [];
+
+    const updated = [];
+    for (const msg of db.messages) {
+        if (msg.chatId !== chatId) continue;
+        if (msg.senderId === readerId) continue;
+        if (!Array.isArray(msg.readBy)) msg.readBy = [];
+        if (!msg.readBy.includes(readerId)) {
+            msg.readBy.push(readerId);
+            updated.push(msg.id);
+        }
+    }
+    if (updated.length) persist();
+    return updated;
+}
+
+/** @returns {'sent'|'read'|null} status for viewer's own messages */
+export function readStatusFor(message, chat, viewerId) {
+    if (!message || message.senderId !== viewerId) return null;
+    const readBy = Array.isArray(message.readBy) ? message.readBy : [];
+    const others = (chat?.memberIds || []).filter((id) => id !== viewerId);
+    if (!others.length) return 'sent';
+    return others.every((id) => readBy.includes(id)) ? 'read' : 'sent';
 }

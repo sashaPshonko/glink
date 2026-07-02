@@ -19,6 +19,7 @@ import {
     connectWs,
     fetchMessages,
     fileUrl,
+    markChatRead,
     sendMediaMessage,
     sendMessage,
 } from '../lib/api';
@@ -63,30 +64,57 @@ function MessageBody({ item, isGroup, mine }) {
                 </Pressable>
             ) : null}
             {item.text ? <LinkText text={item.text} style={styles.bubbleText} /> : null}
+            {mine ? <MessageTicks status={item.status} /> : null}
         </View>
     );
+}
+
+function MessageTicks({ status }) {
+    if (!status) return null;
+    const read = status === 'read';
+    return (
+        <View style={styles.ticksRow}>
+            <Text style={[styles.ticks, read && styles.ticksRead]}>{read ? '✓✓' : '✓'}</Text>
+        </View>
+    );
+}
+
+function fmtTime(ms) {
+    if (!ms || !Number.isFinite(ms)) return '0:00';
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
 function VoicePlayer({ uri }) {
     const soundRef = useRef(null);
     const [playing, setPlaying] = useState(false);
+    const [pos, setPos] = useState(0);
+    const [dur, setDur] = useState(0);
 
     async function toggle() {
         if (playing && soundRef.current) {
-            await soundRef.current.stopAsync();
-            await soundRef.current.unloadAsync();
-            soundRef.current = null;
+            await soundRef.current.pauseAsync();
             setPlaying(false);
+            return;
+        }
+        if (soundRef.current) {
+            await soundRef.current.playAsync();
+            setPlaying(true);
             return;
         }
         const { sound } = await Audio.Sound.createAsync({ uri });
         soundRef.current = sound;
         setPlaying(true);
         sound.setOnPlaybackStatusUpdate((st) => {
+            if (!st.isLoaded) return;
+            setPos(st.positionMillis || 0);
+            setDur(st.durationMillis || 0);
             if (st.didJustFinish) {
                 setPlaying(false);
-                sound.unloadAsync();
-                soundRef.current = null;
+                setPos(0);
+                sound.setPositionAsync(0);
             }
         });
         await sound.playAsync();
@@ -96,9 +124,15 @@ function VoicePlayer({ uri }) {
         soundRef.current?.unloadAsync();
     }, []);
 
+    const pct = dur > 0 ? Math.min(1, pos / dur) : 0;
+
     return (
         <Pressable onPress={toggle} style={styles.voiceBtn}>
-            <Text style={styles.voiceText}>{playing ? '⏸ пауза' : '▶ голосовое'}</Text>
+            <Text style={styles.voiceText}>{playing ? '⏸' : '▶'} голосовое</Text>
+            <View style={styles.voiceTrack}>
+                <View style={[styles.voiceFill, { width: `${pct * 100}%` }]} />
+            </View>
+            <Text style={styles.voiceTime}>{fmtTime(pos)} / {fmtTime(dur)}</Text>
         </Pressable>
     );
 }
@@ -122,6 +156,7 @@ export default function ChatScreen({ chat, user, onBack }) {
     const loadMessages = useCallback(async () => {
         const data = await fetchMessages(chat.id);
         setMessages(data.messages || []);
+        markChatRead(chat.id).catch(() => {});
     }, [chat.id]);
 
     useEffect(() => {
@@ -142,6 +177,10 @@ export default function ChatScreen({ chat, user, onBack }) {
             if (!alive) return;
             if (ev.type === 'message' && ev.message?.chatId === chat.id) {
                 appendMessage(ev.message);
+                markChatRead(chat.id).catch(() => {});
+            }
+            if (ev.type === 'read' && ev.chatId === chat.id) {
+                loadMessages();
             }
         }).then((socket) => {
             ws = socket;
@@ -153,7 +192,7 @@ export default function ChatScreen({ chat, user, onBack }) {
             alive = false;
             ws?.close();
         };
-    }, [chat.id, appendMessage]);
+    }, [chat.id, appendMessage, loadMessages]);
 
     async function onSend() {
         const body = text.trim();
@@ -363,8 +402,25 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         marginBottom: 4,
         alignSelf: 'flex-start',
+        minWidth: 160,
     },
-    voiceText: { color: theme.primaryDark, fontWeight: '600' },
+    voiceText: { color: theme.primaryDark, fontWeight: '600', marginBottom: 6 },
+    voiceTrack: {
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: theme.border,
+        overflow: 'hidden',
+        marginBottom: 4,
+    },
+    voiceFill: {
+        height: '100%',
+        backgroundColor: theme.primaryDark,
+        borderRadius: 2,
+    },
+    voiceTime: { color: theme.textMuted, fontSize: 11, fontVariant: ['tabular-nums'] },
+    ticksRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4 },
+    ticks: { color: theme.textMuted, fontSize: 12, letterSpacing: -2 },
+    ticksRead: { color: '#2563eb' },
     composer: {
         flexDirection: 'row',
         padding: 12,
