@@ -56,6 +56,7 @@
       cursor: pointer;
     }
     button.secondary { background: transparent; color: #e879a9; }
+    #backBtn { min-height: 44px; min-width: 44px; touch-action: manipulation; flex-shrink: 0; }
     button.icon {
       width: 44px; height: 44px; padding: 0; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
@@ -391,7 +392,7 @@
     <div id="chatList"></div>
     <div id="chatView" class="hidden">
       <header>
-        <button id="backBtn" class="secondary">← назад</button>
+        <button id="backBtn" type="button" class="secondary">← назад</button>
         <div>
           <h1 id="chatTitle">Чат</h1>
           <small id="chatSub"></small>
@@ -1554,8 +1555,9 @@
       };
     }
 
-    async function openChat(chat) {
+    async function openChat(chat, opts = {}) {
       activeChat = chat;
+      localStorage.setItem('glink_active_chat', chat.id);
       lastMsgCount = 0;
       lastMessagesSig = '';
       userPinnedBottom = true;
@@ -1563,6 +1565,13 @@
       $('chatView').classList.remove('hidden');
       $('chatTitle').textContent = chatTitle(chat);
       $('chatSub').textContent = chat.type === 'group' ? 'группа ♡' : 'личный чат';
+      if (!opts.skipHistory) {
+        history.pushState(
+          { glink: 'chat', chatId: chat.id },
+          '',
+          '#chat/' + encodeURIComponent(chat.id),
+        );
+      }
       await loadMessages({ forceBottom: true });
       if (ws?.readyState === 1) wsJoinAllChats();
       clearInterval(pollTimer);
@@ -1573,6 +1582,67 @@
         if (videoRecorder?.state === 'recording') return;
         syncMessages();
       }, 5000);
+    }
+
+    function closeChatUI() {
+      activeChat = null;
+      localStorage.removeItem('glink_active_chat');
+      clearInterval(pollTimer);
+      pollTimer = null;
+      cancelVoiceRecording();
+      cancelVideoRecording();
+      $('chatList').classList.remove('hidden');
+      $('chatView').classList.add('hidden');
+    }
+
+    function userGoBack() {
+      if (!$('videoRecOverlay').classList.contains('hidden')) {
+        cancelVideoRecording();
+        return true;
+      }
+      if (!$('voiceRecOverlay').classList.contains('hidden')) {
+        cancelVoiceRecording();
+        return true;
+      }
+      if (!activeChat) return false;
+      if (history.state?.glink === 'chat') {
+        history.back();
+      } else {
+        closeChatUI();
+        history.replaceState({ glink: 'list' }, '', location.pathname + location.search);
+      }
+      return true;
+    }
+
+    window.glinkGoBack = userGoBack;
+
+    window.addEventListener('popstate', (e) => {
+      const st = e.state;
+      if (st?.glink === 'chat' && st.chatId) {
+        const chat = chats.find((c) => c.id === st.chatId);
+        if (chat && !chat.waiting) openChat(chat, { skipHistory: true });
+        else closeChatUI();
+        return;
+      }
+      closeChatUI();
+    });
+
+    async function restoreActiveChat() {
+      const fromHash = location.hash.match(/^#chat\/([^/?#]+)/);
+      const chatId = (fromHash && decodeURIComponent(fromHash[1])) || localStorage.getItem('glink_active_chat');
+      if (!chatId) return;
+      const chat = chats.find((c) => c.id === chatId);
+      if (chat && !chat.waiting) {
+        await openChat(chat, { skipHistory: true });
+        history.replaceState({ glink: 'list' }, '', location.pathname + location.search);
+        history.pushState(
+          { glink: 'chat', chatId: chat.id },
+          '',
+          '#chat/' + encodeURIComponent(chat.id),
+        );
+      } else {
+        localStorage.removeItem('glink_active_chat');
+      }
     }
 
     async function loadChats() {
@@ -1597,6 +1667,10 @@
       connectWs();
       try {
         await loadChats();
+        await restoreActiveChat();
+        if (!activeChat) {
+          history.replaceState({ glink: 'list' }, '', location.pathname + location.search);
+        }
       } catch (e) {
         showAppErr(e.message || 'не удалось загрузить чаты');
         throw e;
@@ -1832,13 +1906,7 @@
       cancelVideoRecording();
       showLogin();
     };
-    $('backBtn').onclick = () => {
-      activeChat = null;
-      clearInterval(pollTimer);
-      cancelVoiceRecording();
-      cancelVideoRecording();
-      loadChats();
-    };
+    $('backBtn').onclick = (e) => { e.preventDefault(); userGoBack(); };
     $('sendBtn').onclick = sendText;
     $('msgInput').onkeydown = (e) => { if (e.key === 'Enter') sendText(); };
     $('fileInput').onchange = onFilePicked;

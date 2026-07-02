@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
+    BackHandler,
     Platform,
     SafeAreaView,
     StatusBar,
@@ -13,9 +14,26 @@ import { theme } from './lib/theme';
 
 const SERVER_URL = Constants.expoConfig?.extra?.serverUrl || 'https://31.128.38.147:3920';
 
+const BACK_JS = `
+(function () {
+  if (window.glinkGoBack && window.glinkGoBack()) return;
+  window.ReactNativeWebView && window.ReactNativeWebView.postMessage('glink:back:exit');
+})();
+true;
+`;
+
 export default function App() {
     const webRef = useRef(null);
     const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (Platform.OS !== 'android') return undefined;
+        const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+            webRef.current?.injectJavaScript(BACK_JS);
+            return true;
+        });
+        return () => sub.remove();
+    }, []);
 
     return (
         <SafeAreaView style={styles.root}>
@@ -32,6 +50,11 @@ export default function App() {
                 onLoadEnd={() => setLoading(false)}
                 onLoadStart={() => setLoading(true)}
                 onError={() => setLoading(false)}
+                onMessage={(event) => {
+                    if (event.nativeEvent.data === 'glink:back:exit') {
+                        BackHandler.exitApp();
+                    }
+                }}
                 javaScriptEnabled
                 domStorageEnabled
                 sharedCookiesEnabled
