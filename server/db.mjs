@@ -238,6 +238,24 @@ export function addMessage({ chatId, senderId, text, kind = 'text', file = null 
     return msg;
 }
 
+export function editMessage({ messageId, chatId, userId, text }) {
+    const msg = db.messages.find((m) => m.id === messageId && m.chatId === chatId);
+    if (!msg) throw new Error('message_not_found');
+    if (msg.senderId !== userId) throw new Error('forbidden');
+    if (msg.kind !== 'text' && !msg.text) throw new Error('not_editable');
+
+    const newText = String(text ?? '').trim();
+    if (msg.kind === 'text' && !newText) throw new Error('empty_message');
+
+    msg.text = newText;
+    msg.editedAt = new Date().toISOString();
+
+    const chat = findChatById(chatId);
+    if (chat) chat.updatedAt = msg.editedAt;
+    persist();
+    return msg;
+}
+
 export function findChatById(chatId) {
     return db.chats.find((c) => c.id === chatId) || null;
 }

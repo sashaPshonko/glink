@@ -11,6 +11,7 @@ import {
     addMessage,
     countUsers,
     createUser,
+    editMessage,
     findUserById,
     findUserByUsername,
     findChatById,
@@ -69,7 +70,7 @@ const upload = multer({
 
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
     res.setHeader(
         'Access-Control-Allow-Headers',
         'Content-Type, Authorization',
@@ -432,6 +433,49 @@ app.post('/chats/:chatId/messages', authMiddleware, maybeUpload, (req, res) => {
         broadcast(chatId, { type: 'message', message });
         res.json({ message });
     } catch (e) {
+        if (e.message === 'empty_message') {
+            res.status(400).json({ error: 'empty_message' });
+            return;
+        }
+        throw e;
+    }
+});
+
+app.patch('/chats/:chatId/messages/:messageId', authMiddleware, (req, res) => {
+    const { chatId, messageId } = req.params;
+    if (chatId.startsWith('pending:')) {
+        res.status(400).json({ error: 'waiting_peer' });
+        return;
+    }
+    if (!userInChat(req.userId, chatId)) {
+        res.status(403).json({ error: 'forbidden' });
+        return;
+    }
+    try {
+        const message = enrichMessage(
+            editMessage({
+                messageId,
+                chatId,
+                userId: req.userId,
+                text: req.body?.text,
+            }),
+            req.userId,
+        );
+        broadcast(chatId, { type: 'message_edit', message });
+        res.json({ message });
+    } catch (e) {
+        if (e.message === 'message_not_found') {
+            res.status(404).json({ error: 'message_not_found' });
+            return;
+        }
+        if (e.message === 'forbidden') {
+            res.status(403).json({ error: 'forbidden' });
+            return;
+        }
+        if (e.message === 'not_editable') {
+            res.status(400).json({ error: 'not_editable' });
+            return;
+        }
         if (e.message === 'empty_message') {
             res.status(400).json({ error: 'empty_message' });
             return;

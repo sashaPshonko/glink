@@ -246,12 +246,30 @@
     }
     .msg-foot {
       display: flex; justify-content: flex-end; margin-top: 5px;
+      gap: 4px; align-items: center;
     }
     .ticks {
       font-size: 0.78rem; letter-spacing: -3px; line-height: 1;
       color: rgba(92, 51, 71, 0.42); user-select: none;
     }
     .ticks.read { color: #2563eb; }
+    .edited-mark {
+      font-size: 0.68rem; color: rgba(92, 51, 71, 0.45);
+      margin-right: 6px; user-select: none;
+    }
+    .bubble.mine.editable { cursor: pointer; touch-action: manipulation; }
+    #composer { flex-wrap: wrap; }
+    #editBanner {
+      flex: 1 1 100%;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      padding: 6px 10px; border-radius: 12px;
+      background: rgba(255, 255, 255, 0.85);
+      border: 1px solid rgba(232, 121, 169, 0.35);
+      font-size: 0.85rem; color: #9d174d;
+    }
+    #editBanner.hidden { display: none; }
+    #editCancelBtn { padding: 6px 10px; font-size: 0.85rem; }
+    #composer.editing #sendBtn { background: #db2777; }
     .file-card {
       display: flex; align-items: center; gap: 10px;
       margin-top: 4px; padding: 10px 12px;
@@ -400,6 +418,10 @@
       </header>
       <div id="messages"></div>
       <div id="composer">
+        <div id="editBanner" class="hidden">
+          <span>✎ редактирование</span>
+          <button id="editCancelBtn" type="button" class="secondary">отмена</button>
+        </div>
         <input id="fileInput" type="file" class="hidden" />
         <button id="mediaBtn" type="button" class="icon secondary" title="Файл" aria-label="Файл"></button>
         <input id="msgInput" type="text" placeholder="Сообщение…" />
@@ -467,7 +489,10 @@
     let suppressScrollTrack = false;
     let loadMsgGen = 0;
     let selectedUsername = localStorage.getItem('glink_last_user') || '';
-    let accounts = [];
+    let activeMessages = [];
+    let editingMessageId = null;
+    let editPressTimer = null;
+    let editPressId = null;
 
     const $ = (id) => document.getElementById(id);
 
@@ -477,6 +502,9 @@
       unauthorized: 'сессия истекла — нажми на себя снова',
       full: 'все 3 места заняты',
       not_allowed: 'выбери одного из троих',
+      not_editable: 'это сообщение нельзя редактировать',
+      message_not_found: 'сообщение не найдено',
+      empty_message: 'сообщение не может быть пустым',
     };
 
     function errText(code) {
@@ -709,11 +737,64 @@
     }
 
     function renderTicks(m, mine) {
-      if (!mine || !m.status) return '';
+      const edited = m.editedAt
+        ? `<span class="edited-mark" title="изменено">изм.</span>`
+        : '';
+      if (!mine || !m.status) {
+        return edited ? `<div class="msg-foot">${edited}</div>` : '';
+      }
       const read = m.status === 'read';
       const cls = read ? 'ticks read' : 'ticks sent';
       const title = read ? 'прочитано' : 'отправлено';
-      return `<div class="msg-foot"><span class="${cls}" title="${title}">${read ? '✓✓' : '✓'}</span></div>`;
+      return `<div class="msg-foot">${edited}<span class="${cls}" title="${title}">${read ? '✓✓' : '✓'}</span></div>`;
+    }
+
+    function canEditMessage(m) {
+      if (!m || m.senderId !== user?.id || m._pending) return false;
+      if (m.kind === 'text') return true;
+      return Boolean(m.text);
+    }
+
+    function getMessage(id) {
+      return activeMessages.find((m) => m.id === id) || null;
+    }
+
+    function getLastEditableMessage() {
+      if (!user?.id) return null;
+      for (let i = activeMessages.length - 1; i >= 0; i--) {
+        const m = activeMessages[i];
+        if (canEditMessage(m)) return m;
+      }
+      return null;
+    }
+
+    function upsertActiveMessage(msg) {
+      const i = activeMessages.findIndex((m) => m.id === msg.id);
+      if (i >= 0) activeMessages[i] = msg;
+      else activeMessages.push(msg);
+    }
+
+    function startEditMessage(m) {
+      if (!canEditMessage(m)) return;
+      editingMessageId = m.id;
+      $('msgInput').value = m.text || '';
+      $('composer').classList.add('editing');
+      $('editBanner').classList.remove('hidden');
+      $('msgInput').focus();
+      $('msgInput').setSelectionRange($('msgInput').value.length, $('msgInput').value.length);
+    }
+
+    function cancelEdit() {
+      editingMessageId = null;
+      $('msgInput').value = '';
+      $('composer').classList.remove('editing');
+      $('editBanner').classList.add('hidden');
+    }
+
+    function clearEditPress() {
+      clearTimeout(editPressTimer);
+      editPressTimer = null;
+      editPressId = null;
     }
 
     function renderBubbleHtml(m) {
@@ -725,7 +806,8 @@
           : (m.kind === 'audio' ? ' has-media-audio'
             : (m.kind === 'image' && !m.text ? ' has-image' : '')));
       const pendingCls = m._pending ? ' pending' : '';
-      return `<div class="bubble ${mine ? 'mine' : 'theirs'}${extraCls}${pendingCls}" data-id="${m.id}">${sender}${renderMessageBody(m)}${renderTicks(m, mine)}</div>`;
+      const editCls = canEditMessage(m) ? ' editable' : '';
+      return `<div class="bubble ${mine ? 'mine' : 'theirs'}${extraCls}${pendingCls}${editCls}" data-id="${m.id}">${sender}${renderMessageBody(m)}${renderTicks(m, mine)}</div>`;
     }
 
     function syncSigFromBox() {
@@ -755,6 +837,7 @@
       else if (!box.querySelector('.bubble[data-id="' + msg.id + '"]')) {
         box.insertAdjacentHTML('beforeend', renderBubbleHtml(msg));
       }
+      upsertActiveMessage(msg);
       syncSigFromBox();
       if (userPinnedBottom) scrollToBottom(box);
       wireVoicePlayers(box);
@@ -779,6 +862,7 @@
         }
       }
       appendMessage(message, { forceBottom: userPinnedBottom });
+      upsertActiveMessage(message);
     }
 
     function renderChats() {
@@ -856,6 +940,7 @@
       }
       lastMessagesSig = sig;
       lastMsgCount = data.messages?.length || 0;
+      activeMessages = data.messages || [];
 
       box.innerHTML = data.messages.map((m) => renderBubbleHtml(m)).join('');
       if (gen !== loadMsgGen) return;
@@ -932,8 +1017,7 @@
 
     function messagesSig(messages) {
       if (!messages?.length) return '0';
-      const last = messages[messages.length - 1];
-      return messages.length + ':' + last.id;
+      return messages.map((m) => `${m.id}\t${m.text || ''}\t${m.editedAt || ''}`).join('\n');
     }
 
     function applyReadTicks(messages, box = $('messages')) {
@@ -1546,6 +1630,10 @@
             ingestIncomingMessage(msg.message);
             refreshChatList();
           }
+          if (msg.type === 'message_edit' && activeChat && msg.message?.chatId === activeChat.id) {
+            replaceMessage(msg.message.id, msg.message);
+            refreshChatList();
+          }
           if (msg.type === 'read' && msg.chatId) {
             if (activeChat && msg.chatId === activeChat.id && msg.readerId !== user.id) {
               refreshReadTicks();
@@ -1585,6 +1673,8 @@
     }
 
     function closeChatUI() {
+      cancelEdit();
+      activeMessages = [];
       activeChat = null;
       localStorage.removeItem('glink_active_chat');
       clearInterval(pollTimer);
@@ -1677,7 +1767,42 @@
       }
     }
 
+    async function saveEdit() {
+      const id = editingMessageId;
+      const text = $('msgInput').value.trim();
+      const m = getMessage(id);
+      if (!id || !m || !activeChat) {
+        cancelEdit();
+        return;
+      }
+      if (m.kind === 'text' && !text) {
+        showAppErr('сообщение не может быть пустым');
+        return;
+      }
+      if (text === (m.text || '')) {
+        cancelEdit();
+        return;
+      }
+      cancelEdit();
+      try {
+        const data = await api('/chats/' + activeChat.id + '/messages/' + id, {
+          method: 'PATCH',
+          body: JSON.stringify({ text }),
+        });
+        replaceMessage(id, data.message);
+        refreshChatList();
+      } catch (e) {
+        startEditMessage(m);
+        $('msgInput').value = text;
+        showAppErr(e.message || 'не удалось сохранить');
+      }
+    }
+
     async function sendText() {
+      if (editingMessageId) {
+        await saveEdit();
+        return;
+      }
       const text = $('msgInput').value.trim();
       if (!text || !activeChat) return;
       $('msgInput').value = '';
@@ -1691,6 +1816,7 @@
         status: 'sent',
         _pending: true,
       }, { forceBottom: true });
+      upsertActiveMessage({ id: pendingId, senderId: user.id, kind: 'text', text, _pending: true });
 
       try {
         const data = await api('/chats/' + activeChat.id + '/messages', {
@@ -1698,6 +1824,7 @@
           body: JSON.stringify({ text }),
         });
         replaceMessage(pendingId, data.message);
+        upsertActiveMessage(data.message);
         refreshChatList();
       } catch (e) {
         removeMessage(pendingId);
@@ -1728,6 +1855,7 @@
       try {
         const data = await api('/chats/' + activeChat.id + '/messages', { method: 'POST', body: fd });
         replaceMessage(pendingId, data.message);
+        upsertActiveMessage(data.message);
         refreshChatList();
       } catch (e) {
         removeMessage(pendingId);
@@ -1907,8 +2035,23 @@
       showLogin();
     };
     $('backBtn').onclick = (e) => { e.preventDefault(); userGoBack(); };
+    $('editCancelBtn').onclick = (e) => { e.preventDefault(); cancelEdit(); };
     $('sendBtn').onclick = sendText;
-    $('msgInput').onkeydown = (e) => { if (e.key === 'Enter') sendText(); };
+    $('msgInput').onkeydown = (e) => {
+      if (e.key === 'ArrowUp' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        const input = $('msgInput');
+        if (!editingMessageId && input.value === '') {
+          const m = getLastEditableMessage();
+          if (m) {
+            e.preventDefault();
+            startEditMessage(m);
+          }
+        }
+        return;
+      }
+      if (e.key === 'Enter') sendText();
+      if (e.key === 'Escape' && editingMessageId) cancelEdit();
+    };
     $('fileInput').onchange = onFilePicked;
 
     const MEDIA_ICONS = {
@@ -1999,6 +2142,35 @@
       if (suppressScrollTrack || !activeChat) return;
       userPinnedBottom = isAtBottom($('messages'));
     }, { passive: true });
+
+    $('messages').addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      const bubble = e.target.closest('.bubble.mine.editable');
+      if (!bubble) return;
+      if (e.target.closest('.voice-play, .video-note, .file-card, video, audio, img, a')) return;
+      const m = getMessage(bubble.dataset.id);
+      if (!canEditMessage(m)) return;
+      editPressId = bubble.dataset.id;
+      editPressTimer = setTimeout(() => {
+        if (editPressId !== bubble.dataset.id) return;
+        startEditMessage(m);
+        clearEditPress();
+      }, 480);
+    });
+    $('messages').addEventListener('pointerup', clearEditPress);
+    $('messages').addEventListener('pointercancel', clearEditPress);
+    $('messages').addEventListener('pointermove', (e) => {
+      if (!editPressTimer) return;
+      const bubble = e.target.closest('.bubble.mine.editable');
+      if (!bubble || bubble.dataset.id !== editPressId) clearEditPress();
+    });
+    $('messages').addEventListener('contextmenu', (e) => {
+      const bubble = e.target.closest('.bubble.mine.editable');
+      if (!bubble) return;
+      e.preventDefault();
+      const m = getMessage(bubble.dataset.id);
+      if (canEditMessage(m)) startEditMessage(m);
+    });
 
     (async () => {
       if (!token) return showLogin();
