@@ -486,22 +486,34 @@
     #composer.editing #sendBtn { background: #db2777; }
     #draftAttach {
       flex: 1 1 100%;
-      display: flex; align-items: center; gap: 10px;
-      padding: 8px 10px; border-radius: 14px;
-      background: rgba(255, 255, 255, 0.88);
-      border: 1px solid rgba(232, 121, 169, 0.35);
+      padding: 6px 0 2px;
     }
     #draftAttach.hidden { display: none; }
-    .draft-attach-inner {
-      flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
+    .draft-attach-list {
+      display: flex; gap: 8px; overflow-x: auto;
+      padding: 4px 2px 2px;
+      -webkit-overflow-scrolling: touch;
     }
-    .draft-remove {
-      flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%;
-      border: none; background: rgba(255, 236, 244, 0.95); color: #9d174d;
-      font-size: 1rem; cursor: pointer; line-height: 1;
+    .draft-item {
+      position: relative; flex-shrink: 0;
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 8px; border-radius: 12px;
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(232, 121, 169, 0.28);
+      max-width: min(220px, 72vw);
+    }
+    .draft-item-body {
+      display: flex; align-items: center; gap: 8px; min-width: 0;
+    }
+    .draft-item-remove {
+      position: absolute; top: -6px; right: -6px;
+      width: 22px; height: 22px; border-radius: 50%;
+      border: none; background: #db2777; color: #fff;
+      font-size: 0.72rem; cursor: pointer; line-height: 1;
+      box-shadow: 0 1px 4px rgba(92, 51, 71, 0.2);
     }
     .draft-img {
-      max-height: 72px; max-width: 120px; border-radius: 12px;
+      max-height: 56px; max-width: 56px; border-radius: 10px;
       object-fit: cover; display: block;
     }
     .draft-voice-play {
@@ -512,7 +524,7 @@
     .draft-voice-label { font-size: 0.9rem; color: #9d174d; font-weight: 600; }
     .draft-voice-dur { font-size: 0.8rem; color: #b07a94; margin-left: auto; }
     .draft-vnote {
-      position: relative; width: 72px; height: 72px;
+      position: relative; width: 56px; height: 56px;
       border-radius: 50%; overflow: hidden; flex-shrink: 0; cursor: pointer;
       background: #1a1a1a;
     }
@@ -536,6 +548,20 @@
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .draft-file-size { font-size: 0.75rem; color: #b07a94; flex-shrink: 0; }
+    .msg-album {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px;
+    }
+    .msg-album-item { flex: 0 0 auto; max-width: 100%; }
+    .msg-album-item img {
+      max-width: min(140px, 100%); max-height: 140px;
+      border-radius: 16px; display: block; cursor: pointer;
+    }
+    .bubble.has-album { padding: 8px 10px; }
+    .bubble.has-album.has-caption { padding-bottom: 8px; }
+    .album-pending {
+      font-size: 0.85rem; color: #9d174d; padding: 6px 10px;
+      background: rgba(255,255,255,0.45); border-radius: 12px;
+    }
     .file-card {
       display: flex; align-items: center; gap: 10px;
       margin-top: 4px; padding: 10px 12px;
@@ -695,14 +721,13 @@
       <button type="button" id="unreadJumpBtn" class="hidden">новые ↓</button>
       <div id="composer">
         <div id="draftAttach" class="hidden">
-          <div id="draftAttachInner" class="draft-attach-inner"></div>
-          <button type="button" id="draftRemoveBtn" class="draft-remove" title="Убрать">✕</button>
+          <div id="draftAttachList" class="draft-attach-list"></div>
         </div>
         <div id="editBanner" class="hidden">
           <span>✎ редактирование</span>
           <button id="editCancelBtn" type="button" class="secondary">отмена</button>
         </div>
-        <input id="fileInput" type="file" class="hidden" />
+        <input id="fileInput" type="file" class="hidden" multiple />
         <button id="mediaBtn" type="button" class="icon secondary" title="Файл" aria-label="Файл"></button>
         <textarea id="msgInput" rows="1" placeholder="Сообщение…"></textarea>
         <button id="sendBtn" class="icon">♡</button>
@@ -772,9 +797,11 @@
     let videoRaf = null;
     let videoRafWrap = null;
     let videoRafVid = null;
-    let draftAttachment = null;
+    let draftAttachments = [];
     let draftPreviewAudio = null;
+    let draftPreviewAudioId = null;
     let draftPreviewVideo = null;
+    const MAX_DRAFT_FILES = 12;
     let lastChatActivityAt = Date.now();
     let readPendingTimer = null;
     const notifySeen = new Set();
@@ -996,84 +1023,83 @@
       return 'file';
     }
 
-    function renderMessageBody(m) {
-      const parts = [];
-      const kind = m.kind || 'text';
-
-      if (kind === 'image' && m.fileUrl && !m._pending) {
-        parts.push(`<img src="${fileUrl(m.fileUrl)}" alt="фото" onclick="window.open(this.src,'_blank')" />`);
-      } else if (kind === 'image' && m._pending) {
-        parts.push('<div>📷 …</div>');
-      } else if (kind === 'voice' && m.fileUrl && !m._pending) {
-        const src = escapeHtml(fileUrl(m.fileUrl));
-        parts.push(
-          `<div class="voice-msg" data-src="${src}">` +
+    function renderAttachmentPart(f, pending, m) {
+      const kind = attachmentKind(f);
+      const url = attachmentUrl(f);
+      if (kind === 'image' && url && !pending) {
+        return `<img src="${url}" alt="фото" onclick="window.open(this.src,'_blank')" />`;
+      }
+      if (kind === 'image' && pending) return '<div class="album-pending">📷</div>';
+      if (kind === 'voice' && url && !pending) {
+        const src = escapeHtml(url);
+        return `<div class="voice-msg" data-src="${src}">` +
           `<button type="button" class="voice-play" aria-label="играть">▶</button>` +
-          `<div class="voice-body">` +
-          `<div class="voice-wave"><div class="voice-bars"></div></div>` +
+          `<div class="voice-body"><div class="voice-wave"><div class="voice-bars"></div></div>` +
           `<div class="voice-time"><span class="voice-cur">0:00</span> / <span class="voice-dur">…</span></div>` +
-          `</div></div>`,
-        );
-      } else if (kind === 'voice' && m._pending) {
-        parts.push('<div>🎤 …</div>');
-      } else if (isVideoNote(m) && m.fileUrl && !m._pending) {
-        const src = escapeHtml(fileUrl(m.fileUrl));
-        parts.push(
-          `<div class="video-note" data-src="${src}">` +
+          `</div></div>`;
+      }
+      if (kind === 'voice' && pending) return '<div class="album-pending">🎤</div>';
+      if (kind === 'video_note' && url && !pending) {
+        const src = escapeHtml(url);
+        return `<div class="video-note" data-src="${src}">` +
           `<svg class="vid-ring" viewBox="0 0 200 200" aria-hidden="true">` +
           `<circle class="vid-ring-track" cx="100" cy="100" r="${VID_RING_R}"/>` +
           `<circle class="vid-ring-fill" cx="100" cy="100" r="${VID_RING_R}"/>` +
-          `</svg>` +
-          `<div class="video-note-hole">` +
+          `</svg><div class="video-note-hole">` +
           `<video playsinline preload="metadata" src="${src}"></video>` +
-          `<div class="vid-badge">▶</div>` +
-          `</div></div>`,
-        );
-      } else if (kind === 'video_note' && m._pending) {
-        parts.push('<div>⭕ …</div>');
-      } else if (kind === 'video' && m.fileUrl && !m._pending) {
-        const src = escapeHtml(fileUrl(m.fileUrl));
-        const name = escapeHtml(m.file?.name || 'видео');
-        parts.push(
-          `<div class="media-video">` +
-          `<video controls playsinline preload="metadata" src="${src}"></video>` +
-          `<div class="media-video-name">${name}</div>` +
-          `</div>`,
-        );
-      } else if (kind === 'video' && m._pending) {
-        parts.push('<div>🎬 …</div>');
-      } else if (kind === 'audio' && m.fileUrl && !m._pending) {
-        const src = escapeHtml(fileUrl(m.fileUrl));
-        const name = escapeHtml(m.file?.name || 'аудио');
-        parts.push(
-          `<div class="media-audio">` +
-          `<audio controls preload="metadata" src="${src}"></audio>` +
-          `<div class="media-audio-name">${name}</div>` +
-          `</div>`,
-        );
-      } else if (kind === 'audio' && m._pending) {
-        parts.push('<div>🎵 …</div>');
-      } else if (kind === 'file' && m._pending) {
-        const name = escapeHtml(m.file?.name || 'файл');
-        parts.push(
-          `<div class="file-card" style="pointer-events:none">` +
-          `<span class="file-card-icon">${FILE_ICON_SVG}</span>` +
-          `<span class="file-card-body">` +
-          `<span class="file-card-name">${name}</span>` +
-          `<span class="file-card-size">отправка…</span>` +
-          `</span></div>`,
-        );
-      } else if (kind === 'file' && m.fileUrl) {
-        const name = escapeHtml(m.file?.name || 'файл');
-        const size = m.file?.size ? fmtFileSize(m.file.size) : '';
-        parts.push(
-          `<a class="file-card" href="${fileUrl(m.fileUrl)}" target="_blank" rel="noopener">` +
-          `<span class="file-card-icon">${FILE_ICON_SVG}</span>` +
-          `<span class="file-card-body">` +
+          `<div class="vid-badge">▶</div></div></div>`;
+      }
+      if (kind === 'video_note' && pending) return '<div class="album-pending">⭕</div>';
+      if (kind === 'video' && url && !pending) {
+        const src = escapeHtml(url);
+        const name = escapeHtml(f.name || 'видео');
+        return `<div class="media-video"><video controls playsinline preload="metadata" src="${src}"></video>` +
+          `<div class="media-video-name">${name}</div></div>`;
+      }
+      if (kind === 'video' && pending) return '<div class="album-pending">🎬</div>';
+      if (kind === 'audio' && url && !pending) {
+        const src = escapeHtml(url);
+        const name = escapeHtml(f.name || 'аудио');
+        return `<div class="media-audio"><audio controls preload="metadata" src="${src}"></audio>` +
+          `<div class="media-audio-name">${name}</div></div>`;
+      }
+      if (kind === 'audio' && pending) return '<div class="album-pending">🎵</div>';
+      if (pending) {
+        const name = escapeHtml(f.name || 'файл');
+        return `<div class="file-card" style="pointer-events:none"><span class="file-card-icon">${FILE_ICON_SVG}</span>` +
+          `<span class="file-card-body"><span class="file-card-name">${name}</span>` +
+          `<span class="file-card-size">отправка…</span></span></div>`;
+      }
+      if (url) {
+        const name = escapeHtml(f.name || 'файл');
+        const size = f.size ? fmtFileSize(f.size) : '';
+        return `<a class="file-card" href="${url}" target="_blank" rel="noopener">` +
+          `<span class="file-card-icon">${FILE_ICON_SVG}</span><span class="file-card-body">` +
           `<span class="file-card-name">${name}</span>` +
           (size ? `<span class="file-card-size">${size}</span>` : '') +
-          `</span></a>`,
-        );
+          `</span></a>`;
+      }
+      return '<div class="album-pending">📎</div>';
+    }
+
+    function renderMessageBody(m) {
+      const parts = [];
+      const attachments = messageFiles(m);
+      const pending = Boolean(m._pending);
+
+      if (attachments.length > 1 || m.kind === 'album') {
+        parts.push(`<div class="msg-album">${attachments.map((f) =>
+          `<div class="msg-album-item">${renderAttachmentPart(f, pending, m)}</div>`,
+        ).join('')}</div>`);
+      } else if (attachments.length === 1) {
+        parts.push(renderAttachmentPart(attachments[0], pending, m));
+      } else {
+        const kind = m.kind || 'text';
+        if (kind === 'image' && pending) parts.push('<div>📷 …</div>');
+        else if (kind === 'voice' && pending) parts.push('<div>🎤 …</div>');
+        else if (kind === 'video_note' && pending) parts.push('<div>⭕ …</div>');
+        else if (kind === 'video' && pending) parts.push('<div>🎬 …</div>');
+        else if (kind === 'audio' && pending) parts.push('<div>🎵 …</div>');
       }
 
       if (m.text) parts.push(`<div>${linkify(m.text)}</div>`);
@@ -1332,10 +1358,16 @@
       const mine = m.senderId === user.id;
       const sender = activeChat?.type === 'group' && !mine
         ? `<div class="sender">${escapeHtml(m.senderName || '?')}</div>` : '';
-      const extraCls = isVideoNote(m) ? ' has-video'
-        : (m.kind === 'video' ? ' has-media-video'
-          : (m.kind === 'audio' ? ' has-media-audio'
-            : (m.kind === 'image' ? (' has-image' + (m.text ? ' has-caption' : '')) : '')));
+      const attachments = messageFiles(m);
+      const multi = attachments.length > 1 || m.kind === 'album';
+      const single = attachments[0];
+      const sk = single ? attachmentKind(single) : m.kind;
+      const extraCls = multi
+        ? (' has-album' + (m.text ? ' has-caption' : ''))
+        : (sk === 'video_note' ? ' has-video'
+          : (sk === 'video' ? ' has-media-video'
+            : (sk === 'audio' ? ' has-media-audio'
+              : (sk === 'image' ? (' has-image' + (m.text ? ' has-caption' : '')) : ''))));
       const pendingCls = m._pending ? ' pending' : '';
       const reactCls = hasReactions(m) ? ' has-reactions' : '';
       return `<div class="bubble ${mine ? 'mine' : 'theirs'}${extraCls}${reactCls}${pendingCls}">${sender}${renderMessageBody(m)}${renderBubbleFoot(m, mine)}</div>`;
@@ -1773,6 +1805,9 @@
       if (kind === 'video') return '🎬 видео';
       if (kind === 'audio') return '🎵 аудио';
       if (kind === 'file') return '📎 ' + (m.file?.name || 'файл');
+      if (kind === 'album' || m.files?.length > 1) {
+        return '📎 ' + (m.files?.length || 0) + ' вложения';
+      }
       return 'новое сообщение';
     }
 
@@ -1918,35 +1953,70 @@
 
     const FILE_ICON_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.5 6v11.5a4 4 0 01-8 0V5a2.5 2.5 0 015 0v10.5a1 1 0 11-2 0V6H9v9.5a3.5 3.5 0 007 0V5a4 4 0 00-8 0v12.5a5.5 5.5 0 0011 0V6h-1.5z"/></svg>';
 
+    function messageFiles(m) {
+      if (m.files?.length) return m.files;
+      if (m.file || m.fileUrl) {
+        return [{
+          ...(m.file || {}),
+          kind: m.kind,
+          fileUrl: m.fileUrl,
+        }];
+      }
+      return [];
+    }
+
+    function attachmentKind(f) {
+      return f?.kind || 'file';
+    }
+
+    function attachmentUrl(f) {
+      return f?.fileUrl ? fileUrl(f.fileUrl) : '';
+    }
+
     function stopDraftPreview() {
       if (draftPreviewAudio) {
         draftPreviewAudio.pause();
         draftPreviewAudio = null;
+        draftPreviewAudioId = null;
       }
       if (draftPreviewVideo) {
         draftPreviewVideo.pause();
         draftPreviewVideo = null;
       }
-      $('draftAttachInner')?.querySelector('.draft-vnote')?.classList.remove('playing');
-      const btn = $('draftAttachInner')?.querySelector('.draft-voice-play');
-      if (btn) btn.textContent = '▶';
+      document.querySelectorAll('.draft-vnote.playing').forEach((el) => el.classList.remove('playing'));
+      document.querySelectorAll('.draft-voice-play').forEach((btn) => { btn.textContent = '▶'; });
+    }
+
+    function clearDraftAttachments() {
+      stopDraftPreview();
+      for (const item of draftAttachments) {
+        if (item.url) URL.revokeObjectURL(item.url);
+      }
+      draftAttachments = [];
+      $('draftAttach')?.classList.add('hidden');
+      if ($('draftAttachList')) $('draftAttachList').innerHTML = '';
     }
 
     function clearDraftAttachment() {
-      stopDraftPreview();
-      if (draftAttachment?.url) URL.revokeObjectURL(draftAttachment.url);
-      draftAttachment = null;
-      $('draftAttach')?.classList.add('hidden');
-      if ($('draftAttachInner')) $('draftAttachInner').innerHTML = '';
+      clearDraftAttachments();
+    }
+
+    function hasDraftAttachments() {
+      return draftAttachments.length > 0;
     }
 
     function wireDraftVideoNote(wrap) {
       const vid = wrap.querySelector('video');
       if (!vid) return;
-      draftPreviewVideo = vid;
       const sync = () => wrap.classList.toggle('playing', !vid.paused && !vid.ended);
       wrap.onclick = (e) => {
         e.preventDefault();
+        e.stopPropagation();
+        if (draftPreviewVideo && draftPreviewVideo !== vid) {
+          draftPreviewVideo.pause();
+          draftPreviewVideo.closest('.draft-vnote')?.classList.remove('playing');
+        }
+        draftPreviewVideo = vid;
         if (vid.paused) vid.play().catch(() => {});
         else vid.pause();
       };
@@ -1955,15 +2025,18 @@
       vid.onended = () => {
         vid.currentTime = 0;
         sync();
+        if (draftPreviewVideo === vid) draftPreviewVideo = null;
       };
     }
 
-    function toggleDraftVoice() {
-      if (!draftAttachment || draftAttachment.kind !== 'voice') return;
-      const btn = $('draftAttachInner')?.querySelector('.draft-voice-play');
-      if (!draftPreviewAudio || draftPreviewAudio.src !== draftAttachment.url) {
+    function toggleDraftVoice(itemId) {
+      const item = draftAttachments.find((x) => x.id === itemId);
+      if (!item || item.kind !== 'voice') return;
+      const btn = document.querySelector(`.draft-voice-play[data-id="${itemId}"]`);
+      if (!draftPreviewAudio || draftPreviewAudioId !== itemId) {
         stopDraftPreview();
-        draftPreviewAudio = new Audio(draftAttachment.url);
+        draftPreviewAudio = new Audio(item.url);
+        draftPreviewAudioId = itemId;
         draftPreviewAudio.onended = () => { if (btn) btn.textContent = '▶'; };
       }
       if (draftPreviewAudio.paused) {
@@ -1975,65 +2048,101 @@
       }
     }
 
-    function preloadDraftVoiceDuration() {
-      if (!draftAttachment || draftAttachment.kind !== 'voice') return;
-      const durEl = $('draftAttachInner')?.querySelector('.draft-voice-dur');
-      if (!durEl) return;
-      const audio = new Audio();
-      audio.preload = 'metadata';
-      audio.src = draftAttachment.url;
-      audio.onloadedmetadata = () => {
-        durEl.textContent = saneDur(audio.duration) ? fmtTime(audio.duration) : '';
-        audio.src = '';
-      };
-    }
-
-    function renderDraftAttachment() {
-      const box = $('draftAttachInner');
-      if (!box || !draftAttachment) return;
-      const { file, kind, url } = draftAttachment;
+    function draftItemHtml(item) {
+      const { id, file, kind, url } = item;
       if (kind === 'image') {
-        box.innerHTML = `<img class="draft-img" src="${url}" alt="фото" />`;
-      } else if (kind === 'voice') {
-        box.innerHTML =
-          `<button type="button" class="draft-voice-play">▶</button>` +
-          `<span class="draft-voice-label">🎤 голосовое</span>` +
-          `<span class="draft-voice-dur"></span>`;
-        box.querySelector('.draft-voice-play').onclick = (e) => {
-          e.stopPropagation();
-          toggleDraftVoice();
-        };
-        preloadDraftVoiceDuration();
-      } else if (kind === 'video_note') {
-        box.innerHTML =
-          `<div class="draft-vnote">` +
-          `<video playsinline preload="metadata" src="${url}"></video>` +
-          `<span class="draft-vnote-play">▶</span></div>`;
-        wireDraftVideoNote(box.querySelector('.draft-vnote'));
-      } else if (kind === 'video') {
-        box.innerHTML = `<video class="draft-video" controls playsinline preload="metadata" src="${url}"></video>`;
-      } else if (kind === 'audio') {
-        box.innerHTML = `<audio class="draft-audio" controls preload="metadata" src="${url}"></audio>`;
-      } else {
-        box.innerHTML =
-          `<span class="draft-file-icon">${FILE_ICON_SVG}</span>` +
-          `<span class="draft-file-name">${escapeHtml(file.name || 'файл')}</span>` +
-          `<span class="draft-file-size">${fmtFileSize(file.size)}</span>`;
+        return `<img class="draft-img" src="${url}" alt="фото" />`;
       }
+      if (kind === 'voice') {
+        return `<button type="button" class="draft-voice-play" data-id="${id}">▶</button>` +
+          `<span class="draft-voice-label">🎤</span>`;
+      }
+      if (kind === 'video_note') {
+        return `<div class="draft-vnote"><video playsinline preload="metadata" src="${url}"></video>` +
+          `<span class="draft-vnote-play">▶</span></div>`;
+      }
+      if (kind === 'video') {
+        return `<span class="draft-voice-label">🎬</span>` +
+          `<span class="draft-file-name">${escapeHtml(file.name || 'видео')}</span>`;
+      }
+      if (kind === 'audio') {
+        return `<span class="draft-voice-label">🎵</span>` +
+          `<span class="draft-file-name">${escapeHtml(file.name || 'аудио')}</span>`;
+      }
+      return `<span class="draft-file-icon">${FILE_ICON_SVG}</span>` +
+        `<span class="draft-file-name">${escapeHtml(file.name || 'файл')}</span>`;
     }
 
-    function setDraftAttachment(file, kind) {
+    function renderDraftAttachments() {
+      const list = $('draftAttachList');
+      if (!list) return;
+      stopDraftPreview();
+      if (!draftAttachments.length) {
+        list.innerHTML = '';
+        $('draftAttach').classList.add('hidden');
+        return;
+      }
+      list.innerHTML = draftAttachments.map((item) =>
+        `<div class="draft-item" data-id="${item.id}">` +
+        `<div class="draft-item-body">${draftItemHtml(item)}</div>` +
+        `<button type="button" class="draft-item-remove" data-id="${item.id}" title="Убрать">✕</button>` +
+        `</div>`,
+      ).join('');
+      list.querySelectorAll('.draft-voice-play').forEach((btn) => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          toggleDraftVoice(btn.dataset.id);
+        };
+      });
+      list.querySelectorAll('.draft-vnote').forEach(wireDraftVideoNote);
+      list.querySelectorAll('.draft-item-remove').forEach((btn) => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          removeDraftAttachment(btn.dataset.id);
+        };
+      });
+      $('draftAttach').classList.remove('hidden');
+    }
+
+    function removeDraftAttachment(id) {
+      const idx = draftAttachments.findIndex((x) => x.id === id);
+      if (idx < 0) return;
+      const [item] = draftAttachments.splice(idx, 1);
+      if (item.url) URL.revokeObjectURL(item.url);
+      if (draftPreviewAudioId === id) stopDraftPreview();
+      renderDraftAttachments();
+    }
+
+    function addDraftAttachment(file, kind) {
       if (!file) return;
       if (editingMessageId) {
         showAppErr('сначала закончи редактирование');
         return;
       }
-      clearDraftAttachment();
+      if (draftAttachments.length >= MAX_DRAFT_FILES) {
+        showAppErr(`можно прикрепить не больше ${MAX_DRAFT_FILES} файлов`);
+        return;
+      }
       const url = URL.createObjectURL(file);
-      draftAttachment = { file, kind: kind || uploadKind(file), url };
-      renderDraftAttachment();
-      $('draftAttach').classList.remove('hidden');
+      draftAttachments.push({
+        id: 'draft-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+        file,
+        kind: kind || uploadKind(file),
+        url,
+      });
+      renderDraftAttachments();
       $('msgInput').focus();
+    }
+
+    function setDraftAttachment(file, kind) {
+      addDraftAttachment(file, kind);
+    }
+
+    function restoreDraftAttachments(items) {
+      clearDraftAttachments();
+      for (const item of items) {
+        addDraftAttachment(item.file, item.kind);
+      }
     }
 
     const VID_RING_R = 96;
@@ -2806,20 +2915,19 @@
         return;
       }
       const text = $('msgInput').value.trim();
-      if (!activeChat || (!text && !draftAttachment)) return;
+      if (!activeChat || (!text && !hasDraftAttachments())) return;
       touchChatActivity();
 
-      if (draftAttachment) {
-        const file = draftAttachment.file;
-        const kind = draftAttachment.kind;
+      if (hasDraftAttachments()) {
+        const items = draftAttachments.map((x) => ({ file: x.file, kind: x.kind }));
         $('msgInput').value = '';
         resizeMsgInput();
-        clearDraftAttachment();
+        clearDraftAttachments();
         userPinnedBottom = true;
         try {
-          await sendFile(file, kind, text || undefined);
+          await sendFiles(items, text || undefined);
         } catch (e) {
-          setDraftAttachment(file, kind);
+          restoreDraftAttachments(items.map((x) => ({ file: x.file, kind: x.kind })));
           $('msgInput').value = text;
           resizeMsgInput();
           showAppErr(e.message || 'не удалось отправить');
@@ -2857,24 +2965,28 @@
       }
     }
 
-    async function sendFile(file, kind, caption) {
-      if (!activeChat || !file) return;
+    async function sendFiles(items, caption) {
+      if (!activeChat || !items?.length) return;
       userPinnedBottom = true;
       const pendingId = 'pending-' + Date.now();
-      const msgKind = kind || 'file';
+      const multi = items.length > 1;
+      const msgKind = multi ? 'album' : (items[0].kind || 'file');
       appendMessage({
         id: pendingId,
         senderId: user.id,
         kind: msgKind,
-        text: caption || (msgKind === 'file' ? 'отправка…' : ''),
-        file: { name: file.name || 'файл' },
+        text: caption || '',
+        files: items.map((x) => ({ name: x.file.name || 'файл', kind: x.kind })),
+        file: items[0] ? { name: items[0].file.name || 'файл' } : null,
         status: 'sent',
         _pending: true,
       }, { forceBottom: true });
 
       const fd = new FormData();
-      fd.append('file', file, file.name || 'upload');
-      if (kind) fd.append('kind', kind);
+      for (const item of items) {
+        fd.append('files', item.file, item.file.name || 'upload');
+        fd.append('kinds', item.kind || uploadKind(item.file));
+      }
       if (caption) fd.append('text', caption);
       try {
         const data = await api('/chats/' + activeChat.id + '/messages', { method: 'POST', body: fd });
@@ -2887,11 +2999,15 @@
       }
     }
 
+    async function sendFile(file, kind, caption) {
+      return sendFiles([{ file, kind }], caption);
+    }
+
     async function onFilePicked(ev) {
-      const file = ev.target.files?.[0];
+      const files = [...(ev.target.files || [])];
       ev.target.value = '';
-      if (!file) return;
-      setDraftAttachment(file, uploadKind(file));
+      if (!files.length) return;
+      for (const file of files) addDraftAttachment(file, uploadKind(file));
     }
 
     function fileFromClipboard(dataTransfer) {
@@ -3079,7 +3195,6 @@
     };
     $('backBtn').onclick = (e) => { e.preventDefault(); userGoBack(); };
     $('editCancelBtn').onclick = (e) => { e.preventDefault(); cancelEdit(); };
-    $('draftRemoveBtn').onclick = (e) => { e.preventDefault(); clearDraftAttachment(); };
     $('sendBtn').onclick = sendText;
     $('msgInput').onkeydown = (e) => {
       if (e.key === 'ArrowUp' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {

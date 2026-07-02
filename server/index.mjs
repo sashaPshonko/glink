@@ -105,8 +105,21 @@ function enrichMessage(msg, viewerId = null) {
         kind: msg.kind || 'text',
         senderName: sender?.displayName || sender?.username || '?',
     };
+    if (msg.files?.length) {
+        base.files = msg.files.map((f) => ({
+            ...f,
+            fileUrl: f.id ? `/files/${f.id}` : undefined,
+        }));
+    }
     if (msg.file?.id) {
         base.fileUrl = `/files/${msg.file.id}`;
+        if (!base.files?.length) {
+            base.files = [{
+                ...msg.file,
+                kind: msg.kind,
+                fileUrl: base.fileUrl,
+            }];
+        }
     }
     if (viewerId && chat) {
         base.status = readStatusFor(msg, chat, viewerId);
@@ -386,7 +399,10 @@ app.post('/chats/:chatId/read', authMiddleware, (req, res) => {
 function maybeUpload(req, res, next) {
     const ct = req.headers['content-type'] || '';
     if (ct.includes('multipart/form-data')) {
-        upload.single('file')(req, res, (err) => {
+        upload.fields([
+            { name: 'file', maxCount: 1 },
+            { name: 'files', maxCount: 12 },
+        ])(req, res, (err) => {
             if (err) {
                 if (err.code === 'LIMIT_FILE_SIZE') {
                     res.status(413).json({ error: 'file_too_large' });
@@ -402,6 +418,26 @@ function maybeUpload(req, res, next) {
     next();
 }
 
+function uploadedFiles(req) {
+    const fromFields = req.files?.files || [];
+    const fromSingle = req.files?.file || [];
+    return [...fromSingle, ...fromFields];
+}
+
+function parseUploadKinds(body, count) {
+    const raw = body?.kinds;
+    if (Array.isArray(raw)) return raw.map(String);
+    if (typeof raw === 'string' && raw) {
+        try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) return parsed.map(String);
+        } catch {
+            return raw.split(',').map((s) => s.trim()).filter(Boolean);
+        }
+    }
+    return Array.from({ length: count }, () => '');
+}
+
 app.post('/chats/:chatId/messages', authMiddleware, maybeUpload, (req, res) => {
     const { chatId } = req.params;
     if (chatId.startsWith('pending:')) {
@@ -414,22 +450,32 @@ app.post('/chats/:chatId/messages', authMiddleware, maybeUpload, (req, res) => {
     }
     try {
         let message;
-        if (req.file) {
-            const stored = registerFile({
-                storedName: req.file.filename,
-                originalName: req.file.originalname,
-                mime: req.file.mimetype,
-                size: req.file.size,
-                uploaderId: req.userId,
+        const uploads = uploadedFiles(req);
+        if (uploads.length) {
+            const kinds = parseUploadKinds(req.body, uploads.length);
+            const storedFiles = uploads.map((uploaded, i) => {
+                const stored = registerFile({
+                    storedName: uploaded.filename,
+                    originalName: uploaded.originalname,
+                    mime: uploaded.mimetype,
+                    size: uploaded.size,
+                    uploaderId: req.userId,
+                });
+                const kind = guessKind(uploaded.mimetype, kinds[i] || req.body?.kind);
+                return {
+                    id: stored.id,
+                    name: stored.originalName || stored.name,
+                    mime: stored.mime,
+                    size: stored.size,
+                    kind,
+                };
             });
-            const kind = guessKind(req.file.mimetype, req.body?.kind);
             message = enrichMessage(
                 addMessage({
                     chatId,
                     senderId: req.userId,
                     text: req.body?.text,
-                    kind,
-                    file: stored,
+                    files: storedFiles,
                 }),
                 req.userId,
             );

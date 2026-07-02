@@ -147,6 +147,11 @@ export function messagePreview(msg) {
     if (msg.kind === 'video') return msg.file?.name ? `🎬 ${msg.file.name}` : '🎬 видео';
     if (msg.kind === 'audio') return msg.file?.name ? `🎵 ${msg.file.name}` : '🎵 аудио';
     if (msg.kind === 'file') return `📎 ${msg.file?.name || 'файл'}`;
+    if (msg.kind === 'album' || (msg.files?.length > 1)) {
+        const n = msg.files?.length || 0;
+        if (msg.text) return `📎 ${n} вложения · ${msg.text}`;
+        return `📎 ${n} вложения`;
+    }
     return msg.text || '';
 }
 
@@ -206,32 +211,56 @@ export function listMessages(chatId, after = null) {
     return rows.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
 }
 
-export function addMessage({ chatId, senderId, text, kind = 'text', file = null }) {
+export function addMessage({ chatId, senderId, text, kind = 'text', file = null, files = null }) {
     const chat = db.chats.find((c) => c.id === chatId);
     if (!chat) throw new Error('chat_not_found');
 
-    const msgKind = kind || 'text';
+    const entries = Array.isArray(files) && files.length
+        ? files.map((f) => ({
+            id: f.id,
+            name: f.name || f.originalName || 'файл',
+            mime: f.mime || '',
+            size: f.size || 0,
+            kind: f.kind || 'file',
+        }))
+        : file
+            ? [{
+                id: file.id,
+                name: file.originalName || file.name,
+                mime: file.mime,
+                size: file.size,
+                kind: kind || 'file',
+            }]
+            : [];
+
+    const msgKind = entries.length > 1
+        ? 'album'
+        : entries.length === 1
+            ? (entries[0].kind || kind || 'file')
+            : (kind || 'text');
+
     const msg = {
         id: randomUUID(),
         chatId,
         senderId,
         kind: msgKind,
         text: String(text || '').trim(),
-        file: file
+        file: entries[0]
             ? {
-                id: file.id,
-                name: file.originalName || file.name,
-                mime: file.mime,
-                size: file.size,
+                id: entries[0].id,
+                name: entries[0].name,
+                mime: entries[0].mime,
+                size: entries[0].size,
             }
             : null,
+        files: entries.length > 1 ? entries : undefined,
         createdAt: new Date().toISOString(),
         readBy: [],
         reactions: {},
     };
 
     if (msgKind === 'text' && !msg.text) throw new Error('empty_message');
-    if (msgKind !== 'text' && !msg.file) throw new Error('empty_message');
+    if (msgKind !== 'text' && !entries.length) throw new Error('empty_message');
 
     db.messages.push(msg);
     chat.updatedAt = msg.createdAt;
