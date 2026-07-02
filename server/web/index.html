@@ -143,8 +143,26 @@
     .voice-wave {
       position: relative;
       height: 40px; cursor: pointer; touch-action: manipulation;
+      --pct: 0%;
     }
+    .voice-wave::before {
+      content: '';
+      position: absolute; left: 0; top: 0; bottom: 0;
+      width: var(--pct); z-index: 1; pointer-events: none;
+      background: rgba(219, 39, 119, 0.18);
+      border-radius: 4px;
+    }
+    .voice-wave::after {
+      content: '';
+      position: absolute; top: 4px; bottom: 4px;
+      left: var(--pct); z-index: 2; pointer-events: none;
+      width: 3px; margin-left: -1px;
+      background: #db2777; border-radius: 2px;
+    }
+    .bubble.theirs .voice-wave::before { background: rgba(244, 114, 182, 0.22); }
+    .bubble.theirs .voice-wave::after { background: #db2777; }
     .voice-bars {
+      position: relative; z-index: 0;
       display: flex; align-items: center; gap: 2px; height: 100%;
     }
     .voice-bars i {
@@ -155,18 +173,20 @@
     .bubble.theirs .voice-bars i { background: rgba(232, 121, 169, 0.28); }
     .bubble.theirs .voice-bars i.on { background: rgba(219, 39, 119, 0.85); }
     .voice-track {
-      height: 4px; border-radius: 2px; margin-top: 6px;
-      background: rgba(157, 23, 77, 0.15); overflow: hidden;
+      height: 8px; border-radius: 4px; margin-top: 6px;
+      background: rgba(157, 23, 77, 0.12); overflow: hidden;
+      border: 1px solid rgba(157, 23, 77, 0.18);
+      cursor: pointer; touch-action: manipulation;
     }
-    .bubble.theirs .voice-track { background: rgba(232, 121, 169, 0.2); }
+    .bubble.theirs .voice-track {
+      background: rgba(232, 121, 169, 0.15);
+      border-color: rgba(232, 121, 169, 0.25);
+    }
     .voice-track-fill {
-      height: 100%; width: 0%; border-radius: 2px;
-      background: linear-gradient(90deg, #db2777, #9d174d);
-      transition: width 0.12s linear;
+      height: 100%; width: 0%; min-width: 0; border-radius: 3px;
+      background: #db2777;
     }
-    .bubble.theirs .voice-track-fill {
-      background: linear-gradient(90deg, #f472b6, #db2777);
-    }
+    .bubble.theirs .voice-track-fill { background: #e879a9; }
     .voice-time {
       font-size: 0.72rem; color: rgba(92, 51, 71, 0.65);
       margin-top: 3px; font-variant-numeric: tabular-nums;
@@ -533,13 +553,45 @@
       return `${m}:${String(sec).padStart(2, '0')}`;
     }
 
+    function saneDur(d) {
+      return d > 0 && Number.isFinite(d) ? d : 0;
+    }
+
+    function cacheVoiceDuration(el, audio) {
+      if (!el || !audio) return 0;
+      let d = saneDur(audio.duration);
+      if (!d && audio.buffered?.length) {
+        d = saneDur(audio.buffered.end(audio.buffered.length - 1));
+      }
+      if (d) {
+        el.dataset.duration = String(d);
+        const durEl = el.querySelector('.voice-dur');
+        if (durEl) durEl.textContent = fmtTime(d);
+      }
+      return d || saneDur(Number(el.dataset.duration));
+    }
+
+    function voiceDuration(el, audio) {
+      return cacheVoiceDuration(el, audio) || saneDur(Number(el?.dataset.duration));
+    }
+
     function getDuration(src) {
       return new Promise((resolve) => {
         const a = new Audio();
-        a.preload = 'metadata';
-        a.onloadedmetadata = () => resolve(a.duration || 0);
-        a.onerror = () => resolve(0);
+        a.preload = 'auto';
+        let settled = false;
+        const done = (d) => {
+          if (settled) return;
+          settled = true;
+          resolve(saneDur(d));
+        };
+        a.onloadedmetadata = () => done(a.duration);
+        a.ondurationchange = () => done(a.duration);
+        a.oncanplay = () => done(a.duration);
+        a.onerror = () => done(0);
+        setTimeout(() => done(a.duration), 2500);
         a.src = src;
+        a.load();
       });
     }
 
@@ -579,20 +631,19 @@
     }
 
     function updateVoiceProgress(el, current, duration) {
-      const dur = duration > 0 ? duration : Number(el.dataset.duration) || 0;
+      if (!el) return;
+      const dur = saneDur(duration) || voiceDuration(el, voiceAudio);
       const cur = Math.max(0, current || 0);
       const pct = dur > 0 ? Math.min(100, (cur / dur) * 100) : 0;
       const fill = el.querySelector('.voice-track-fill');
-      if (fill) fill.style.width = pct + '%';
+      if (fill) fill.style.width = (pct > 0 ? Math.max(pct, 1) : 0) + '%';
+      const wave = el.querySelector('.voice-wave');
+      if (wave) wave.style.setProperty('--pct', pct + '%');
       const bars = el.querySelectorAll('.voice-bars i');
-      const active = bars.length ? Math.floor((pct / 100) * bars.length) : 0;
+      const active = bars.length ? Math.ceil((pct / 100) * bars.length) : 0;
       bars.forEach((bar, i) => bar.classList.toggle('on', i < active));
       const curEl = el.querySelector('.voice-cur');
       if (curEl) curEl.textContent = fmtTime(cur);
-    }
-
-    function voiceDuration(el, audio) {
-      return Number(el?.dataset.duration) || audio?.duration || 0;
     }
 
     function seekVoice(el, src, pct) {
@@ -612,27 +663,28 @@
       stopVoiceRaf();
       const tick = () => {
         if (!voiceAudio || voiceAudio.paused || voiceMsgEl !== el) return;
+        const dur = voiceDuration(el, voiceAudio);
         const t = voiceAudio.currentTime;
         voicePos.set(voiceAudio.dataset.glinkSrc, t);
-        updateVoiceProgress(el, t, voiceAudio.duration);
+        updateVoiceProgress(el, t, dur);
         voiceRaf = requestAnimationFrame(tick);
       };
       voiceRaf = requestAnimationFrame(tick);
     }
 
-    function bindVoiceAudio(el, src, btn) {
-      voiceAudio.onloadedmetadata = () => {
-        el.dataset.duration = String(voiceAudio.duration);
-        el.querySelector('.voice-dur').textContent = fmtTime(voiceAudio.duration);
-        const saved = voicePos.get(src) || 0;
-        if (saved > 0 && saved < voiceAudio.duration) voiceAudio.currentTime = saved;
-        updateVoiceProgress(el, voiceAudio.currentTime, voiceAudio.duration);
+    function hookVoiceDuration(el, src, btn) {
+      const sync = () => {
+        const dur = cacheVoiceDuration(el, voiceAudio);
+        if (dur) updateVoiceProgress(el, voiceAudio.currentTime, dur);
       };
-      voiceAudio.ontimeupdate = () => {
+      voiceAudio.addEventListener('loadedmetadata', sync);
+      voiceAudio.addEventListener('durationchange', sync);
+      voiceAudio.addEventListener('canplay', sync);
+      voiceAudio.addEventListener('timeupdate', () => {
         if (voiceMsgEl !== el) return;
         voicePos.set(src, voiceAudio.currentTime);
-        updateVoiceProgress(el, voiceAudio.currentTime, voiceAudio.duration);
-      };
+        updateVoiceProgress(el, voiceAudio.currentTime, voiceDuration(el, voiceAudio));
+      });
       voiceAudio.onended = () => {
         btn.textContent = '▶';
         stopVoiceRaf();
@@ -655,14 +707,16 @@
       try {
         const { peaks, duration } = await getWaveform(src);
         paintWaveform(barsEl, peaks);
-        el.querySelector('.voice-dur').textContent = fmtTime(duration);
-        el.dataset.duration = String(duration);
+        if (saneDur(duration)) el.dataset.duration = String(duration);
       } catch {
         paintWaveform(barsEl, Array.from({ length: 40 }, () => 0.35));
+      }
+      if (!saneDur(Number(el.dataset.duration))) {
         const duration = await getDuration(src);
-        el.querySelector('.voice-dur').textContent = duration ? fmtTime(duration) : '—';
         if (duration) el.dataset.duration = String(duration);
       }
+      const dur = saneDur(Number(el.dataset.duration));
+      el.querySelector('.voice-dur').textContent = dur ? fmtTime(dur) : '…';
       const saved = voicePos.get(src) || 0;
       if (saved > 0) updateVoiceProgress(el, saved, Number(el.dataset.duration) || 0);
       el.dataset.ready = '1';
@@ -696,12 +750,17 @@
           voiceAudio.pause();
           btn.textContent = '▶';
           stopVoiceRaf();
+          updateVoiceProgress(el, voiceAudio.currentTime, voiceDuration(el, voiceAudio));
           return;
         }
         btn.textContent = '⏸';
         voiceBtnEl = btn;
         voiceMsgEl = el;
-        voiceAudio.play().then(() => trackVoiceProgress(el)).catch(() => {
+        voiceAudio.play().then(() => {
+          cacheVoiceDuration(el, voiceAudio);
+          updateVoiceProgress(el, voiceAudio.currentTime, voiceDuration(el, voiceAudio));
+          trackVoiceProgress(el);
+        }).catch(() => {
           btn.textContent = '▶';
           showAppErr('не удалось воспроизвести голосовое');
         });
@@ -720,8 +779,15 @@
       voiceBtnEl = btn;
       voiceMsgEl = el;
       btn.textContent = '⏸';
-      bindVoiceAudio(el, src, btn);
-      voiceAudio.play().then(() => trackVoiceProgress(el)).catch(() => {
+      hookVoiceDuration(el, src, btn);
+      voiceAudio.preload = 'auto';
+      voiceAudio.play().then(() => {
+        const saved = voicePos.get(src) || 0;
+        const dur = cacheVoiceDuration(el, voiceAudio);
+        if (saved > 0 && dur && saved < dur) voiceAudio.currentTime = saved;
+        updateVoiceProgress(el, voiceAudio.currentTime, voiceDuration(el, voiceAudio));
+        trackVoiceProgress(el);
+      }).catch(() => {
         btn.textContent = '▶';
         showAppErr('не удалось воспроизвести голосовое');
       });
@@ -757,7 +823,10 @@
       await loadMessages();
       if (ws?.readyState === 1) ws.send(JSON.stringify({ type: 'join', chatId: chat.id }));
       clearInterval(pollTimer);
-      pollTimer = setInterval(loadMessages, 5000);
+      pollTimer = setInterval(() => {
+        if (voiceAudio && !voiceAudio.paused) return;
+        loadMessages();
+      }, 5000);
     }
 
     async function loadChats() {
