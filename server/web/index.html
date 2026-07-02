@@ -190,7 +190,7 @@
     .bubble {
       width: fit-content;
       max-width: 100%;
-      padding: 10px 14px; border-radius: 16px;
+      padding: 10px 14px; border-radius: 20px;
       line-height: 1.4; word-break: break-word;
     }
     .mine { background: rgba(249, 197, 223, 0.95); }
@@ -198,7 +198,7 @@
     .sender { font-size: 0.75rem; color: #db2777; font-weight: 600; margin-bottom: 4px; }
     .bubble a { color: #be185d; text-decoration: underline; }
     .bubble img {
-      max-width: min(280px, 100%); border-radius: 14px; display: block;
+      max-width: min(280px, 100%); border-radius: 18px; display: block;
       margin: 4px 0 0; cursor: pointer; border: none; outline: none;
     }
     .bubble.has-image {
@@ -206,7 +206,7 @@
       width: fit-content; max-width: min(280px, 88%);
     }
     .bubble.has-image img {
-      margin-top: 0; border-radius: 16px;
+      margin-top: 0; border-radius: 20px;
       box-shadow: 0 2px 14px rgba(92, 51, 71, 0.1);
     }
     .voice-msg {
@@ -361,7 +361,7 @@
       display: flex; align-items: center; gap: 10px;
       margin-top: 4px; padding: 10px 12px;
       background: rgba(255, 255, 255, 0.5);
-      border-radius: 12px; color: #9d174d; text-decoration: none;
+      border-radius: 16px; color: #9d174d; text-decoration: none;
       max-width: min(280px, 100%);
     }
     .bubble.mine .file-card { background: rgba(255, 255, 255, 0.35); }
@@ -398,9 +398,10 @@
     .video-note {
       width: 200px; height: 200px; position: relative; margin-top: 4px;
       flex-shrink: 0; touch-action: none; cursor: pointer;
+      border-radius: 50%; overflow: hidden;
     }
     .video-note-hole {
-      position: absolute; inset: 9px; border-radius: 50%;
+      position: absolute; inset: 0; border-radius: 50%;
       overflow: hidden; background: #1a1a1a; z-index: 1;
     }
     .video-note-hole video {
@@ -410,14 +411,15 @@
       position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2;
       pointer-events: none;
     }
-    .vid-ring-track {
-      fill: none; stroke: rgba(232, 121, 169, 0.22); stroke-width: 5;
-    }
+    .vid-ring-track { display: none; }
     .vid-ring-fill {
-      fill: none; stroke: #e879a9; stroke-width: 5; stroke-linecap: round;
+      fill: none; stroke: #e879a9; stroke-width: 4; stroke-linecap: round;
       transform: rotate(-90deg); transform-origin: 100px 100px;
       transition: stroke-dashoffset 0.08s linear;
+      opacity: 0;
     }
+    .video-note.playing .vid-ring-fill,
+    .video-note.seeking .vid-ring-fill { opacity: 1; }
     .video-note.seeking .vid-ring-fill { transition: none; }
     .video-note .vid-badge {
       position: absolute; inset: 0; display: flex;
@@ -427,7 +429,7 @@
     }
     .video-note.playing .vid-badge { opacity: 0; }
     .bubble.has-video {
-      padding: 4px; background: transparent !important; border: none !important;
+      padding: 0; background: transparent !important; border: none !important;
       width: fit-content; max-width: min(200px, 88%);
     }
     .bubble.has-media-video {
@@ -438,7 +440,7 @@
       max-width: min(320px, 100%); margin-top: 2px; width: 100%;
     }
     .media-video video {
-      width: 100%; max-height: 240px; border-radius: 12px;
+      width: 100%; max-height: 240px; border-radius: 16px;
       background: #1a1a1a; display: block; margin: 0;
     }
     .media-video-name, .media-audio-name {
@@ -461,7 +463,7 @@
     #videoRecPreview {
       width: min(72vw, 280px); height: min(72vw, 280px);
       border-radius: 50%; object-fit: cover;
-      border: 4px solid #fff; background: #000;
+      border: none; background: #000;
       transform: scaleX(-1);
     }
     #videoRecTimer { color: #fbcfe8; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
