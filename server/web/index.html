@@ -2989,7 +2989,7 @@
     }
 
     function canEditMessage(m) {
-      return Boolean(m && m.senderId === user?.id && !m._pending);
+      return Boolean(m && m.senderId === user?.id && !m._pending && m.kind !== 'sticker');
     }
 
     function getMessage(id) {
