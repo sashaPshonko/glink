@@ -719,6 +719,31 @@
       font-size: 0.72rem; color: rgba(92, 51, 71, 0.65);
       margin-top: 3px; font-variant-numeric: tabular-nums;
     }
+    .voice-dock {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px 9px;
+      background: rgba(255, 236, 244, 0.98);
+      border-bottom: 1px solid rgba(252, 231, 243, 0.95);
+      z-index: 18;
+    }
+    .voice-dock.hidden { display: none !important; }
+    .voice-dock-play {
+      width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+      background: rgba(255, 255, 255, 0.72); border: none;
+      font-size: 0.95rem; cursor: pointer; color: #9d174d;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .voice-dock-body { flex: 1; min-width: 0; }
+    .voice-dock-wave { height: 24px; }
+    .voice-dock .voice-time { margin-top: 2px; font-size: 0.68rem; }
+    .voice-dock-close {
+      width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+      border: none; background: transparent; color: rgba(157, 23, 77, 0.55);
+      font-size: 1rem; cursor: pointer; line-height: 1;
+    }
     .msg-foot {
       display: flex; justify-content: flex-end; flex-wrap: wrap;
       margin-top: 4px; gap: 4px; align-items: center;
@@ -1544,6 +1569,14 @@
         </div>
         <div class="chat-header-spacer" aria-hidden="true"></div>
       </header>
+      <div id="voiceDock" class="voice-dock hidden">
+        <button type="button" id="voiceDockPlay" class="voice-dock-play" aria-label="Пауза">⏸</button>
+        <div class="voice-dock-body">
+          <div class="voice-wave voice-dock-wave"><div class="voice-bars"></div></div>
+          <div class="voice-time"><span class="voice-cur">0:00</span> / <span class="voice-dur">…</span></div>
+        </div>
+        <button type="button" id="voiceDockClose" class="voice-dock-close" aria-label="Закрыть">✕</button>
+      </div>
       <div class="chat-body">
         <div id="messages"></div>
         <div id="videoNotePinHost" aria-hidden="true"></div>
@@ -4006,18 +4039,112 @@
       voiceReviewAudio.play().catch(() => showAppErr('не удалось воспроизвести'));
     }
 
-    function updateVoiceProgress(el, current, duration) {
-      if (!el) return;
-      const dur = saneDur(duration) || voiceDuration(el, voiceAudio);
+    function syncVoiceDockPlayBtn() {
+      const btn = $('voiceDockPlay');
+      if (!btn) return;
+      btn.textContent = voiceAudio && !voiceAudio.paused && !voiceAudio.ended ? '⏸' : '▶';
+    }
+
+    function syncVoiceDockUI(current, duration) {
+      const dock = $('voiceDock');
+      if (!dock || dock.classList.contains('hidden')) return;
+      const dur = saneDur(duration) || (voiceMsgEl ? voiceDuration(voiceMsgEl, voiceAudio) : 0);
       const cur = Math.max(0, current || 0);
       const pct = dur > 0 ? Math.min(100, (cur / dur) * 100) : 0;
-      const wave = el.querySelector('.voice-wave');
+      const wave = dock.querySelector('.voice-dock-wave');
       if (wave) wave.style.setProperty('--pct', pct + '%');
-      const bars = el.querySelectorAll('.voice-bars i');
+      const bars = dock.querySelectorAll('.voice-bars i');
       const active = bars.length ? Math.ceil((pct / 100) * bars.length) : 0;
       bars.forEach((bar, i) => bar.classList.toggle('on', i < active));
-      const curEl = el.querySelector('.voice-cur');
+      const curEl = dock.querySelector('.voice-cur');
       if (curEl) curEl.textContent = fmtTime(cur);
+      const durEl = dock.querySelector('.voice-dur');
+      if (durEl && dur) durEl.textContent = fmtTime(dur);
+      syncVoiceDockPlayBtn();
+    }
+
+    async function prepareVoiceDockUi(src) {
+      const dock = $('voiceDock');
+      if (!dock || dock.dataset.srcReady === src) return;
+      const barsEl = dock.querySelector('.voice-bars');
+      if (!barsEl) return;
+      try {
+        const { peaks, duration } = await getWaveform(src);
+        paintWaveform(barsEl, peaks);
+        const durEl = dock.querySelector('.voice-dur');
+        if (durEl) durEl.textContent = saneDur(duration) ? fmtTime(duration) : '…';
+        dock.dataset.srcReady = src;
+      } catch {
+        paintWaveform(barsEl, Array.from({ length: 40 }, () => 0.35));
+        dock.dataset.srcReady = src;
+      }
+    }
+
+    function showVoiceDock(src) {
+      const dock = $('voiceDock');
+      if (!dock || !src) return;
+      dock.classList.remove('hidden');
+      dock.dataset.src = src;
+      prepareVoiceDockUi(src);
+      syncVoiceDockPlayBtn();
+      if (voiceAudio && voiceMsgEl) {
+        syncVoiceDockUI(voiceAudio.currentTime, voiceDuration(voiceMsgEl, voiceAudio));
+      }
+    }
+
+    function hideVoiceDock() {
+      const dock = $('voiceDock');
+      if (!dock) return;
+      dock.classList.add('hidden');
+      delete dock.dataset.src;
+      delete dock.dataset.srcReady;
+    }
+
+    function initVoiceDock() {
+      const dock = $('voiceDock');
+      if (!dock || dock.dataset.wired) return;
+      dock.dataset.wired = '1';
+      $('voiceDockPlay').onclick = () => {
+        if (!voiceAudio || !voiceMsgEl) return;
+        toggleVoice(voiceAudio.dataset.glinkSrc, voiceBtnEl, voiceMsgEl);
+      };
+      $('voiceDockClose').onclick = () => {
+        if (voiceAudio && !voiceAudio.paused) {
+          voicePos.set(voiceAudio.dataset.glinkSrc, voiceAudio.currentTime);
+          voiceAudio.pause();
+          if (voiceBtnEl) voiceBtnEl.textContent = '▶';
+          stopVoiceRaf();
+        }
+        hideVoiceDock();
+      };
+      wireVoiceWaveScrub(dock.querySelector('.voice-dock-wave'), {
+        seek: (pct) => {
+          if (!voiceMsgEl || !voiceAudio) return;
+          seekVoice(voiceMsgEl, voiceAudio.dataset.glinkSrc, pct);
+        },
+        onStart: () => {
+          if (voiceMsgEl && voiceAudio) beginVoiceScrubChat(voiceMsgEl, voiceAudio.dataset.glinkSrc);
+        },
+        onEnd: () => {
+          if (voiceMsgEl && voiceAudio) finishVoiceScrubChat(voiceMsgEl, voiceAudio.dataset.glinkSrc);
+        },
+      });
+    }
+
+    function updateVoiceProgress(el, current, duration) {
+      if (el) {
+        const dur = saneDur(duration) || voiceDuration(el, voiceAudio);
+        const cur = Math.max(0, current || 0);
+        const pct = dur > 0 ? Math.min(100, (cur / dur) * 100) : 0;
+        const wave = el.querySelector('.voice-wave');
+        if (wave) wave.style.setProperty('--pct', pct + '%');
+        const bars = el.querySelectorAll('.voice-bars i');
+        const active = bars.length ? Math.ceil((pct / 100) * bars.length) : 0;
+        bars.forEach((bar, i) => bar.classList.toggle('on', i < active));
+        const curEl = el.querySelector('.voice-cur');
+        if (curEl) curEl.textContent = fmtTime(cur);
+      }
+      syncVoiceDockUI(current, duration);
     }
 
     function seekVoice(el, src, pct) {
@@ -4071,10 +4198,12 @@
         updateVoiceProgress(el, 0, voiceDuration(el, voiceAudio));
         voiceBtnEl = null;
         voiceMsgEl = null;
+        hideVoiceDock();
       };
       voiceAudio.onerror = () => {
         btn.textContent = '▶';
         stopVoiceRaf();
+        hideVoiceDock();
         showAppErr('не удалось воспроизвести голосовое');
       };
     }
@@ -4125,17 +4254,21 @@
           btn.textContent = '▶';
           stopVoiceRaf();
           updateVoiceProgress(el, voiceAudio.currentTime, voiceDuration(el, voiceAudio));
+          showVoiceDock(src);
+          syncVoiceDockPlayBtn();
           return;
         }
         btn.textContent = '⏸';
         voiceBtnEl = btn;
         voiceMsgEl = el;
+        showVoiceDock(src);
         voiceAudio.play().then(() => {
           cacheVoiceDuration(el, voiceAudio);
           updateVoiceProgress(el, voiceAudio.currentTime, voiceDuration(el, voiceAudio));
           trackVoiceProgress(el);
         }).catch(() => {
           btn.textContent = '▶';
+          hideVoiceDock();
           showAppErr('не удалось воспроизвести голосовое');
         });
         return;
@@ -4155,6 +4288,7 @@
       btn.textContent = '⏸';
       hookVoiceDuration(el, src, btn);
       voiceAudio.preload = 'auto';
+      showVoiceDock(src);
       voiceAudio.play().then(() => {
         const saved = voicePos.get(src) || 0;
         const dur = cacheVoiceDuration(el, voiceAudio);
@@ -4163,6 +4297,7 @@
         trackVoiceProgress(el);
       }).catch(() => {
         btn.textContent = '▶';
+        hideVoiceDock();
         showAppErr('не удалось воспроизвести голосовое');
       });
     }
@@ -5398,6 +5533,7 @@
       cancelEdit();
       closeMsgMenu();
       clearVideoNotePin();
+      hideVoiceDock();
       activeMessages = [];
       activeChat = null;
       localStorage.removeItem('glink_active_chat');
@@ -6239,6 +6375,8 @@
         closeAvatarMenu();
       }
     });
+
+    initVoiceDock();
 
     window.addEventListener('resize', () => {
       scheduleVideoNoteCaps();
