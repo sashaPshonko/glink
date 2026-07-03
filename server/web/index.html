@@ -537,7 +537,7 @@
       gap: 2px;
     }
     .msg-group.theirs .msg-group-body { align-items: flex-start; }
-    .msg-group.mine .msg-group-body { align-items: flex-end; }
+    .msg-group.mine .msg-group-body { align-items: stretch; }
     .msg-group.no-avatar .msg-group-body { width: 100%; }
     .msg-stack:has(.video-note) {
       max-width: 100%;
@@ -593,10 +593,12 @@
       .msg-row.mine .msg-hit-right { flex: 0 0 6px; min-width: 6px; max-width: 6px; }
       /* центр между твоими и чужими — не трогаем */
       .msg-row.theirs .msg-hit-right { flex: 1 1 0; min-width: 44px; }
-      .msg-row.mine .msg-hit-left { flex: 1 1 0; min-width: 44px; }
+      .msg-row.mine .msg-hit-left { flex: 0 0 44px; min-width: 44px; }
       /* текст не наезжает через середину */
       .msg-stack { max-width: min(340px, calc(50vw - 24px)); }
-      .msg-stack:has(.video-note) { max-width: 100%; }
+      .msg-stack:has(.video-note),
+      .msg-row.mine .msg-stack:has(.video-note),
+      .msg-row.theirs .msg-stack:has(.video-note) { max-width: 100%; }
       .video-note { --vnote-pip: 96px; }
       .row { gap: 10px; padding: 12px 12px; }
       .avatar-wrap { width: 40px; height: 40px; }
@@ -846,7 +848,7 @@
       display: flex;
       flex-direction: column;
     }
-    .msg-row.mine { align-items: flex-end; }
+    .msg-row.mine { align-items: stretch; }
     .msg-row.theirs { align-items: flex-start; }
     .msg-row-line {
       display: flex;
@@ -869,10 +871,24 @@
     }
     .msg-hit-left { flex: 0 0 44px; }
     .msg-hit-right { flex: 1 1 0; min-width: 44px; }
-    .msg-row.mine .msg-hit-left { flex: 1 1 0; min-width: 44px; }
-    .msg-row.mine .msg-hit-right { flex: 0 0 44px; }
+    .msg-row.mine .msg-hit-left { flex: 0 0 44px; min-width: 44px; }
+    .msg-row.mine .msg-hit-right { flex: 0 0 44px; min-width: 44px; }
+    .msg-row.mine .msg-stack {
+      flex: 1 1 auto;
+      width: auto;
+      min-width: 0;
+      max-width: min(82%, 340px);
+      align-items: flex-end;
+    }
     .msg-row.theirs .msg-hit-left { flex: 0 0 44px; }
     .msg-row.theirs .msg-hit-right { flex: 1 1 0; min-width: 44px; }
+    .msg-row.theirs .msg-stack {
+      flex: 1 1 auto;
+      width: auto;
+      min-width: 0;
+      max-width: min(82%, 340px);
+      align-items: flex-start;
+    }
     .msg-stack {
       flex: 0 0 auto;
       width: fit-content;
@@ -880,8 +896,11 @@
       display: flex;
       flex-direction: column;
     }
-    .msg-row.mine .msg-stack { align-items: flex-end; }
-    .msg-row.theirs .msg-stack { align-items: flex-start; }
+    .msg-stack:has(.video-note),
+    .msg-row.mine .msg-stack:has(.video-note),
+    .msg-row.theirs .msg-stack:has(.video-note) {
+      max-width: 100%;
+    }
     .msg-row-inner {
       width: fit-content;
       max-width: 100%;
@@ -1189,7 +1208,7 @@
       flex-direction: column;
       align-items: stretch;
       width: fit-content;
-      max-width: min(280px, 88%);
+      max-width: min(280px, 100%);
       padding: 0;
     }
     .bubble.has-album .msg-album {
