@@ -2790,18 +2790,15 @@
       const prev = getMessage(messageId);
       if (!prev || prev._pending) return;
       const optimistic = applyReactionToggle(prev, reaction);
-      replaceMessage(messageId, optimistic);
-      upsertActiveMessage(optimistic);
+      replaceMessage(messageId, optimistic, { reactionsOnly: true });
       try {
         const data = await api('/chats/' + activeChat.id + '/messages/' + messageId + '/reactions', {
           method: 'POST',
           body: JSON.stringify({ reaction }),
         });
-        replaceMessage(messageId, data.message);
-        upsertActiveMessage(data.message);
+        replaceMessage(messageId, data.message, { reactionsOnly: true });
       } catch (e) {
-        replaceMessage(messageId, prev);
-        upsertActiveMessage(prev);
+        replaceMessage(messageId, prev, { reactionsOnly: true });
         showAppErr(e.message || 'не удалось поставить реакцию');
       }
     }
@@ -2898,12 +2895,42 @@
       if (!m._pending) markChatRead();
     }
 
-    function replaceMessage(oldId, msg) {
+    function replaceMessage(oldId, msg, opts = {}) {
       const idx = activeMessages.findIndex((x) => x.id === oldId);
       if (idx >= 0) activeMessages[idx] = msg;
       else upsertActiveMessage(msg);
+      if (opts.reactionsOnly) {
+        applyMessageReactions(msg);
+        lastMessagesSig = messagesSig(activeMessages);
+        return;
+      }
       relayoutMessages($('messages'), { forceBottom: shouldStickToBottom() });
       markChatRead();
+    }
+
+    function applyMessageReactions(m, box = $('messages')) {
+      const row = box.querySelector('.msg-row[data-id="' + m.id + '"]');
+      if (!row) {
+        relayoutMessages(box, { forceBottom: shouldStickToBottom() });
+        return;
+      }
+      const bubble = row.querySelector('.bubble');
+      if (!bubble) return;
+      const preserve = !shouldStickToBottom();
+      const anchor = preserve ? saveScrollAnchor(box) : null;
+      const mine = m.senderId === user.id;
+      applyMsgMetaToBubble(bubble, m, mine);
+      bubble.classList.toggle('has-reactions', hasReactions(m));
+      if (anchor) {
+        restoreScrollAnchor(box, anchor);
+        maintainScrollAnchor(box, anchor);
+      }
+      scheduleVideoNoteCaps(box);
+      requestAnimationFrame(() => {
+        const pinnedRow = pinnedVideoPlaceholder?.closest('.msg-row');
+        if (pinnedRow?.dataset.id === m.id) vnotePinDragged = false;
+        updatePinnedVideoNotePosition();
+      });
     }
 
     function removeMessage(id) {
@@ -4469,10 +4496,31 @@
       setPinnedVideoNotePosition(wrap, cx - host.left - half, cy - host.top - half);
     }
 
+    function recoverOrphanedVideoPin() {
+      const wrap = pinnedVideoWrap;
+      if (!wrap || wrap.dataset.pinned !== '1') return false;
+      if (pinnedVideoPlaceholder?.isConnected) return false;
+      const vid = wrap.querySelector('video');
+      if (vid && !vid.paused) vid.pause();
+      wrap.classList.remove('playing', 'pin-screen', 'pin-dragging');
+      delete wrap.dataset.pinned;
+      delete wrap.dataset.vnotePlayReady;
+      delete wrap.dataset.pinnedMsgId;
+      clearPinnedVideoNoteStyle(wrap);
+      wrap.remove();
+      pinnedVideoPlaceholder = null;
+      pinnedVideoOrigin = null;
+      pinnedVideoWrap = null;
+      vnotePinDragged = false;
+      vnotePinDrag = null;
+      return true;
+    }
+
     function updatePinnedVideoNotePosition() {
+      if (recoverOrphanedVideoPin()) return;
       const wrap = pinnedVideoWrap;
       const ph = pinnedVideoPlaceholder;
-      if (!wrap || wrap.dataset.pinned !== '1' || !ph || vnotePinDragged) return;
+      if (!wrap || wrap.dataset.pinned !== '1' || !ph?.isConnected || vnotePinDragged) return;
       const phRect = ph.getBoundingClientRect();
       const host = getVideoNotePinHostRect();
       const half = pinnedVideoNoteSize(wrap) / 2;
@@ -4499,6 +4547,8 @@
       ph.className = 'video-note-placeholder';
       ph.style.width = idle;
       ph.style.height = idle;
+      const row = wrap.closest('.msg-row');
+      if (row) wrap.dataset.pinnedMsgId = row.dataset.id;
       pinnedVideoOrigin = { parent: wrap.parentNode, next: wrap.nextSibling };
       wrap.parentNode.insertBefore(ph, wrap);
       pinnedVideoPlaceholder = ph;
@@ -4516,6 +4566,7 @@
       wrap.classList.remove('pin-screen', 'pin-dragging');
       delete wrap.dataset.pinned;
       delete wrap.dataset.vnotePlayReady;
+      delete wrap.dataset.pinnedMsgId;
       clearPinnedVideoNoteStyle(wrap);
       vnotePinDragged = false;
       vnotePinDrag = null;
@@ -4536,10 +4587,8 @@
       if (!wrap) return;
       const vid = wrap.querySelector('video');
       if (vid && !vid.paused) vid.pause();
-      else {
-        wrap.classList.remove('playing');
-        unpinVideoNoteFromScreen(wrap);
-      }
+      wrap.classList.remove('playing');
+      unpinVideoNoteFromScreen(wrap);
     }
 
     function beginVideoNotePlay(wrap, vid) {
@@ -5460,7 +5509,7 @@
           }
           if (msg.type === 'message_reaction' && msg.message) {
             if (activeChat && msg.message.chatId === activeChat.id) {
-              replaceMessage(msg.message.id, msg.message);
+              replaceMessage(msg.message.id, msg.message, { reactionsOnly: true });
             }
           }
           if (msg.type === 'read' && msg.chatId) {
