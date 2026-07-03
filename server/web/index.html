@@ -637,11 +637,12 @@
     .voice-body { flex: 1; min-width: 0; }
     .voice-wave {
       position: relative;
-      height: 22px; cursor: pointer; touch-action: manipulation;
+      height: 22px; cursor: pointer; touch-action: none;
       user-select: none;
       -webkit-user-select: none;
       --pct: 0%;
     }
+    .voice-wave.scrubbing { cursor: grabbing; }
     .voice-bars {
       position: relative; z-index: 0;
       display: flex; align-items: center; gap: 2px; height: 100%;
@@ -1239,7 +1240,7 @@
     .review-voice-body { width: 100%; }
     .review-voice-body .voice-wave {
       position: relative;
-      height: 28px; cursor: pointer; touch-action: manipulation;
+      height: 28px; cursor: pointer; touch-action: none;
       user-select: none;
       -webkit-user-select: none;
       --pct: 0%;
@@ -1582,6 +1583,7 @@
     let voiceBtnEl = null;
     let voiceMsgEl = null;
     let voiceRaf = null;
+    let voiceScrubbing = false;
     const waveCache = new Map();
     const voicePos = new Map();
     let videoRecorder = null;
@@ -3784,6 +3786,50 @@
       }).join('');
     }
 
+    function wavePctFromPointer(waveEl, clientX) {
+      const rect = waveEl.getBoundingClientRect();
+      if (!rect.width) return 0;
+      return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    }
+
+    function wireVoiceWaveScrub(waveEl, seekFn) {
+      if (!waveEl || waveEl.dataset.scrubWired) return;
+      waveEl.dataset.scrubWired = '1';
+      let scrubbing = false;
+
+      const applySeek = (clientX) => {
+        seekFn(wavePctFromPointer(waveEl, clientX));
+      };
+
+      const endScrub = (e) => {
+        if (!scrubbing) return;
+        scrubbing = false;
+        voiceScrubbing = false;
+        waveEl.classList.remove('scrubbing');
+        try { waveEl.releasePointerCapture(e.pointerId); } catch (_) {}
+      };
+
+      waveEl.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        scrubbing = true;
+        voiceScrubbing = true;
+        waveEl.classList.add('scrubbing');
+        waveEl.setPointerCapture(e.pointerId);
+        applySeek(e.clientX);
+        e.preventDefault();
+        e.stopPropagation();
+      });
+
+      waveEl.addEventListener('pointermove', (e) => {
+        if (!scrubbing) return;
+        applySeek(e.clientX);
+        e.preventDefault();
+      });
+
+      waveEl.addEventListener('pointerup', endScrub);
+      waveEl.addEventListener('pointercancel', endScrub);
+    }
+
     function updateVoiceProgress(el, current, duration) {
       if (!el) return;
       const dur = saneDur(duration) || voiceDuration(el, voiceAudio);
@@ -3815,6 +3861,10 @@
       stopVoiceRaf();
       const tick = () => {
         if (!voiceAudio || voiceAudio.paused || voiceMsgEl !== el) return;
+        if (voiceScrubbing) {
+          voiceRaf = requestAnimationFrame(tick);
+          return;
+        }
         const dur = voiceDuration(el, voiceAudio);
         const t = voiceAudio.currentTime;
         voicePos.set(voiceAudio.dataset.glinkSrc, t);
@@ -3833,7 +3883,7 @@
       voiceAudio.addEventListener('durationchange', sync);
       voiceAudio.addEventListener('canplay', sync);
       voiceAudio.addEventListener('timeupdate', () => {
-        if (voiceMsgEl !== el) return;
+        if (voiceMsgEl !== el || voiceScrubbing) return;
         voicePos.set(src, voiceAudio.currentTime);
         updateVoiceProgress(el, voiceAudio.currentTime, voiceDuration(el, voiceAudio));
       });
@@ -3872,11 +3922,7 @@
       const saved = voicePos.get(src) || 0;
       if (saved > 0) updateVoiceProgress(el, saved, Number(el.dataset.duration) || 0);
       el.dataset.ready = '1';
-      el.querySelector('.voice-wave').onclick = (e) => {
-        const rect = e.currentTarget.getBoundingClientRect();
-        const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-        seekVoice(el, src, pct);
-      };
+      wireVoiceWaveScrub(el.querySelector('.voice-wave'), (pct) => seekVoice(el, src, pct));
     }
 
     function wireVoicePlayers(container) {
@@ -4288,6 +4334,10 @@
       const el = $('voiceReviewMsg');
       const tick = () => {
         if (!voiceReviewAudio || voiceReviewAudio.paused) return;
+        if (voiceScrubbing) {
+          voiceReviewRaf = requestAnimationFrame(tick);
+          return;
+        }
         updateVoiceProgress(el, voiceReviewAudio.currentTime, voiceReviewAudio.duration);
         voiceReviewRaf = requestAnimationFrame(tick);
       };
@@ -4340,11 +4390,7 @@
           el.querySelector('.voice-dur').textContent = fmtTime(duration);
         }
       }
-      el.querySelector('.voice-wave').onclick = (e) => {
-        const rect = e.currentTarget.getBoundingClientRect();
-        const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-        seekVoiceReview(pct);
-      };
+      wireVoiceWaveScrub(el.querySelector('.voice-wave'), seekVoiceReview);
       updateVoiceProgress(el, 0, Number(el.dataset.duration) || 0);
     }
 
