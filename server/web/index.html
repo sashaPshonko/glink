@@ -546,13 +546,14 @@
         font-size: 0.85rem;
         bottom: 8px;
       }
-      .msg-hit-left { flex: 0 0 8px; min-width: 8px; }
-      .msg-hit-right { flex: 1 1 0; min-width: 8px; }
-      .msg-row.mine .msg-hit-left { flex: 1 1 0; min-width: 8px; }
-      .msg-row.mine .msg-hit-right { flex: 0 0 8px; min-width: 8px; }
-      .msg-row.theirs .msg-hit-left { flex: 0 0 8px; min-width: 8px; }
-      .msg-row.theirs .msg-hit-right { flex: 1 1 0; min-width: 8px; }
-      .msg-stack { max-width: 88%; }
+      /* только зазор аватар ↔ пузырь */
+      .msg-row.theirs .msg-hit-left { flex: 0 0 6px; min-width: 6px; max-width: 6px; }
+      .msg-row.mine .msg-hit-right { flex: 0 0 6px; min-width: 6px; max-width: 6px; }
+      /* центр между твоими и чужими — не трогаем */
+      .msg-row.theirs .msg-hit-right { flex: 1 1 0; min-width: 44px; }
+      .msg-row.mine .msg-hit-left { flex: 1 1 0; min-width: 44px; }
+      /* текст не наезжает через середину */
+      .msg-stack { max-width: min(340px, calc(50vw - 24px)); }
       .msg-stack:has(.video-note) { max-width: 100%; }
       .row { gap: 10px; padding: 12px 12px; }
       .avatar-wrap { width: 40px; height: 40px; }
