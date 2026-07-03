@@ -3862,12 +3862,14 @@
         await seekToPreview();
         const wasMuted = vid.muted;
         vid.muted = true;
+        vid.dataset.previewPriming = '1';
         try {
           await vid.play();
           await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
           vid.pause();
           await seekToPreview();
         } catch { /* WebKit may block until gesture — poster still attempted */ }
+        delete vid.dataset.previewPriming;
         vid.muted = wasMuted;
         const poster = captureVideoNotePoster(vid);
         if (poster) vid.poster = poster;
@@ -4546,8 +4548,28 @@
       setPinnedVideoNotePosition(wrap, cx - half, cy - half);
     }
 
+    function stopOtherVideoNotes(exceptWrap) {
+      $('messages')?.querySelectorAll('.video-note:not(.review-video-note)').forEach((el) => {
+        if (el === exceptWrap) return;
+        if (!el.classList.contains('playing') && el.dataset.pinned !== '1') return;
+        el.classList.remove('playing', 'seeking', 'pin-dragging');
+        delete el.dataset.vnotePlayReady;
+        delete el.dataset.seeking;
+        delete el.dataset.vnoteIntent;
+        const v = el.querySelector('video');
+        if (v && !v.paused && el.dataset.vnotePlayed === '1') v.pause();
+        if (el.dataset.pinned === '1') unpinVideoNoteFromScreen(el);
+      });
+    }
+
+    function startVideoNotePlayback(wrap, vid, trackFn = trackVideoProgress) {
+      beginVideoNotePlay(wrap, vid);
+      trackFn(wrap, vid);
+    }
+
     function pinVideoNoteToScreen(wrap, anchorCx, anchorCy) {
       if (!wrap || wrap.classList.contains('review-video-note') || wrap.dataset.pinned === '1') return;
+      if (pinnedVideoWrap && pinnedVideoWrap !== wrap) unpinVideoNoteFromScreen(pinnedVideoWrap);
       const host = $('videoNotePinHost');
       if (!host) return;
       copyVideoNoteSizeVars(wrap);
@@ -4691,10 +4713,6 @@
     function wireVideoNotePlayback(wrap, vid, trackFn = trackVideoProgress) {
       if (vid.dataset.playbackWired) return;
       vid.dataset.playbackWired = '1';
-      vid.addEventListener('playing', () => {
-        beginVideoNotePlay(wrap, vid);
-        trackFn(wrap, vid);
-      });
       vid.addEventListener('timeupdate', () => {
         if (vid.paused || vid.ended || !wrap.classList.contains('playing')) return;
         updateVideoRing(wrap, vid);
@@ -4834,6 +4852,7 @@
     }
 
     function playVideoNote(wrap, vid, src) {
+      stopOtherVideoNotes(wrap);
       if (activeVideoEl && activeVideoEl !== vid) {
         activeVideoEl.pause();
         activeVideoEl.closest('.video-note')?.classList.remove('playing');
@@ -4848,11 +4867,19 @@
       vid.muted = false;
       measureVideoNoteCaps(wrap);
       activeVideoEl = vid;
+      wrap.dataset.vnoteIntent = '1';
+      const onStarted = () => {
+        if (wrap.dataset.vnoteIntent !== '1') return;
+        delete wrap.dataset.vnoteIntent;
+        startVideoNotePlayback(wrap, vid);
+      };
       if (vid.paused) {
-        vid.play().catch(() => showAppErr('не удалось воспроизвести видео'));
+        vid.play().then(onStarted).catch(() => {
+          delete wrap.dataset.vnoteIntent;
+          showAppErr('не удалось воспроизвести видео');
+        });
       } else {
-        beginVideoNotePlay(wrap, vid);
-        trackVideoProgress(wrap, vid);
+        onStarted();
       }
     }
 
@@ -5090,9 +5117,12 @@
           wrap.dataset.seeking = '1';
           seekVideoNote(wrap, vid, e.clientX, e.clientY);
           if (vid.paused) {
-            wrap.classList.add('playing');
-            updateVideoRing(wrap, vid);
-            vid.play().catch(() => showAppErr('не удалось воспроизвести'));
+            wrap.dataset.vnoteIntent = '1';
+            vid.play().then(() => {
+              if (wrap.dataset.vnoteIntent !== '1') return;
+              delete wrap.dataset.vnoteIntent;
+              startVideoNotePlayback(wrap, vid, trackVideoReviewProgress);
+            }).catch(() => showAppErr('не удалось воспроизвести'));
           } else {
             trackVideoReviewProgress(wrap, vid);
           }
@@ -5100,10 +5130,16 @@
           if (!vid.paused) {
             vid.pause();
             wrap.classList.remove('playing');
+            delete wrap.dataset.vnotePlayReady;
             stopVideoReviewRaf();
             updateVideoRing(wrap, vid);
           } else {
-            vid.play().catch(() => showAppErr('не удалось воспроизвести'));
+            wrap.dataset.vnoteIntent = '1';
+            vid.play().then(() => {
+              if (wrap.dataset.vnoteIntent !== '1') return;
+              delete wrap.dataset.vnoteIntent;
+              startVideoNotePlayback(wrap, vid, trackVideoReviewProgress);
+            }).catch(() => showAppErr('не удалось воспроизвести'));
           }
         }
       });
