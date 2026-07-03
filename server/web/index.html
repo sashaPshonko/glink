@@ -533,9 +533,30 @@
         width: 38px; height: 38px; font-size: 1.05rem;
       }
       #composer { gap: 5px; padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); }
-      #messages { padding: 12px 10px; }
+      #messages { padding: 10px 8px; }
+      .msg-group { gap: 3px; }
+      .msg-group-avatar-col {
+        flex: 0 0 32px;
+        width: 32px;
+        min-width: 32px;
+      }
+      .msg-chat-avatar {
+        width: 32px;
+        height: 32px;
+        font-size: 0.85rem;
+        bottom: 8px;
+      }
+      .msg-hit-left { flex: 0 0 8px; min-width: 8px; }
+      .msg-hit-right { flex: 1 1 0; min-width: 8px; }
+      .msg-row.mine .msg-hit-left { flex: 1 1 0; min-width: 8px; }
+      .msg-row.mine .msg-hit-right { flex: 0 0 8px; min-width: 8px; }
+      .msg-row.theirs .msg-hit-left { flex: 0 0 8px; min-width: 8px; }
+      .msg-row.theirs .msg-hit-right { flex: 1 1 0; min-width: 8px; }
       .msg-stack { max-width: 88%; }
       .msg-stack:has(.video-note) { max-width: 100%; }
+      .row { gap: 10px; padding: 12px 12px; }
+      .avatar-wrap { width: 40px; height: 40px; }
+      .avatar { width: 40px; height: 40px; }
     }
     .bubble {
       width: fit-content;
