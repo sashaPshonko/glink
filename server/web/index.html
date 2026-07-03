@@ -3410,10 +3410,11 @@
         if (vid.paused) vid.play().catch(() => {});
         else vid.pause();
       };
+      primeVideoNotePreview(vid);
       vid.onplay = sync;
       vid.onpause = sync;
       vid.onended = () => {
-        vid.currentTime = 0;
+        restoreVideoNotePreview(vid);
         sync();
         if (draftPreviewVideo === vid) draftPreviewVideo = null;
       };
@@ -3535,6 +3536,50 @@
 
     const VID_RING_R = 96;
     const VID_RING_LEN = 2 * Math.PI * VID_RING_R;
+    const VIDEO_NOTE_PREVIEW_SEC = 1;
+
+    function videoNotePreviewTime(vid) {
+      const dur = saneDur(vid?.duration);
+      if (!dur) return 0;
+      return Math.min(VIDEO_NOTE_PREVIEW_SEC, Math.max(0, dur - 0.05));
+    }
+
+    function resetVideoNotePreviewRing(wrap) {
+      if (!wrap) return;
+      initVideoRing(wrap);
+      wrap.classList.remove('viewed');
+    }
+
+    function primeVideoNotePreview(vid, wrap) {
+      if (!vid) return;
+      const apply = () => {
+        if (!saneDur(vid.duration)) return;
+        const t = videoNotePreviewTime(vid);
+        const paint = () => resetVideoNotePreviewRing(wrap);
+        if (Math.abs(vid.currentTime - t) < 0.03 && vid.readyState >= 2) {
+          paint();
+          return;
+        }
+        vid.addEventListener('seeked', paint, { once: true });
+        try { vid.currentTime = t; } catch { /* ignore */ }
+      };
+      if (vid.readyState >= 1) apply();
+      else vid.addEventListener('loadedmetadata', apply, { once: true });
+    }
+
+    function seekVideoNotePreview(vid) {
+      if (!vid || !saneDur(vid.duration)) return;
+      try { vid.currentTime = videoNotePreviewTime(vid); } catch { /* ignore */ }
+    }
+
+    function restoreVideoNotePreview(vid, wrap) {
+      if (!vid) return;
+      if (!saneDur(vid.duration)) return;
+      if (wrap) {
+        vid.addEventListener('seeked', () => resetVideoNotePreviewRing(wrap), { once: true });
+      }
+      seekVideoNotePreview(vid);
+    }
 
     function saneDur(d) {
       return d > 0 && Number.isFinite(d) ? d : 0;
@@ -3830,10 +3875,11 @@
     }
 
     function hookVideoProgress(wrap, vid) {
-      vid.onloadedmetadata = () => updateVideoRing(wrap, vid);
+      primeVideoNotePreview(vid, wrap);
       vid.onpause = () => {
         stopVideoRaf();
-        updateVideoRing(wrap, vid);
+        if (wrap.dataset.vnotePlayed === '1') updateVideoRing(wrap, vid);
+        else resetVideoNotePreviewRing(wrap);
       };
     }
 
@@ -3903,7 +3949,10 @@
           wrap.classList.remove('playing');
           stopVideoRaf();
           if (activeVideoEl === vid) activeVideoEl = null;
-          updateVideoRing(wrap, vid);
+          wrap.classList.add('viewed');
+          const ring = wrap.querySelector('.vid-ring-fill');
+          if (ring) ring.style.strokeDashoffset = '0';
+          seekVideoNotePreview(vid);
         };
       });
     }
@@ -3922,11 +3971,13 @@
       if (!vid.src) vid.src = src;
       if (vid.paused) {
         vid.play().then(() => {
+          wrap.dataset.vnotePlayed = '1';
           wrap.classList.add('playing');
           activeVideoEl = vid;
           trackVideoProgress(wrap, vid);
         }).catch(() => showAppErr('не удалось воспроизвести видео'));
       } else {
+        wrap.dataset.vnotePlayed = '1';
         wrap.classList.add('playing');
         activeVideoEl = vid;
         trackVideoProgress(wrap, vid);
@@ -4129,19 +4180,23 @@
       wrap.dataset.reviewWired = '1';
       initVideoRing(wrap);
 
-      vid.onloadedmetadata = () => updateVideoRing(wrap, vid);
+      primeVideoNotePreview(vid, wrap);
       vid.onpause = () => {
         stopVideoReviewRaf();
-        updateVideoRing(wrap, vid);
+        if (wrap.dataset.vnotePlayed === '1') updateVideoRing(wrap, vid);
+        else resetVideoNotePreviewRing(wrap);
         wrap.classList.remove('playing');
       };
       vid.onended = () => {
         wrap.classList.remove('playing');
         stopVideoReviewRaf();
-        vid.currentTime = 0;
-        updateVideoRing(wrap, vid);
+        wrap.classList.add('viewed');
+        const ring = wrap.querySelector('.vid-ring-fill');
+        if (ring) ring.style.strokeDashoffset = '0';
+        seekVideoNotePreview(vid);
       };
       vid.onplay = () => {
+        wrap.dataset.vnotePlayed = '1';
         wrap.classList.add('playing');
         trackVideoReviewProgress(wrap, vid);
       };
@@ -4216,6 +4271,7 @@
         wrap.classList.remove('playing', 'seeking', 'viewed');
         delete wrap.dataset.seeking;
         delete wrap.dataset.reviewWired;
+        delete wrap.dataset.vnotePlayed;
         const ring = wrap.querySelector('.vid-ring-fill');
         if (ring) {
           delete ring.dataset.ready;
@@ -4286,7 +4342,6 @@
       const pb = $('videoRecPlayback');
       pb.src = videoReviewUrl;
       wireVideoReviewUI();
-      updateVideoRing($('videoReviewNote'), pb);
     }
 
     function toggleVoiceReviewPlay() {
