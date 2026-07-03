@@ -105,6 +105,38 @@
       min-width: 0;
       padding: 0 4px;
     }
+    .chat-header-top.has-avatar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      text-align: left;
+    }
+    .chat-header-titles {
+      min-width: 0;
+    }
+    .chat-header-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #fbcfe8;
+      color: #e879a9;
+      font-weight: 700;
+      overflow: hidden;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+      box-shadow: 0 1px 4px rgba(92, 51, 71, 0.08);
+    }
+    .chat-header-avatar .avatar-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .chat-header-avatar.hidden { display: none !important; }
     .chat-header-top h1 {
       margin: 0;
       color: #e879a9;
@@ -457,6 +489,7 @@
     .msg-group.mine .msg-group-body { align-items: flex-end; }
     .msg-group-body .msg-row.theirs .msg-hit-left { flex: 0 0 8px; min-width: 8px; }
     .msg-group-body .msg-row.mine .msg-hit-right { flex: 0 0 8px; min-width: 8px; }
+    .msg-group.no-avatar .msg-group-body { width: 100%; }
     #composer {
       display: flex; gap: 8px; padding: 10px 12px;
       padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
@@ -1328,9 +1361,12 @@
             <path d="M14.5 5.5 8 12l6.5 6.5"/>
           </svg>
         </button>
-        <div class="chat-header-top">
-          <h1 id="chatTitle">Чат</h1>
-          <small id="chatSub"></small>
+        <div id="chatHeaderTop" class="chat-header-top">
+          <div id="chatHeaderAvatar" class="chat-header-avatar hidden" aria-hidden="true"></div>
+          <div class="chat-header-titles">
+            <h1 id="chatTitle">Чат</h1>
+            <small id="chatSub"></small>
+          </div>
         </div>
         <div class="chat-header-spacer" aria-hidden="true"></div>
       </header>
@@ -1740,16 +1776,55 @@
       return groups;
     }
 
+    function showMessageAvatars() {
+      return activeChat?.type === 'group';
+    }
+
+    function peerAvatarInfo(chat) {
+      if (chat?.type !== 'dm' || !chat.peer) return null;
+      return {
+        url: chat.peer.avatarUrl || null,
+        letter: (chat.peer.displayName || chat.peer.username || '?')[0].toUpperCase(),
+      };
+    }
+
+    function updateChatHeader(chat = activeChat) {
+      if (!chat) return;
+      $('chatTitle').textContent = chatTitle(chat);
+      $('chatSub').textContent = chat.type === 'group' ? 'группа ♡' : 'личный чат';
+      const top = $('chatHeaderTop');
+      const avEl = $('chatHeaderAvatar');
+      if (chat.type === 'dm' && chat.peer) {
+        const info = peerAvatarInfo(chat);
+        top.classList.add('has-avatar');
+        avEl.classList.remove('hidden');
+        avEl.removeAttribute('aria-hidden');
+        avEl.innerHTML = renderChatAvatarInner(info);
+        avEl.title = chat.peer.displayName || chat.peer.username || '';
+      } else {
+        top.classList.remove('has-avatar');
+        avEl.classList.add('hidden');
+        avEl.setAttribute('aria-hidden', 'true');
+        avEl.innerHTML = '';
+        avEl.removeAttribute('title');
+      }
+    }
+
     function renderMessageGroupHtml(group) {
       const mine = group.senderId === user.id;
       const cls = mine ? 'mine' : 'theirs';
+      const rows = group.messages.map((m, i) =>
+        renderMessageRowHtml(m, { showSender: i === 0 }),
+      ).join('');
+      if (!showMessageAvatars()) {
+        return `<div class="msg-group ${cls} no-avatar" data-sender-id="${escapeHtml(group.senderId)}">` +
+          `<div class="msg-group-body">${rows}</div>` +
+          `</div>`;
+      }
       const av = senderAvatarInfo(group.messages[group.messages.length - 1]);
       const title = mine
         ? (user?.displayName || user?.username || '')
         : (group.messages[0].senderName || '');
-      const rows = group.messages.map((m, i) =>
-        renderMessageRowHtml(m, { showSender: i === 0 }),
-      ).join('');
       return `<div class="msg-group ${cls}" data-sender-id="${escapeHtml(group.senderId)}">` +
         `<div class="msg-group-avatar-col" aria-hidden="true">` +
         `<div class="msg-chat-avatar" title="${escapeHtml(title)}">${renderChatAvatarInner(av)}</div>` +
@@ -1834,6 +1909,7 @@
         if (activeChat) {
           const fresh = chats.find((c) => c.id === activeChat.id);
           if (fresh) activeChat = fresh;
+          updateChatHeader(activeChat);
           relayoutMessages($('messages'), { forceBottom: userPinnedBottom });
         }
       } catch (e) {
@@ -1852,6 +1928,7 @@
         if (activeChat) {
           const fresh = chats.find((c) => c.id === activeChat.id);
           if (fresh) activeChat = fresh;
+          updateChatHeader(activeChat);
           relayoutMessages($('messages'), { forceBottom: userPinnedBottom });
         }
       } catch (e) {
@@ -4435,8 +4512,7 @@
       userPinnedBottom = true;
       $('chatList').classList.add('hidden');
       $('chatView').classList.remove('hidden');
-      $('chatTitle').textContent = chatTitle(chat);
-      $('chatSub').textContent = chat.type === 'group' ? 'группа ♡' : 'личный чат';
+      updateChatHeader(chat);
       updateAppChrome();
       restoreChatComposerDraft(chat.id);
       if (!opts.skipHistory) {
@@ -4542,6 +4618,13 @@
       try {
         const data = await api('/chats');
         chats = data.chats || [];
+        if (activeChat) {
+          const fresh = chats.find((c) => c.id === activeChat.id);
+          if (fresh) {
+            activeChat = fresh;
+            updateChatHeader(activeChat);
+          }
+        }
         renderChats();
         wsJoinAllChats();
       } catch (_) {}
