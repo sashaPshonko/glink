@@ -4557,13 +4557,27 @@
       return true;
     }
 
+    function isVideoNotePipSession(wrap) {
+      return wrap.classList.contains('playing')
+        || (wrap.dataset.pinned === '1' && wrap.dataset.vnotePlayReady === '1');
+    }
+
+    function pauseVideoNoteInPip(wrap, vid) {
+      wrap.classList.remove('playing', 'seeking');
+      delete wrap.dataset.seeking;
+      vid.pause();
+      stopVideoRaf();
+      if (activeVideoEl === vid) activeVideoEl = null;
+      updateVideoRing(wrap, vid);
+    }
+
     function updateVideoNotePipState() {
       if (recoverOrphanedVideoPin()) {
         requestAnimationFrame(() => updateVideoNotePipState());
         return;
       }
       const wrap = playingVideoWrap;
-      if (!wrap || !wrap.classList.contains('playing')) return;
+      if (!wrap || !isVideoNotePipSession(wrap)) return;
       if (wrap.classList.contains('review-video-note')) return;
 
       const anchorVisible = isVideoNoteAnchorVisible(wrap);
@@ -4577,6 +4591,7 @@
       }
 
       if (wrap.dataset.pinned !== '1') {
+        if (!wrap.classList.contains('playing')) return;
         vnotePinDragged = false;
         enterVideoNotePip(wrap);
         return;
@@ -4667,7 +4682,12 @@
     function beginVideoNotePlay(wrap, vid) {
       wrap.dataset.vnotePlayed = '1';
       if (wrap.dataset.vnotePlayReady === '1') {
+        wrap.classList.add('playing');
         updateVideoRing(wrap, vid);
+        if (!wrap.classList.contains('review-video-note')) {
+          playingVideoWrap = wrap;
+          requestAnimationFrame(() => updateVideoNotePipState());
+        }
         return;
       }
       measureVideoNoteCaps(wrap);
@@ -4737,7 +4757,10 @@
         const tapped = !drag.moved;
         vnotePinDrag = null;
         wrap.classList.remove('pin-dragging');
-        if (tapped) toggleVideoNote(wrap, vid, src);
+        if (tapped) {
+          if (!vid.paused) pauseVideoNoteInPip(wrap, vid);
+          else playVideoNote(wrap, vid, src);
+        }
       }
     }
 
@@ -4782,6 +4805,7 @@
         stopVideoRaf();
         if (vid.ended) return;
         if (wrap.classList.contains('playing')) return;
+        if (wrap.dataset.pinned === '1' && wrap.dataset.vnotePlayReady === '1') return;
         delete wrap.dataset.vnotePlayReady;
         unpinVideoNoteFromScreen(wrap);
         if (wrap.dataset.vnotePlayed === '1') updateVideoRing(wrap, vid);
@@ -4927,6 +4951,10 @@
         stopVideoRaf();
       }
       if (!vid.paused) {
+        if (wrap.dataset.pinned === '1') {
+          pauseVideoNoteInPip(wrap, vid);
+          return;
+        }
         wrap.classList.remove('playing');
         delete wrap.dataset.vnotePlayReady;
         vid.pause();
