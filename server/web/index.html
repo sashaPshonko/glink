@@ -638,35 +638,22 @@
     .voice-wave {
       position: relative;
       height: 22px; cursor: pointer; touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
       --pct: 0%;
     }
-    .voice-wave::before {
-      content: '';
-      position: absolute; left: 0; top: 0; bottom: 0;
-      width: var(--pct); z-index: 1; pointer-events: none;
-      background: rgba(219, 39, 119, 0.18);
-      border-radius: 4px;
-    }
-    .voice-wave::after {
-      content: '';
-      position: absolute; top: 2px; bottom: 2px;
-      left: var(--pct); z-index: 2; pointer-events: none;
-      width: 3px; margin-left: -1px;
-      background: #db2777; border-radius: 2px;
-    }
-    .bubble.theirs .voice-wave::before { background: rgba(244, 114, 182, 0.22); }
-    .bubble.theirs .voice-wave::after { background: #db2777; }
     .voice-bars {
       position: relative; z-index: 0;
       display: flex; align-items: center; gap: 2px; height: 100%;
     }
     .voice-bars i {
       flex: 1; min-width: 2px; max-width: 5px; border-radius: 2px;
-      background: rgba(157, 23, 77, 0.22); display: block; align-self: center;
+      background: rgba(157, 23, 77, 0.2); display: block; align-self: center;
+      transition: background-color 0.08s linear;
     }
-    .voice-bars i.on { background: rgba(157, 23, 77, 0.88); }
-    .bubble.theirs .voice-bars i { background: rgba(232, 121, 169, 0.28); }
-    .bubble.theirs .voice-bars i.on { background: rgba(219, 39, 119, 0.85); }
+    .voice-bars i.on { background: rgba(157, 23, 77, 0.92); }
+    .bubble.theirs .voice-bars i { background: rgba(219, 39, 119, 0.22); }
+    .bubble.theirs .voice-bars i.on { background: rgba(190, 24, 93, 0.95); }
     .voice-time {
       font-size: 0.72rem; color: rgba(92, 51, 71, 0.65);
       margin-top: 3px; font-variant-numeric: tabular-nums;
@@ -1253,19 +1240,15 @@
     .review-voice-body .voice-wave {
       position: relative;
       height: 28px; cursor: pointer; touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
       --pct: 0%;
-    }
-    .review-voice-body .voice-wave::before {
-      background: rgba(255, 255, 255, 0.18);
-    }
-    .review-voice-body .voice-wave::after {
-      background: #fbcfe8;
     }
     .review-voice-body .voice-bars i {
       background: rgba(255, 255, 255, 0.28);
     }
     .review-voice-body .voice-bars i.on {
-      background: rgba(255, 255, 255, 0.92);
+      background: rgba(255, 255, 255, 0.95);
     }
     .review-voice-body .voice-time {
       color: #fbcfe8; text-align: center; margin-top: 6px;
@@ -1646,6 +1629,9 @@
     let lastMessagesSig = '';
     let userPinnedBottom = true;
     let suppressScrollTrack = false;
+    let userScrollingUntil = 0;
+    const SCROLL_BOTTOM_PX = 24;
+    const SCROLL_IDLE_MS = 200;
     let loadMsgGen = 0;
     let selectedUsername = localStorage.getItem('glink_last_user') || '';
     let activeMessages = [];
@@ -1918,12 +1904,23 @@
       return groupMessagesBySender(messages).map(renderMessageGroupHtml).join('');
     }
 
+    function markUserScrolling() {
+      userScrollingUntil = Date.now() + SCROLL_IDLE_MS;
+    }
+
+    function shouldStickToBottom(forceBottom = false) {
+      if (forceBottom) return true;
+      if (!userPinnedBottom) return false;
+      if (Date.now() < userScrollingUntil) return false;
+      return isAtBottom($('messages'), SCROLL_BOTTOM_PX);
+    }
+
     function afterMessagesDomUpdate(box, opts = {}) {
-      syncSigFromBox();
-      const stick = opts.forceBottom || userPinnedBottom;
-      if (stick) scrollToBottom(box, true);
+      syncMessagesStateFromDom();
+      if (opts.stick) scrollToBottom(box, true);
       else if (opts.anchor) {
         restoreScrollAnchor(box, opts.anchor);
+        requestAnimationFrame(() => restoreScrollAnchor(box, opts.anchor));
         maintainScrollAnchor(box, opts.anchor);
       }
       wireVoicePlayers(box);
@@ -1950,11 +1947,11 @@
     }
 
     function relayoutMessages(box = $('messages'), opts = {}) {
-      const stick = opts.forceBottom || userPinnedBottom;
+      const stick = shouldStickToBottom(opts.forceBottom);
       const anchor = stick ? null : saveScrollAnchor(box);
       box.innerHTML = renderMessagesHtml(activeMessages);
       if (stick) box.scrollTop = box.scrollHeight;
-      afterMessagesDomUpdate(box, { ...opts, anchor });
+      afterMessagesDomUpdate(box, { ...opts, anchor, stick });
     }
 
     const PROFILE_BTN_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm0 2c-3.87 0-7 2.13-7 4.75V21h14v-2.25C19 16.13 15.87 14 12 14z"/></svg>';
@@ -2025,7 +2022,7 @@
           const fresh = chats.find((c) => c.id === activeChat.id);
           if (fresh) activeChat = fresh;
           updateChatHeader(activeChat);
-          relayoutMessages($('messages'), { forceBottom: userPinnedBottom });
+          relayoutMessages($('messages'), { forceBottom: shouldStickToBottom() });
         }
       } catch (e) {
         showAppErr(e.message);
@@ -2044,7 +2041,7 @@
           const fresh = chats.find((c) => c.id === activeChat.id);
           if (fresh) activeChat = fresh;
           updateChatHeader(activeChat);
-          relayoutMessages($('messages'), { forceBottom: userPinnedBottom });
+          relayoutMessages($('messages'), { forceBottom: shouldStickToBottom() });
         }
       } catch (e) {
         showAppErr(e.message);
@@ -2727,12 +2724,10 @@
       return renderMessagesHtml([m]);
     }
 
-    function syncSigFromBox() {
+    function syncMessagesStateFromDom() {
       const box = $('messages');
-      const rows = box.querySelectorAll('.msg-row');
-      const last = rows[rows.length - 1];
-      lastMessagesSig = rows.length + ':' + (last?.dataset.id || '0');
-      lastMsgCount = rows.length;
+      lastMsgCount = box.querySelectorAll('.msg-row').length;
+      lastMessagesSig = messagesSig(activeMessages);
     }
 
     function appendMessage(m, opts = {}) {
@@ -2747,7 +2742,7 @@
       const idx = activeMessages.findIndex((x) => x.id === oldId);
       if (idx >= 0) activeMessages[idx] = msg;
       else upsertActiveMessage(msg);
-      relayoutMessages($('messages'), { forceBottom: userPinnedBottom });
+      relayoutMessages($('messages'), { forceBottom: shouldStickToBottom() });
       markChatRead();
     }
 
@@ -2767,7 +2762,7 @@
           return;
         }
       }
-      appendMessage(message, { forceBottom: userPinnedBottom });
+      appendMessage(message, { forceBottom: shouldStickToBottom() });
       upsertActiveMessage(message);
     }
 
@@ -2826,7 +2821,7 @@
 
       const gen = ++loadMsgGen;
       const box = $('messages');
-      const stick = opts.forceBottom || userPinnedBottom;
+      const stick = shouldStickToBottom(opts.forceBottom);
       const anchor = stick ? null : saveScrollAnchor(box);
 
       let restore = null;
@@ -2883,7 +2878,7 @@
       }
     }
 
-    function isAtBottom(box, threshold = 80) {
+    function isAtBottom(box, threshold = SCROLL_BOTTOM_PX) {
       return box.scrollHeight - box.scrollTop - box.clientHeight < threshold;
     }
 
@@ -2908,23 +2903,38 @@
     }
 
     function saveScrollAnchor(box) {
-      const scrollTop = box.scrollTop;
+      const boxTop = box.getBoundingClientRect().top;
+      const distanceFromBottom = box.scrollHeight - box.scrollTop - box.clientHeight;
       for (const row of box.querySelectorAll('.msg-row')) {
-        if (row.offsetTop + row.offsetHeight > scrollTop + 2) {
-          return { id: row.dataset.id, offset: scrollTop - row.offsetTop };
+        const rr = row.getBoundingClientRect();
+        if (rr.bottom > boxTop + 1) {
+          return {
+            id: row.dataset.id,
+            offset: rr.top - boxTop,
+            distanceFromBottom,
+          };
         }
       }
-      return { bottom: true };
+      return { bottom: true, distanceFromBottom: 0 };
     }
 
     function restoreScrollAnchor(box, anchor) {
       if (!anchor) return;
       if (anchor.bottom) {
-        scrollToBottom(box);
+        scrollToBottom(box, true);
         return;
       }
       const el = box.querySelector('.msg-row[data-id="' + anchor.id + '"]');
-      if (el) setScrollTop(box, el.offsetTop + anchor.offset);
+      if (el) {
+        const boxTop = box.getBoundingClientRect().top;
+        const rr = el.getBoundingClientRect();
+        const delta = rr.top - boxTop - anchor.offset;
+        if (Math.abs(delta) > 0.5) setScrollTop(box, box.scrollTop + delta);
+        return;
+      }
+      if (typeof anchor.distanceFromBottom === 'number') {
+        setScrollTop(box, box.scrollHeight - box.clientHeight - anchor.distanceFromBottom);
+      }
     }
 
     function maintainScrollAnchor(box, anchor) {
@@ -2944,12 +2954,19 @@
     }
 
     function applyReadTicks(messages, box = $('messages')) {
+      if (!messages?.length) return;
+      const preserve = !shouldStickToBottom();
+      const anchor = preserve ? saveScrollAnchor(box) : null;
       for (const m of messages) {
         if (m.senderId !== user.id) continue;
         const bubble = box.querySelector('.msg-row[data-id="' + m.id + '"] .bubble');
         if (!bubble) continue;
         applyMsgMetaToBubble(bubble, m, true);
         bubble.classList.toggle('has-reactions', hasReactions(m));
+      }
+      if (anchor) {
+        restoreScrollAnchor(box, anchor);
+        maintainScrollAnchor(box, anchor);
       }
     }
 
@@ -2959,7 +2976,7 @@
         const data = await api('/chats/' + activeChat.id + '/messages');
         const sig = messagesSig(data.messages);
         if (sig !== lastMessagesSig) {
-          await loadMessages({ forceBottom: userPinnedBottom, messages: data.messages });
+          await loadMessages({ messages: data.messages });
         } else {
           applyReadTicks(data.messages);
           scheduleMarkVisibleRead();
@@ -5562,13 +5579,18 @@
     $('videoReviewRedoBtn').onclick = (e) => { e.preventDefault(); hideVideoOverlay(); openVideoRecorder(); };
     $('videoReviewAttachBtn').onclick = (e) => { e.preventDefault(); attachVideoReview(); };
 
-    $('messages').addEventListener('scroll', () => {
+    const messagesEl = $('messages');
+    messagesEl.addEventListener('scroll', () => {
       if (suppressScrollTrack || !activeChat) return;
+      markUserScrolling();
       touchChatActivity();
-      userPinnedBottom = isAtBottom($('messages'));
+      userPinnedBottom = isAtBottom(messagesEl);
       scheduleMarkVisibleRead();
       updateInChatUnreadBadge();
     }, { passive: true });
+    messagesEl.addEventListener('wheel', () => { markUserScrolling(); }, { passive: true });
+    messagesEl.addEventListener('touchstart', () => { markUserScrolling(); }, { passive: true });
+    messagesEl.addEventListener('touchmove', () => { markUserScrolling(); }, { passive: true });
 
     $('messages').addEventListener('selectstart', (e) => {
       if (e.target.closest('.msg-hit, .msg-reaction-pill')) e.preventDefault();

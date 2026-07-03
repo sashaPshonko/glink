@@ -755,12 +755,36 @@ wss.on('connection', (ws, req) => {
 });
 
 function tlsFiles() {
+    const customKey = process.env.GLINK_TLS_KEY;
+    const customCert = process.env.GLINK_TLS_CERT;
+    if (customKey && customCert && existsSync(customKey) && existsSync(customCert)) {
+        return {
+            key: readFileSync(customKey),
+            cert: readFileSync(customCert),
+            source: customCert,
+        };
+    }
+
+    const domain = process.env.GLINK_DOMAIN;
+    if (domain) {
+        const leKey = join('/etc/letsencrypt/live', domain, 'privkey.pem');
+        const leCert = join('/etc/letsencrypt/live', domain, 'fullchain.pem');
+        if (existsSync(leKey) && existsSync(leCert)) {
+            return {
+                key: readFileSync(leKey),
+                cert: readFileSync(leCert),
+                source: leCert,
+            };
+        }
+    }
+
     const key = join(CERT_DIR, 'key.pem');
     const cert = join(CERT_DIR, 'cert.pem');
     if (!existsSync(key) || !existsSync(cert)) return null;
     return {
         key: readFileSync(key),
         cert: readFileSync(cert),
+        source: cert,
     };
 }
 
@@ -792,5 +816,10 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`[glink] ${MEMBERS.join(', ')} + группа «${GROUP_TITLE}»`);
     console.log(`[glink] веб-клиент: ${scheme}://0.0.0.0:${PORT}/`);
     console.log(`[glink] ${scheme === 'https' ? 'wss' : 'ws'}://0.0.0.0:${PORT}/ws`);
+    if (tls?.source?.includes('letsencrypt')) {
+        console.log(`[glink] TLS: Let's Encrypt (${tls.source})`);
+    } else if (tls?.source?.includes('certs/')) {
+        console.log('[glink] TLS: самоподписанный — браузер может ругаться, нужен домен или «Доверять»');
+    }
     if (tls) startHttpRedirect();
 });
