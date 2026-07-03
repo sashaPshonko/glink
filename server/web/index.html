@@ -72,6 +72,109 @@
       background: rgba(255, 236, 244, 0.98);
       transform: scale(0.94);
     }
+    #profileBtn {
+      width: 48px; height: 48px; min-width: 48px; min-height: 48px;
+      padding: 0; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(232, 121, 169, 0.32);
+      color: #db2777;
+      flex-shrink: 0; touch-action: manipulation;
+      box-shadow: 0 2px 10px rgba(219, 39, 119, 0.1);
+      transition: background 0.15s ease, transform 0.12s ease;
+    }
+    #profileBtn svg { width: 26px; height: 26px; display: block; }
+    #profileBtn:active {
+      background: rgba(255, 236, 244, 0.98);
+      transform: scale(0.94);
+    }
+    #listHeader.hidden { display: none !important; }
+    .chat-header {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: flex-start;
+      background: rgba(255, 236, 244, 0.88);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(252, 231, 243, 0.9);
+      padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 10px;
+    }
+    .chat-header-top {
+      text-align: center;
+      padding: 0 8px 10px;
+    }
+    .chat-header-top h1 {
+      margin: 0;
+      color: #e879a9;
+      font-size: 1.28rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .chat-header-top small {
+      color: #b07a94;
+      font-size: 0.85rem;
+    }
+    .chat-header-bar {
+      display: flex;
+      align-items: center;
+    }
+    .profile-sheet {
+      position: fixed; inset: 0; z-index: 600;
+      background: rgba(92, 51, 71, 0.42);
+      display: flex; align-items: flex-end; justify-content: center;
+      padding: 16px;
+      padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    }
+    .profile-sheet.hidden { display: none !important; }
+    .profile-card {
+      width: 100%; max-width: 360px;
+      background: rgba(255, 255, 255, 0.98);
+      border-radius: 24px;
+      padding: 28px 20px 20px;
+      text-align: center;
+      position: relative;
+      box-shadow: 0 12px 40px rgba(92, 51, 71, 0.18);
+    }
+    #profileClose {
+      position: absolute; top: 12px; right: 12px;
+      width: 36px; height: 36px; border-radius: 50%;
+      border: none; background: rgba(255, 236, 244, 0.9);
+      color: #b07a94; font-size: 1rem; cursor: pointer;
+    }
+    .profile-avatar-btn {
+      width: 96px; height: 96px; border-radius: 50%;
+      border: 3px solid #fbcfe8;
+      background: #ffecf4;
+      margin: 0 auto 12px;
+      padding: 0;
+      overflow: hidden;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2.2rem; font-weight: 700; color: #e879a9;
+    }
+    .profile-avatar-btn img {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+    #profileName {
+      font-size: 1.15rem; font-weight: 700; color: #9d174d;
+    }
+    #profileHint {
+      margin-top: 6px; font-size: 0.82rem; color: #b07a94;
+    }
+    #profileLogout {
+      margin-top: 22px;
+      width: 100%;
+      background: transparent;
+      color: #e879a9;
+      border: 1px solid rgba(232, 121, 169, 0.35);
+      border-radius: 14px;
+      padding: 12px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
     button.icon {
       width: 44px; height: 44px; padding: 0; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
@@ -164,6 +267,10 @@
       width: 44px; height: 44px; border-radius: 50%;
       background: #fbcfe8; display: flex; align-items: center; justify-content: center;
       color: #e879a9; font-weight: 700;
+      overflow: hidden;
+    }
+    .avatar-img {
+      width: 100%; height: 100%; object-fit: cover; display: block;
     }
     .avatar.group { background: #f9a8d4; }
     .preview {
@@ -520,11 +627,16 @@
     }
     #editBanner.hidden { display: none; }
     #editCancelBtn {
-      padding: 8px 14px; font-size: 0.88rem; border-radius: 999px;
-      background: rgba(255, 255, 255, 0.88);
-      border: 1px solid rgba(232, 121, 169, 0.35);
-      color: #9d174d;
+      width: 40px; height: 40px; min-width: 40px;
+      padding: 0; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: transparent;
+      color: #b07a94;
+      border: none;
+      cursor: pointer;
     }
+    #editCancelBtn svg { width: 22px; height: 22px; display: block; }
+    #editCancelBtn:active { color: #db2777; transform: scale(0.92); }
     #composer.editing #sendBtn { background: #db2777; }
     #draftAttach {
       flex: 1 1 100%;
@@ -987,25 +1099,31 @@
   </div>
 
   <div id="app" class="hidden glink-pattern" style="display:flex;flex-direction:column;height:100dvh;height:100svh;min-height:0;overflow:hidden">
-    <header>
+    <header id="listHeader">
       <div>
         <h1 id="hdrTitle">Glink</h1>
         <small id="hdrSub">@user</small>
       </div>
-      <button id="logoutBtn" class="secondary">выход</button>
+      <button id="profileBtn" type="button" title="Профиль" aria-label="Профиль">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm0 2c-3.87 0-7 2.13-7 4.75V21h14v-2.25C19 16.13 15.87 14 12 14z"/>
+        </svg>
+      </button>
     </header>
     <p id="appErr" class="hidden"><span id="appErrText"></span><button type="button" id="appErrDismiss" class="secondary">✕</button></p>
     <div id="chatList"></div>
     <div id="chatView" class="hidden">
-      <header>
-        <button id="backBtn" type="button" title="Назад" aria-label="Назад">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M14.5 5.5 8 12l6.5 6.5"/>
-          </svg>
-        </button>
-        <div>
+      <header class="chat-header">
+        <div class="chat-header-top">
           <h1 id="chatTitle">Чат</h1>
           <small id="chatSub"></small>
+        </div>
+        <div class="chat-header-bar">
+          <button id="backBtn" type="button" title="Назад" aria-label="Назад">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M14.5 5.5 8 12l6.5 6.5"/>
+            </svg>
+          </button>
         </div>
       </header>
       <div id="messages"></div>
@@ -1015,13 +1133,34 @@
           <div id="draftAttachList" class="draft-attach-list"></div>
         </div>
         <div id="editBanner" class="hidden">
-          <button id="editCancelBtn" type="button" class="secondary">отмена</button>
+          <button id="editCancelBtn" type="button" title="Отменить редактирование" aria-label="Отменить редактирование">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 6h18"/>
+              <path d="M8 6V4h8v2"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+              <path d="M10 11v6"/>
+              <path d="M14 11v6"/>
+            </svg>
+          </button>
         </div>
         <input id="fileInput" type="file" class="hidden" multiple />
         <button id="mediaBtn" type="button" class="icon secondary" title="Файл" aria-label="Файл"></button>
         <textarea id="msgInput" rows="1" placeholder="Сообщение…"></textarea>
         <button id="sendBtn" class="icon">♡</button>
       </div>
+    </div>
+  </div>
+  <div id="profileSheet" class="profile-sheet hidden">
+    <div class="profile-card">
+      <button type="button" id="profileClose" title="Закрыть" aria-label="Закрыть">✕</button>
+      <button type="button" id="profileAvatarBtn" class="profile-avatar-btn" title="Сменить фото">
+        <img id="profileAvatarImg" class="hidden" alt="" />
+        <span id="profileAvatarLetter">?</span>
+      </button>
+      <div id="profileName">Профиль</div>
+      <div id="profileHint">нажми на кружок — выбрать фото</div>
+      <input id="avatarInput" type="file" accept="image/*" class="hidden" />
+      <button type="button" id="profileLogout">выйти</button>
     </div>
   </div>
   <div id="msgMenu" class="msg-menu hidden" role="menu">
@@ -1307,6 +1446,80 @@
       $('login').classList.add('hidden');
       $('app').classList.remove('hidden');
       $('hdrSub').textContent = '@' + user.username;
+      updateProfileUI();
+    }
+
+    function updateAppChrome() {
+      $('listHeader').classList.toggle('hidden', Boolean(activeChat));
+    }
+
+    function chatAvatarHtml(c) {
+      if (c.type === 'group') {
+        return { cls: 'avatar group', inner: '♡' };
+      }
+      const letter = (chatTitle(c)[0] || '?').toUpperCase();
+      const url = c.peer?.avatarUrl;
+      if (url) {
+        return {
+          cls: 'avatar has-img',
+          inner: `<img class="avatar-img" src="${escapeHtml(fileUrl(url))}" alt="" />`,
+        };
+      }
+      return { cls: 'avatar', inner: letter };
+    }
+
+    function updateProfileUI() {
+      if (!user) return;
+      const letter = (user.displayName || user.username || '?')[0].toUpperCase();
+      $('profileName').textContent = user.displayName || user.username;
+      $('profileAvatarLetter').textContent = letter;
+      const img = $('profileAvatarImg');
+      if (user.avatarUrl) {
+        img.src = fileUrl(user.avatarUrl);
+        img.classList.remove('hidden');
+        $('profileAvatarLetter').classList.add('hidden');
+      } else {
+        img.removeAttribute('src');
+        img.classList.add('hidden');
+        $('profileAvatarLetter').classList.remove('hidden');
+      }
+    }
+
+    function openProfileSheet() {
+      updateProfileUI();
+      $('profileSheet').classList.remove('hidden');
+    }
+
+    function closeProfileSheet() {
+      $('profileSheet').classList.add('hidden');
+    }
+
+    function doLogout() {
+      persistActiveChatDraft();
+      clearToken();
+      chatDrafts.clear();
+      localStorage.removeItem(DRAFTS_TEXT_LS);
+      closeProfileSheet();
+      if (ws) ws.close();
+      clearInterval(pollTimer);
+      cancelVoiceRecording();
+      cancelVideoRecording();
+      showLogin();
+    }
+
+    async function uploadAvatar(file) {
+      const fd = new FormData();
+      fd.append('file', file);
+      showAppErr('');
+      try {
+        const data = await api('/me/avatar', { method: 'POST', body: fd });
+        user = data.user;
+        updateProfileUI();
+        $('hdrSub').textContent = '@' + user.username;
+        await refreshChatList();
+      } catch (e) {
+        showAppErr(e.message);
+      }
     }
 
     function showAppErr(msg) {
@@ -1874,15 +2087,14 @@
             ? 'ещё не зарегистрировался'
             : (draftPrev?.text || truncatePreview(c.lastMessage?.text || 'Напиши первым ♡'));
           const previewCls = draftPrev?.draft ? 'preview draft' : 'preview';
-          const av = c.type === 'group' ? '♡' : (chatTitle(c)[0] || '?').toUpperCase();
-          const cls = c.type === 'group' ? 'avatar group' : 'avatar';
+          const avData = chatAvatarHtml(c);
           const unread = c.unreadCount || 0;
           const badge = unread > 0
             ? `<span class="unread-badge">${unreadBadgeText(unread)}</span>`
             : '';
           return `<div class="row${wait}" data-id="${c.id}" data-wait="${c.waiting ? '1' : ''}">
             <div class="avatar-wrap">
-              <div class="${cls}">${av}</div>
+              <div class="${avData.cls}">${avData.inner}</div>
               ${badge}
             </div>
             <div class="row-body">
@@ -1907,6 +2119,7 @@
         $('chatList').classList.remove('hidden');
         $('chatView').classList.add('hidden');
       }
+      updateAppChrome();
     }
 
     async function loadMessages(opts = {}) {
@@ -3753,6 +3966,7 @@
       $('chatView').classList.remove('hidden');
       $('chatTitle').textContent = chatTitle(chat);
       $('chatSub').textContent = chat.type === 'group' ? 'группа ♡' : 'личный чат';
+      updateAppChrome();
       restoreChatComposerDraft(chat.id);
       if (!opts.skipHistory) {
         history.pushState(
@@ -3790,6 +4004,7 @@
       $('unreadJumpBtn')?.classList.add('hidden');
       $('chatList').classList.remove('hidden');
       $('chatView').classList.add('hidden');
+      updateAppChrome();
       refreshChatList();
     }
 
@@ -4282,16 +4497,17 @@
       videoRecTimer = null;
     }
 
-    $('logoutBtn').onclick = () => {
-      persistActiveChatDraft();
-      clearToken();
-      chatDrafts.clear();
-      localStorage.removeItem(DRAFTS_TEXT_LS);
-      if (ws) ws.close();
-      clearInterval(pollTimer);
-      cancelVoiceRecording();
-      cancelVideoRecording();
-      showLogin();
+    $('profileBtn').onclick = () => openProfileSheet();
+    $('profileClose').onclick = () => closeProfileSheet();
+    $('profileLogout').onclick = () => doLogout();
+    $('profileAvatarBtn').onclick = () => $('avatarInput').click();
+    $('avatarInput').onchange = (e) => {
+      const f = e.target.files?.[0];
+      e.target.value = '';
+      if (f) uploadAvatar(f);
+    };
+    $('profileSheet').onclick = (e) => {
+      if (e.target === $('profileSheet')) closeProfileSheet();
     };
     $('backBtn').onclick = (e) => { e.preventDefault(); userGoBack(); };
     $('editCancelBtn').onclick = (e) => { e.preventDefault(); cancelEdit(); };
@@ -4547,6 +4763,9 @@
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && !$('msgMenu').classList.contains('hidden')) {
         closeMsgMenu();
+      }
+      if (e.key === 'Escape' && !$('profileSheet').classList.contains('hidden')) {
+        closeProfileSheet();
       }
     });
 

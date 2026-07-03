@@ -15,6 +15,7 @@ import {
     findUserById,
     findUserByUsername,
     findChatById,
+    setUserAvatar,
     getOrCreateDm,
     getOrCreateMainGroup,
     listMessages,
@@ -94,7 +95,10 @@ const chatSockets = new Map();
 const socketMeta = new Map();
 
 function publicUser(user) {
-    return { id: user.id, username: user.username, displayName: user.displayName };
+    if (!user) return null;
+    const base = { id: user.id, username: user.username, displayName: user.displayName };
+    if (user.avatarFileId) base.avatarUrl = `/files/${user.avatarFileId}`;
+    return base;
 }
 
 function enrichMessage(msg, viewerId = null) {
@@ -348,6 +352,46 @@ app.get('/me', authMiddleware, (req, res) => {
         return;
     }
     res.json({ user: publicUser(user) });
+});
+
+app.post('/me/avatar', authMiddleware, (req, res, next) => {
+    upload.single('file')(req, res, (err) => {
+        if (err) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                res.status(413).json({ error: 'file_too_large' });
+                return;
+            }
+            next(err);
+            return;
+        }
+        next();
+    });
+}, (req, res) => {
+    if (!req.file) {
+        res.status(400).json({ error: 'no_file' });
+        return;
+    }
+    if (!String(req.file.mimetype || '').startsWith('image/')) {
+        res.status(400).json({ error: 'not_image' });
+        return;
+    }
+    try {
+        const stored = registerFile({
+            storedName: req.file.filename,
+            originalName: req.file.originalname,
+            mime: req.file.mimetype,
+            size: req.file.size,
+            uploaderId: req.userId,
+        });
+        const user = setUserAvatar(req.userId, stored.id);
+        res.json({ user: publicUser(user) });
+    } catch (e) {
+        if (e.message === 'user_not_found') {
+            res.status(404).json({ error: 'user_not_found' });
+            return;
+        }
+        throw e;
+    }
 });
 
 app.get('/chats', authMiddleware, (req, res) => {

@@ -74,10 +74,18 @@ export function findUserById(id) {
     return db.users.find((u) => u.id === id) || null;
 }
 
+export function setUserAvatar(userId, fileId) {
+    const user = db.users.find((u) => u.id === userId);
+    if (!user) throw new Error('user_not_found');
+    user.avatarFileId = fileId || null;
+    persist();
+    return user;
+}
+
 export function listUsersExcept(userId) {
     return db.users
         .filter((u) => u.id !== userId)
-        .map(({ id, username, displayName }) => ({ id, username, displayName }));
+        .map(({ id, username, displayName, avatarFileId }) => ({ id, username, displayName, avatarFileId }));
 }
 
 export function dmKey(a, b) {
