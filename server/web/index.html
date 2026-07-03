@@ -545,6 +545,58 @@
       display: flex; justify-content: flex-end; flex-wrap: wrap;
       margin-top: 3px; gap: 4px; align-items: center;
     }
+    .bubble.text-only {
+      padding: 0;
+      border-radius: 18px;
+    }
+    .bubble.text-only.mine {
+      border-radius: 18px 18px 4px 18px;
+    }
+    .bubble.text-only.theirs {
+      border-radius: 18px 18px 18px 4px;
+    }
+    .bubble.text-only .sender {
+      padding: 4px 10px 0;
+      margin-bottom: 0;
+    }
+    .msg-text-block {
+      padding: 5px 9px 5px 10px;
+      line-height: 1.35;
+      word-break: break-word;
+      font-size: 0.98rem;
+    }
+    .msg-inline-meta {
+      float: right;
+      clear: right;
+      margin: -1.05em 0 0 7px;
+      height: 1.05em;
+      display: inline-flex;
+      align-items: flex-end;
+      gap: 3px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .msg-inline-meta .msg-time {
+      font-size: 0.68rem;
+      color: rgba(92, 51, 71, 0.48);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      margin-right: 0;
+      line-height: 1;
+    }
+    .msg-inline-meta .edited-mark {
+      font-size: 0.62rem;
+      color: rgba(92, 51, 71, 0.42);
+      margin-right: 0;
+      line-height: 1;
+    }
+    .msg-inline-meta .ticks {
+      font-size: 0.72rem;
+      letter-spacing: -2px;
+      line-height: 1;
+      color: rgba(92, 51, 71, 0.42);
+    }
+    .msg-inline-meta .ticks.read { color: #2563eb; }
     .msg-time {
       font-size: 0.68rem; color: rgba(92, 51, 71, 0.48);
       font-variant-numeric: tabular-nums; white-space: nowrap;
@@ -1937,6 +1989,40 @@
       return parts.join('');
     }
 
+    function isPlainTextBubble(m) {
+      if (messageFiles(m).length) return false;
+      const kind = m.kind || 'text';
+      return !['voice', 'video_note', 'video', 'audio', 'image', 'file', 'album'].includes(kind);
+    }
+
+    function renderPlainTextBlock(m, mine) {
+      const text = m.text ? linkify(m.text) : '…';
+      const meta = renderMsgMeta(m, mine);
+      const metaHtml = meta ? `<span class="msg-inline-meta">${meta}</span>` : '';
+      return `<div class="msg-text-block">${metaHtml}${text}</div>`;
+    }
+
+    function applyMsgMetaToBubble(bubble, m, mine) {
+      const meta = renderMsgMeta(m, mine);
+      if (bubble.classList.contains('text-only')) {
+        const el = bubble.querySelector('.msg-inline-meta');
+        if (meta) {
+          const html = `<span class="msg-inline-meta">${meta}</span>`;
+          if (el) el.outerHTML = html;
+          else bubble.querySelector('.msg-text-block')?.insertAdjacentHTML('afterbegin', html);
+        } else {
+          el?.remove();
+        }
+        return;
+      }
+      const html = renderBubbleFoot(m, mine);
+      const foot = bubble.querySelector('.msg-foot');
+      if (html) {
+        if (foot) foot.outerHTML = html;
+        else bubble.insertAdjacentHTML('beforeend', html);
+      } else if (foot) foot.remove();
+    }
+
     function renderMsgMeta(m, mine) {
       const edited = m.editedAt
         ? `<span class="edited-mark" title="изменено">изм.</span>`
@@ -2229,7 +2315,9 @@
       const single = attachments[0];
       const sk = single ? attachmentKind(single) : m.kind;
       const allPhotos = multi && attachments.length > 0 && attachments.every(isImageAttachment);
-      const cap = m.text ? ' has-caption' : '';
+      const plainText = isPlainTextBubble(m) && !hasReactions(m);
+      const cap = (!plainText && m.text) ? ' has-caption' : '';
+      const textOnlyCls = plainText ? ' text-only' : '';
       const extraCls = multi
         ? (' has-album' + (allPhotos ? ' has-album-photos' : '') + cap)
         : (sk === 'video_note' ? (' has-video' + cap)
@@ -2239,7 +2327,10 @@
                 : (sk === 'image' ? (' has-image' + cap) : cap)))));
       const pendingCls = m._pending ? ' pending' : '';
       const reactCls = hasReactions(m) ? ' has-reactions' : '';
-      return `<div class="bubble ${mine ? 'mine' : 'theirs'}${extraCls}${reactCls}${pendingCls}">${sender}${renderMessageBody(m)}${renderBubbleFoot(m, mine)}</div>`;
+      const body = plainText
+        ? renderPlainTextBlock(m, mine)
+        : (renderMessageBody(m) + renderBubbleFoot(m, mine));
+      return `<div class="bubble ${mine ? 'mine' : 'theirs'}${extraCls}${textOnlyCls}${reactCls}${pendingCls}">${sender}${body}</div>`;
     }
 
     function renderMessageRowHtml(m) {
@@ -2493,12 +2584,7 @@
         if (m.senderId !== user.id) continue;
         const bubble = box.querySelector('.msg-row[data-id="' + m.id + '"] .bubble');
         if (!bubble) continue;
-        const html = renderBubbleFoot(m, true);
-        const foot = bubble.querySelector('.msg-foot');
-        if (html) {
-          if (foot) foot.outerHTML = html;
-          else bubble.insertAdjacentHTML('beforeend', html);
-        } else if (foot) foot.remove();
+        applyMsgMetaToBubble(bubble, m, true);
         bubble.classList.toggle('has-reactions', hasReactions(m));
       }
     }
