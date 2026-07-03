@@ -179,9 +179,7 @@
     }
     #profileClose {
       position: absolute; top: 12px; right: 12px;
-      width: 36px; height: 36px; border-radius: 50%;
-      border: none; background: rgba(255, 236, 244, 0.9);
-      color: #b07a94; font-size: 1rem; cursor: pointer;
+      width: 36px; height: 36px;
     }
     .profile-avatar-btn {
       width: 96px; height: 96px; border-radius: 50%;
@@ -199,17 +197,6 @@
     }
     #profileName {
       font-size: 1.15rem; font-weight: 700; color: #9d174d;
-    }
-    #profileLogout {
-      margin-top: 22px;
-      width: 100%;
-      background: transparent;
-      color: #e879a9;
-      border: 1px solid rgba(232, 121, 169, 0.35);
-      border-radius: 14px;
-      padding: 12px;
-      font-size: 1rem;
-      cursor: pointer;
     }
     .avatar-menu-card {
       padding: 22px 20px 16px;
@@ -288,22 +275,56 @@
       margin-top: auto;
     }
     .avatar-crop-actions button {
-      flex: 1;
-      border-radius: 14px;
-      padding: 12px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      width: 48px; height: 48px;
+      padding: 0;
       font-size: 1rem;
       cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
-    #avatarCropSave { background: #e879a9; color: #fff; border: none; }
-    #avatarCropCancel {
+    .avatar-crop-actions button svg { width: 22px; height: 22px; display: block; }
+    #avatarCropSave, #stickerCropSave, #stickerCropSend { background: #e879a9; color: #fff; border: none; }
+    #avatarCropCancel, #stickerCropCancel {
       background: transparent;
       color: #e879a9;
       border: 1px solid rgba(232, 121, 169, 0.35);
     }
+    #stickerCropSave { background: transparent; color: #e879a9; border: 1px solid rgba(232, 121, 169, 0.35); }
     button.icon {
       width: 44px; height: 44px; padding: 0; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
       font-size: 1.2rem; flex-shrink: 0;
+    }
+    button.icon svg { width: 22px; height: 22px; display: block; }
+    .ui-icon-btn {
+      width: 44px; height: 44px; padding: 0; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      border: none; background: rgba(255, 236, 244, 0.92); color: #9d174d;
+      cursor: pointer; flex-shrink: 0;
+    }
+    .ui-icon-btn svg { width: 22px; height: 22px; display: block; }
+    .ui-icon-btn:active { transform: scale(0.94); }
+    .ui-icon-btn.primary { background: #e879a9; color: #fff; }
+    .ui-icon-btn.danger { color: #e11d48; background: rgba(255, 236, 244, 0.92); }
+    .ui-icon-btn.ghost { background: transparent; color: #b07a94; }
+    .ui-icon-btn.outline {
+      background: transparent;
+      color: #e879a9;
+      border: 1px solid rgba(232, 121, 169, 0.35);
+    }
+    .ui-icon-row {
+      display: flex; gap: 10px; align-items: center; justify-content: center;
+      flex-wrap: wrap;
+    }
+    .msg-menu-icons { padding: 4px 2px 2px; }
+    .msg-menu-icons .ui-icon-btn { width: 42px; height: 42px; }
+    .icon-actions { justify-content: center; gap: 12px; }
+    .icon-actions .ui-icon-btn { flex: 0 0 auto; }
+    #profileLogout.ui-icon-btn {
+      width: 48px; height: 48px; margin: 22px auto 0;
     }
     button.icon.recording { background: #e11d48; color: #fff; animation: pulse 1s infinite; }
     button.icon.holding { background: #fce7f3; transform: scale(0.94); }
@@ -339,22 +360,22 @@
       font-size: 0.95rem;
     }
     .sticker-upload-btn {
+      width: 36px; height: 36px; padding: 0;
       border: none;
       background: rgba(249, 197, 223, 0.85);
       color: #9d174d;
-      font: inherit;
-      font-weight: 600;
-      font-size: 0.85rem;
-      padding: 7px 12px;
-      border-radius: 14px;
+      border-radius: 50%;
       cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
     }
+    .sticker-upload-btn svg { width: 20px; height: 20px; display: block; }
     .sticker-sheet-close {
       width: 34px; height: 34px;
       border: none; background: transparent;
-      color: #b07a94; font-size: 1.1rem;
-      cursor: pointer; border-radius: 50%;
+      color: #b07a94; cursor: pointer; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
     }
+    .sticker-sheet-close svg { width: 20px; height: 20px; display: block; }
     .sticker-grid {
       flex: 1 1 auto;
       min-height: 0;
@@ -1223,7 +1244,7 @@
       border: 1px solid rgba(252, 231, 243, 0.95);
       border-radius: 14px;
       box-shadow: 0 8px 28px rgba(92, 51, 71, 0.18);
-      padding: 8px; min-width: 190px;
+      padding: 8px; min-width: auto;
     }
     .msg-menu.hidden { display: none; }
     .msg-menu-reactions {
@@ -1245,6 +1266,10 @@
       display: block; width: 100%; text-align: left;
       padding: 10px 12px; background: transparent; color: #9d174d;
       border: none; border-radius: 10px; font-size: 0.95rem; cursor: pointer;
+    }
+    .msg-menu-actions.msg-menu-icons button {
+      display: inline-flex; width: 42px; height: 42px; padding: 0;
+      text-align: center; justify-content: center; align-items: center;
     }
     .msg-menu-actions button:active { background: rgba(255, 236, 244, 0.95); }
     .msg-menu-actions button.hidden { display: none; }
@@ -1822,7 +1847,9 @@
         </svg>
       </button>
     </header>
-    <p id="appErr" class="hidden"><span id="appErrText"></span><button type="button" id="appErrDismiss" class="secondary">✕</button></p>
+    <p id="appErr" class="hidden"><span id="appErrText"></span><button type="button" id="appErrDismiss" class="ui-icon-btn ghost secondary" title="Закрыть" aria-label="Закрыть">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button></p>
     <div id="chatList"></div>
     <div id="chatView" class="hidden">
       <header class="chat-header">
@@ -1871,13 +1898,19 @@
         <input id="fileInput" type="file" class="hidden" multiple />
         <button id="mediaBtn" type="button" class="icon secondary" title="Файл" aria-label="Файл"></button>
         <textarea id="msgInput" rows="1" placeholder="Сообщение…"></textarea>
-        <button id="sendBtn" class="icon">♡</button>
+        <button id="sendBtn" class="icon" type="button" title="Отправить" aria-label="Отправить">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-6.7-4.35-9.33-8.53C.88 9.45 2.06 5.8 5.62 5.18c2.06-.35 3.98.79 5.38 2.55 1.4-1.76 3.32-2.9 5.38-2.55 3.56.62 4.74 4.27 2.95 7.29C18.7 16.65 12 21 12 21z"/></svg>
+        </button>
       </div>
       <div id="stickerSheet" class="sticker-sheet hidden">
         <div class="sticker-sheet-head">
           <span class="sticker-sheet-title">мои стикеры</span>
-          <button type="button" id="stickerUploadBtn" class="sticker-upload-btn">+ загрузить</button>
-          <button type="button" id="stickerSheetClose" class="sticker-sheet-close" title="Закрыть" aria-label="Закрыть">✕</button>
+          <button type="button" id="stickerUploadBtn" class="sticker-upload-btn" title="Загрузить" aria-label="Загрузить">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <button type="button" id="stickerSheetClose" class="sticker-sheet-close" title="Закрыть" aria-label="Закрыть">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          </button>
         </div>
         <div id="stickerGrid" class="sticker-grid"></div>
         <div class="sticker-sheet-hint">нажми — отправить · зажми — обрезать или удалить</div>
@@ -1886,22 +1919,34 @@
   </div>
   <div id="profileSheet" class="profile-sheet hidden">
     <div class="profile-card">
-      <button type="button" id="profileClose" title="Закрыть" aria-label="Закрыть">✕</button>
+      <button type="button" id="profileClose" class="ui-icon-btn ghost" title="Закрыть" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
       <button type="button" id="profileAvatarBtn" class="profile-avatar-btn" title="Сменить фото">
         <img id="profileAvatarImg" class="hidden" alt="" />
         <span id="profileAvatarLetter">?</span>
       </button>
       <div id="profileName">Профиль</div>
       <input id="avatarInput" type="file" accept="image/*" class="hidden" />
-      <button type="button" id="profileLogout">выйти</button>
+      <button type="button" id="profileLogout" class="ui-icon-btn outline" title="Выйти" aria-label="Выйти">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+      </button>
     </div>
   </div>
   <div id="avatarMenuSheet" class="profile-sheet hidden">
     <div class="profile-card avatar-menu-card">
       <div class="avatar-menu-title">фото профиля</div>
-      <button type="button" id="avatarMenuPick" class="avatar-menu-btn">выбрать фото</button>
-      <button type="button" id="avatarMenuDelete" class="avatar-menu-btn danger hidden">удалить</button>
-      <button type="button" id="avatarMenuCancel" class="avatar-menu-btn secondary">отмена</button>
+      <div class="ui-icon-row">
+        <button type="button" id="avatarMenuPick" class="ui-icon-btn" title="Выбрать фото" aria-label="Выбрать фото">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+        </button>
+        <button type="button" id="avatarMenuDelete" class="ui-icon-btn danger hidden" title="Удалить" aria-label="Удалить">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>
+        </button>
+        <button type="button" id="avatarMenuCancel" class="ui-icon-btn ghost" title="Отмена" aria-label="Отмена">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
     </div>
   </div>
   <div id="avatarCropSheet" class="avatar-crop-sheet hidden">
@@ -1911,9 +1956,13 @@
     </div>
     <div class="avatar-crop-hint">двигай пальцем · ползунок — масштаб</div>
     <input type="range" id="avatarCropZoom" min="1" max="3" step="0.01" value="1" />
-    <div class="avatar-crop-actions">
-      <button type="button" id="avatarCropCancel">отмена</button>
-      <button type="button" id="avatarCropSave">готово</button>
+    <div class="avatar-crop-actions icon-actions">
+      <button type="button" id="avatarCropCancel" title="Отмена" aria-label="Отмена">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+      <button type="button" id="avatarCropSave" title="Готово" aria-label="Готово">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+      </button>
     </div>
   </div>
   <input id="stickerInput" type="file" accept="image/*" class="hidden" />
@@ -1939,20 +1988,33 @@
       </div>
     </div>
     <div class="avatar-crop-hint">тяни за края и углы · можно двигать рамку</div>
-    <div class="avatar-crop-actions">
-      <button type="button" id="stickerCropCancel">отмена</button>
-      <button type="button" id="stickerCropSave">готово</button>
+    <div class="avatar-crop-actions icon-actions">
+      <button type="button" id="stickerCropCancel" title="Отмена" aria-label="Отмена">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+      <button type="button" id="stickerCropSave" title="Сохранить" aria-label="Сохранить">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      </button>
+      <button type="button" id="stickerCropSend" class="hidden" title="Отправить" aria-label="Отправить">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+      </button>
     </div>
   </div>
   <div id="stickerManageMenu" class="msg-menu hidden" role="menu">
-    <div class="msg-menu-actions">
-      <button type="button" id="stickerManageCrop">обрезать</button>
-      <button type="button" id="stickerManageDelete" class="danger-text">удалить из набора</button>
+    <div class="msg-menu-actions msg-menu-icons ui-icon-row">
+      <button type="button" id="stickerManageCrop" class="ui-icon-btn" title="Обрезать" aria-label="Обрезать">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 2v4H2M18 22v-4h4M22 6h-4V2M2 18h4v4"/></svg>
+      </button>
+      <button type="button" id="stickerManageDelete" class="ui-icon-btn danger" title="Удалить из набора" aria-label="Удалить из набора">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>
+      </button>
     </div>
   </div>
   <div id="stickerChatMenu" class="msg-menu hidden" role="menu">
-    <div class="msg-menu-actions">
-      <button type="button" id="stickerChatAdd">добавить в мой набор</button>
+    <div class="msg-menu-actions msg-menu-icons ui-icon-row">
+      <button type="button" id="stickerChatAdd" class="ui-icon-btn" title="Добавить в мой набор" aria-label="Добавить в мой набор">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+      </button>
     </div>
   </div>
   <div id="msgMenu" class="msg-menu hidden" role="menu">
@@ -1966,9 +2028,13 @@
       <button type="button" data-reaction="kiss" title="поцелуй">💋</button>
       <button type="button" data-reaction="hot" title="жарко">🥵</button>
     </div>
-    <div class="msg-menu-actions">
-      <button type="button" id="msgMenuCopy" data-action="copy">копировать</button>
-      <button type="button" id="msgMenuEdit" data-action="edit">редактировать</button>
+    <div class="msg-menu-actions msg-menu-icons ui-icon-row">
+      <button type="button" id="msgMenuCopy" class="ui-icon-btn" data-action="copy" title="Копировать" aria-label="Копировать">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </button>
+      <button type="button" id="msgMenuEdit" class="ui-icon-btn" data-action="edit" title="Редактировать" aria-label="Редактировать">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      </button>
     </div>
   </div>
   <div id="voiceRecOverlay" class="rec-overlay hidden">
@@ -6800,12 +6866,11 @@
         stageH,
         scale,
         crop: { x: 0, y: 0, w: img.width, h: img.height },
-        sendAfter: Boolean(activeChat && !replaceStickerId),
       };
       const wrap = $('stickerCropWrap');
       wrap.style.width = stageW + 'px';
       wrap.style.height = stageH + 'px';
-      $('stickerCropSave').textContent = stickerCrop.sendAfter ? 'отправить' : 'готово';
+      $('stickerCropSend').classList.toggle('hidden', !(activeChat && !replaceStickerId));
       drawStickerCrop();
       syncStickerCropUi();
       closeStickerSheet();
@@ -6868,9 +6933,8 @@
       return api('/me/stickers', { method: 'POST', body: fd });
     }
 
-    async function saveStickerCrop() {
+    async function finishStickerCrop({ send = false } = {}) {
       try {
-        const sendAfter = stickerCrop?.sendAfter;
         const replaceId = stickerCropReplaceId;
         const { blob, mime } = await exportStickerCropBlob();
         const ext = mime === 'image/jpeg' ? '.jpg' : '.png';
@@ -6883,7 +6947,7 @@
         }
         closeStickerCrop();
         showAppErr('');
-        if (sendAfter && activeChat && sticker) {
+        if (send && activeChat && sticker) {
           await sendStickerMessage(sticker);
         } else {
           renderStickerGrid();
@@ -7072,7 +7136,8 @@
       if (file) openStickerCropFromFile(file);
     };
     $('stickerCropCancel').onclick = (e) => { e.preventDefault(); closeStickerCrop(); };
-    $('stickerCropSave').onclick = (e) => { e.preventDefault(); saveStickerCrop(); };
+    $('stickerCropSave').onclick = (e) => { e.preventDefault(); finishStickerCrop({ send: false }); };
+    $('stickerCropSend').onclick = (e) => { e.preventDefault(); finishStickerCrop({ send: true }); };
     $('stickerManageCrop').onclick = (e) => {
       e.preventDefault();
       const s = stickerManageTarget;
