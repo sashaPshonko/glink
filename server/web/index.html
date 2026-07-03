@@ -444,18 +444,16 @@
       pointer-events: auto;
       position: absolute;
       margin: 0;
-      top: 42%;
-      transform: translateY(-50%);
+      right: auto;
+      bottom: auto;
+      transform: none;
       transition: width 0.32s cubic-bezier(0.34, 1.12, 0.64, 1),
         height 0.32s cubic-bezier(0.34, 1.12, 0.64, 1);
     }
-    #videoNotePinHost .video-note.pin-mine {
-      right: max(10px, env(safe-area-inset-right, 0px));
-      left: auto;
-    }
-    #videoNotePinHost .video-note.pin-theirs {
-      left: max(10px, env(safe-area-inset-left, 0px));
-      right: auto;
+    #videoNotePinHost .video-note.pin-dragging {
+      transition: width 0.32s cubic-bezier(0.34, 1.12, 0.64, 1),
+        height 0.32s cubic-bezier(0.34, 1.12, 0.64, 1);
+      touch-action: none;
     }
     .video-note-placeholder {
       flex-shrink: 0;
@@ -1712,6 +1710,10 @@
     let pinnedVideoWrap = null;
     let pinnedVideoPlaceholder = null;
     let pinnedVideoOrigin = null;
+    let vnotePinDragged = false;
+    let vnotePinDrag = null;
+    const VNOTE_PIN_PAD = 8;
+    const VNOTE_PIN_DRAG_PX = 8;
     let videoRaf = null;
     let videoRafWrap = null;
     let videoRafVid = null;
@@ -4291,12 +4293,72 @@
       if (play) wrap.style.setProperty('--vnote-play', play);
     }
 
-    function pinVideoNoteToScreen(wrap) {
+    function getVideoNotePinHostRect() {
+      const el = $('videoNotePinHost');
+      return el ? el.getBoundingClientRect() : { left: 0, top: 0, width: 0, height: 0 };
+    }
+
+    function clampPin(n, min, max) {
+      return Math.max(min, Math.min(max, n));
+    }
+
+    function pinnedVideoNoteSize(wrap) {
+      return wrap.offsetWidth || parseFloat(getComputedStyle(wrap).width) || 200;
+    }
+
+    function clearPinnedVideoNoteStyle(wrap) {
+      wrap.style.left = '';
+      wrap.style.top = '';
+      wrap.style.right = '';
+      wrap.style.bottom = '';
+      wrap.style.transform = '';
+    }
+
+    function setPinnedVideoNotePosition(wrap, left, top) {
+      const host = getVideoNotePinHostRect();
+      const size = pinnedVideoNoteSize(wrap);
+      const maxLeft = Math.max(VNOTE_PIN_PAD, host.width - size - VNOTE_PIN_PAD);
+      const maxTop = Math.max(VNOTE_PIN_PAD, host.height - size - VNOTE_PIN_PAD);
+      const l = clampPin(left, VNOTE_PIN_PAD, maxLeft);
+      const t = clampPin(top, VNOTE_PIN_PAD, maxTop);
+      wrap.style.left = l + 'px';
+      wrap.style.top = t + 'px';
+      wrap.style.right = 'auto';
+      wrap.style.bottom = 'auto';
+      wrap.style.transform = 'none';
+    }
+
+    function setPinnedVideoNoteCenter(wrap, cx, cy) {
+      const host = getVideoNotePinHostRect();
+      const half = pinnedVideoNoteSize(wrap) / 2;
+      setPinnedVideoNotePosition(wrap, cx - host.left - half, cy - host.top - half);
+    }
+
+    function updatePinnedVideoNotePosition() {
+      const wrap = pinnedVideoWrap;
+      const ph = pinnedVideoPlaceholder;
+      if (!wrap || wrap.dataset.pinned !== '1' || !ph || vnotePinDragged) return;
+      const phRect = ph.getBoundingClientRect();
+      const host = getVideoNotePinHostRect();
+      const half = pinnedVideoNoteSize(wrap) / 2;
+      const cx = clampPin(
+        phRect.left + phRect.width / 2 - host.left,
+        half + VNOTE_PIN_PAD,
+        host.width - half - VNOTE_PIN_PAD,
+      );
+      const cy = clampPin(
+        phRect.top + phRect.height / 2 - host.top,
+        half + VNOTE_PIN_PAD,
+        host.height - half - VNOTE_PIN_PAD,
+      );
+      setPinnedVideoNotePosition(wrap, cx - half, cy - half);
+    }
+
+    function pinVideoNoteToScreen(wrap, anchorCx, anchorCy) {
       if (!wrap || wrap.classList.contains('review-video-note') || wrap.dataset.pinned === '1') return;
       const host = $('videoNotePinHost');
       if (!host) return;
       copyVideoNoteSizeVars(wrap);
-      const mine = wrap.closest('.msg-row')?.classList.contains('mine');
       const idle = getComputedStyle(wrap).getPropertyValue('--vnote-idle').trim() || '200px';
       const ph = document.createElement('div');
       ph.className = 'video-note-placeholder';
@@ -4308,15 +4370,20 @@
       host.appendChild(wrap);
       wrap.dataset.pinned = '1';
       wrap.classList.add('pin-screen');
-      wrap.classList.toggle('pin-mine', !!mine);
-      wrap.classList.toggle('pin-theirs', !mine);
       pinnedVideoWrap = wrap;
+      vnotePinDragged = false;
+      vnotePinDrag = null;
+      setPinnedVideoNoteCenter(wrap, anchorCx, anchorCy);
     }
 
     function unpinVideoNoteFromScreen(wrap = pinnedVideoWrap) {
       if (!wrap || wrap.dataset.pinned !== '1') return;
-      wrap.classList.remove('pin-screen', 'pin-mine', 'pin-theirs');
+      wrap.classList.remove('pin-screen', 'pin-dragging');
       delete wrap.dataset.pinned;
+      delete wrap.dataset.vnotePlayReady;
+      clearPinnedVideoNoteStyle(wrap);
+      vnotePinDragged = false;
+      vnotePinDrag = null;
       const parent = pinnedVideoOrigin?.parent;
       if (parent?.isConnected) {
         parent.insertBefore(wrap, pinnedVideoPlaceholder || pinnedVideoOrigin?.next || null);
@@ -4342,11 +4409,89 @@
 
     function beginVideoNotePlay(wrap, vid) {
       wrap.dataset.vnotePlayed = '1';
+      if (wrap.dataset.vnotePlayReady === '1') {
+        updateVideoRing(wrap, vid);
+        return;
+      }
       measureVideoNoteCaps(wrap);
-      if (!wrap.classList.contains('review-video-note')) pinVideoNoteToScreen(wrap);
+      let anchorCx = 0;
+      let anchorCy = 0;
+      if (!wrap.classList.contains('review-video-note')) {
+        const rect = wrap.getBoundingClientRect();
+        anchorCx = rect.left + rect.width / 2;
+        anchorCy = rect.top + rect.height / 2;
+        if (wrap.dataset.pinned !== '1') pinVideoNoteToScreen(wrap, anchorCx, anchorCy);
+      }
       wrap.classList.add('playing');
+      wrap.dataset.vnotePlayReady = '1';
       initVideoRing(wrap);
       updateVideoRing(wrap, vid);
+      if (wrap.dataset.pinned === '1') {
+        requestAnimationFrame(() => {
+          setPinnedVideoNoteCenter(wrap, anchorCx, anchorCy);
+          requestAnimationFrame(() => updatePinnedVideoNotePosition());
+        });
+      }
+    }
+
+    function handlePinnedVideoPointerDown(wrap, vid, src, e) {
+      if (isOnVideoRing(wrap, e.clientX, e.clientY)) {
+        wrap.setPointerCapture(e.pointerId);
+        wrap.classList.add('seeking');
+        wrap.dataset.seeking = '1';
+        seekVideoNote(wrap, vid, e.clientX, e.clientY);
+        playVideoNote(wrap, vid, src);
+        return;
+      }
+      vnotePinDrag = {
+        wrap,
+        vid,
+        src,
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        origLeft: parseFloat(wrap.style.left) || 0,
+        origTop: parseFloat(wrap.style.top) || 0,
+        moved: false,
+      };
+      wrap.setPointerCapture(e.pointerId);
+    }
+
+    function handlePinnedVideoPointerMove(wrap, e) {
+      if (wrap.dataset.seeking === '1') {
+        seekVideoNote(wrap, wrap.querySelector('video'), e.clientX, e.clientY);
+        return;
+      }
+      if (!vnotePinDrag || vnotePinDrag.wrap !== wrap) return;
+      const dx = e.clientX - vnotePinDrag.startX;
+      const dy = e.clientY - vnotePinDrag.startY;
+      if (!vnotePinDrag.moved && Math.hypot(dx, dy) >= VNOTE_PIN_DRAG_PX) {
+        vnotePinDrag.moved = true;
+        vnotePinDragged = true;
+        wrap.classList.add('pin-dragging');
+      }
+      if (vnotePinDrag.moved) {
+        setPinnedVideoNotePosition(wrap, vnotePinDrag.origLeft + dx, vnotePinDrag.origTop + dy);
+      }
+    }
+
+    function handlePinnedVideoPointerUp(wrap, vid, src, e) {
+      if (wrap.dataset.seeking === '1') {
+        if (e?.pointerId != null && wrap.hasPointerCapture?.(e.pointerId)) {
+          wrap.releasePointerCapture(e.pointerId);
+        }
+        wrap.dataset.seeking = '';
+        wrap.classList.remove('seeking');
+        return;
+      }
+      const drag = vnotePinDrag?.wrap === wrap ? vnotePinDrag : null;
+      if (drag) {
+        if (wrap.hasPointerCapture?.(drag.pointerId)) wrap.releasePointerCapture(drag.pointerId);
+        const tapped = !drag.moved;
+        vnotePinDrag = null;
+        wrap.classList.remove('pin-dragging');
+        if (tapped) toggleVideoNote(wrap, vid, src);
+      }
     }
 
     function wireVideoNotePlayback(wrap, vid, trackFn = trackVideoProgress) {
@@ -4391,6 +4536,7 @@
     function hookVideoProgress(wrap, vid) {
       primeVideoNotePreview(vid, wrap);
       vid.onpause = () => {
+        delete wrap.dataset.vnotePlayReady;
         wrap.classList.remove('playing');
         unpinVideoNoteFromScreen(wrap);
         stopVideoRaf();
@@ -4436,6 +4582,11 @@
         wrap.addEventListener('pointerdown', (e) => {
           if (e.pointerType === 'mouse' && e.button !== 0) return;
           e.preventDefault();
+          e.stopPropagation();
+          if (wrap.dataset.pinned === '1') {
+            handlePinnedVideoPointerDown(wrap, vid, src, e);
+            return;
+          }
           if (isOnVideoRing(wrap, e.clientX, e.clientY)) {
             wrap.setPointerCapture(e.pointerId);
             wrap.classList.add('seeking');
@@ -4448,11 +4599,19 @@
         });
 
         wrap.addEventListener('pointermove', (e) => {
+          if (wrap.dataset.pinned === '1') {
+            handlePinnedVideoPointerMove(wrap, e);
+            return;
+          }
           if (wrap.dataset.seeking !== '1') return;
           seekVideoNote(wrap, vid, e.clientX, e.clientY);
         });
 
         const endSeek = (e) => {
+          if (wrap.dataset.pinned === '1') {
+            handlePinnedVideoPointerUp(wrap, vid, src, e);
+            return;
+          }
           if (wrap.dataset.seeking !== '1') return;
           if (e?.pointerId != null && wrap.hasPointerCapture?.(e.pointerId)) {
             wrap.releasePointerCapture(e.pointerId);
@@ -5935,6 +6094,7 @@
 
     const messagesEl = $('messages');
     messagesEl.addEventListener('scroll', () => {
+      updatePinnedVideoNotePosition();
       if (suppressScrollTrack || !activeChat) return;
       markUserScrolling();
       touchChatActivity();
@@ -6080,9 +6240,18 @@
       }
     });
 
-    window.addEventListener('resize', () => scheduleVideoNoteCaps(), { passive: true });
+    window.addEventListener('resize', () => {
+      scheduleVideoNoteCaps();
+      updatePinnedVideoNotePosition();
+    }, { passive: true });
     if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', () => scheduleVideoNoteCaps(), { passive: true });
+      window.visualViewport.addEventListener('resize', () => {
+        scheduleVideoNoteCaps();
+        updatePinnedVideoNotePosition();
+      }, { passive: true });
+      window.visualViewport.addEventListener('scroll', () => {
+        updatePinnedVideoNotePosition();
+      }, { passive: true });
     }
 
     (async () => {
