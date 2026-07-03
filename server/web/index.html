@@ -1314,7 +1314,6 @@
     .vid-ring-track { display: none; }
     .vid-ring-fill {
       fill: none; stroke: #e879a9; stroke-width: 4; stroke-linecap: butt;
-      transform: rotate(-90deg); transform-origin: 100px 100px;
       transition: none;
       opacity: 0;
     }
@@ -1563,8 +1562,8 @@
     <div id="videoRecReview" class="rec-stage hidden">
       <div id="videoReviewNote" class="video-note review-video-note">
         <svg class="vid-ring" viewBox="0 0 200 200" aria-hidden="true">
-          <circle class="vid-ring-track" cx="100" cy="100" r="96"/>
-          <circle class="vid-ring-fill" cx="100" cy="100" r="96"/>
+          <circle class="vid-ring-track" cx="100" cy="100" r="94"/>
+          <path class="vid-ring-fill" d="M 100 6 A 94 94 0 1 1 99.999 6"/>
         </svg>
         <div class="video-note-hole">
           <video id="videoRecPlayback" playsinline webkit-playsinline preload="auto"></video>
@@ -2263,7 +2262,7 @@
         return `<div class="video-note" data-src="${rawSrc}">` +
           `<svg class="vid-ring" viewBox="0 0 200 200" aria-hidden="true">` +
           `<circle class="vid-ring-track" cx="100" cy="100" r="${VID_RING_R}"/>` +
-          `<circle class="vid-ring-fill" cx="100" cy="100" r="${VID_RING_R}"/>` +
+          `<path class="vid-ring-fill" d="${VID_RING_PATH}"/>` +
           `</svg><div class="video-note-hole">` +
           `<video playsinline webkit-playsinline muted preload="auto" src="${src}"></video>` +
           `<div class="vid-badge">▶</div></div></div>`;
@@ -3583,8 +3582,9 @@
       }
     }
 
-    const VID_RING_R = 96;
+    const VID_RING_R = 94;
     const VID_RING_LEN = 2 * Math.PI * VID_RING_R;
+    const VID_RING_PATH = `M 100 ${100 - VID_RING_R} A ${VID_RING_R} ${VID_RING_R} 0 1 1 99.999 ${100 - VID_RING_R}`;
     const VIDEO_NOTE_PREVIEW_SEC = 1;
 
     function videoNoteMediaSrc(url) {
@@ -3948,25 +3948,44 @@
       const ring = wrap.querySelector('.vid-ring-fill');
       if (!ring || ring.dataset.ready) return;
       ring.dataset.ready = '1';
-      ring.style.strokeDasharray = String(VID_RING_LEN);
-      ring.style.strokeDashoffset = String(VID_RING_LEN);
+      if (ring.tagName === 'PATH' && !ring.getAttribute('d')) {
+        ring.setAttribute('d', VID_RING_PATH);
+      }
+      const len = ring.getTotalLength?.() || VID_RING_LEN;
+      ring.dataset.len = String(len);
+      ring.setAttribute('stroke-dasharray', String(len));
+      ring.setAttribute('stroke-dashoffset', String(len));
+    }
+
+    function videoRingLen(ring) {
+      if (!ring) return VID_RING_LEN;
+      const stored = Number(ring.dataset.len);
+      if (stored > 0) return stored;
+      const len = ring.getTotalLength?.() || VID_RING_LEN;
+      ring.dataset.len = String(len);
+      return len;
+    }
+
+    function setVideoRingOffset(ring, offset) {
+      ring.setAttribute('stroke-dashoffset', String(offset));
     }
 
     function updateVideoRing(wrap, vid) {
       const ring = wrap.querySelector('.vid-ring-fill');
       if (!ring || !vid) return;
+      const len = videoRingLen(ring);
       const dur = videoNoteDuration(vid);
       if (!dur) {
         if (wrap.classList.contains('playing') || wrap.classList.contains('seeking')) {
           ring.style.opacity = '1';
-          ring.style.strokeDashoffset = String(VID_RING_LEN * 0.985);
+          setVideoRingOffset(ring, len * 0.985);
         }
         return;
       }
       const pct = Math.min(1, Math.max(0, vid.currentTime / dur));
       ring.style.opacity = '1';
-      ring.style.strokeLinecap = pct >= 0.995 ? 'round' : 'butt';
-      ring.style.strokeDashoffset = String(VID_RING_LEN * (1 - pct));
+      ring.setAttribute('stroke-linecap', pct >= 0.995 ? 'round' : 'butt');
+      setVideoRingOffset(ring, len * (1 - pct));
       wrap.classList.toggle('viewed', pct > 0.005);
     }
 
@@ -4094,7 +4113,7 @@
           if (activeVideoEl === vid) activeVideoEl = null;
           wrap.classList.add('viewed');
           const ring = wrap.querySelector('.vid-ring-fill');
-          if (ring) ring.style.strokeDashoffset = '0';
+          if (ring) setVideoRingOffset(ring, 0);
           seekVideoNotePreview(vid);
         };
       });
@@ -4332,7 +4351,7 @@
         stopVideoReviewRaf();
         wrap.classList.add('viewed');
         const ring = wrap.querySelector('.vid-ring-fill');
-        if (ring) ring.style.strokeDashoffset = '0';
+        if (ring) setVideoRingOffset(ring, 0);
         seekVideoNotePreview(vid);
       };
 
@@ -4412,7 +4431,8 @@
         const ring = wrap.querySelector('.vid-ring-fill');
         if (ring) {
           delete ring.dataset.ready;
-          ring.style.strokeDashoffset = String(VID_RING_LEN);
+          delete ring.dataset.len;
+          setVideoRingOffset(ring, videoRingLen(ring));
         }
       }
       if (pb) {
