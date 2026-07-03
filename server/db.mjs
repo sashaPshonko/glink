@@ -13,6 +13,7 @@ const empty = () => ({
     chats: [],
     messages: [],
     files: [],
+    stickerPacks: {},
 });
 
 export function readDb() {
@@ -24,6 +25,7 @@ export function readDb() {
     }
     const db = JSON.parse(readFileSync(DB_FILE, 'utf8'));
     if (!db.files) db.files = [];
+    if (!db.stickerPacks) db.stickerPacks = {};
     return db;
 }
 
@@ -152,6 +154,7 @@ export function messagePreview(msg) {
     if (msg.kind === 'image') return msg.text ? `📷 ${msg.text}` : '📷 фото';
     if (msg.kind === 'voice') return '🎤 голосовое';
     if (msg.kind === 'video_note') return '🎬 кружок';
+    if (msg.kind === 'sticker') return '🎭 стикер';
     if (msg.kind === 'video') return msg.file?.name ? `🎬 ${msg.file.name}` : '🎬 видео';
     if (msg.kind === 'audio') return msg.file?.name ? `🎵 ${msg.file.name}` : '🎵 аудио';
     if (msg.kind === 'file') return `📎 ${msg.file?.name || 'файл'}`;
@@ -456,4 +459,58 @@ export function readStatusFor(message, chat, viewerId) {
     const others = (chat?.memberIds || []).filter((id) => id !== viewerId);
     if (!others.length) return 'sent';
     return others.some((id) => readBy.includes(id)) ? 'read' : 'sent';
+}
+
+const MAX_STICKERS_PER_USER = 200;
+
+function ensureStickerPacks() {
+    if (!db.stickerPacks) db.stickerPacks = {};
+}
+
+export function listUserStickers(userId) {
+    ensureStickerPacks();
+    return [...(db.stickerPacks[userId] || [])].sort(
+        (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt),
+    );
+}
+
+export function findUserSticker(userId, stickerId) {
+    ensureStickerPacks();
+    return db.stickerPacks[userId]?.find((s) => s.id === stickerId) || null;
+}
+
+export function addUserSticker(userId, fileId) {
+    ensureStickerPacks();
+    if (!fileId) throw new Error('invalid_file');
+    if (!db.stickerPacks[userId]) db.stickerPacks[userId] = [];
+    const pack = db.stickerPacks[userId];
+    if (pack.some((s) => s.fileId === fileId)) throw new Error('duplicate_sticker');
+    if (pack.length >= MAX_STICKERS_PER_USER) throw new Error('sticker_pack_full');
+    const entry = {
+        id: randomUUID(),
+        fileId: String(fileId),
+        createdAt: new Date().toISOString(),
+    };
+    pack.push(entry);
+    persist();
+    return entry;
+}
+
+export function updateUserStickerFile(userId, stickerId, fileId) {
+    ensureStickerPacks();
+    const entry = findUserSticker(userId, stickerId);
+    if (!entry) throw new Error('sticker_not_found');
+    entry.fileId = String(fileId);
+    persist();
+    return entry;
+}
+
+export function removeUserSticker(userId, stickerId) {
+    ensureStickerPacks();
+    const pack = db.stickerPacks[userId] || [];
+    const idx = pack.findIndex((s) => s.id === stickerId);
+    if (idx < 0) throw new Error('sticker_not_found');
+    const [removed] = pack.splice(idx, 1);
+    persist();
+    return removed;
 }

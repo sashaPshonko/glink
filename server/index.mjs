@@ -27,6 +27,11 @@ import {
     readStatusFor,
     toggleMessageReaction,
     userInChat,
+    listUserStickers,
+    findUserSticker,
+    addUserSticker,
+    updateUserStickerFile,
+    removeUserSticker,
 } from './db.mjs';
 import {
     authMiddleware,
@@ -417,6 +422,150 @@ app.delete('/me/avatar', authMiddleware, (req, res) => {
     }
 });
 
+function enrichSticker(entry) {
+    const file = getFileRecord(entry.fileId);
+    if (!file) return null;
+    return {
+        id: entry.id,
+        fileId: entry.fileId,
+        createdAt: entry.createdAt,
+        fileUrl: `/files/${entry.fileId}`,
+        mime: file.mime,
+    };
+}
+
+app.get('/me/stickers', authMiddleware, (req, res) => {
+    const stickers = listUserStickers(req.userId)
+        .map(enrichSticker)
+        .filter(Boolean);
+    res.json({ stickers });
+});
+
+app.post('/me/stickers', authMiddleware, (req, res, next) => {
+    upload.single('file')(req, res, (err) => {
+        if (err) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                res.status(413).json({ error: 'file_too_large' });
+                return;
+            }
+            next(err);
+            return;
+        }
+        next();
+    });
+}, (req, res) => {
+    if (!req.file) {
+        res.status(400).json({ error: 'no_file' });
+        return;
+    }
+    if (!String(req.file.mimetype || '').startsWith('image/')) {
+        res.status(400).json({ error: 'not_image' });
+        return;
+    }
+    try {
+        const stored = registerFile({
+            storedName: req.file.filename,
+            originalName: req.file.originalname || 'sticker.png',
+            mime: req.file.mimetype,
+            size: req.file.size,
+            uploaderId: req.userId,
+        });
+        const entry = addUserSticker(req.userId, stored.id);
+        const sticker = enrichSticker(entry);
+        res.json({ sticker });
+    } catch (e) {
+        if (e.message === 'duplicate_sticker') {
+            res.status(409).json({ error: 'duplicate_sticker' });
+            return;
+        }
+        if (e.message === 'sticker_pack_full') {
+            res.status(400).json({ error: 'sticker_pack_full' });
+            return;
+        }
+        throw e;
+    }
+});
+
+app.patch('/me/stickers/:stickerId', authMiddleware, (req, res, next) => {
+    upload.single('file')(req, res, (err) => {
+        if (err) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                res.status(413).json({ error: 'file_too_large' });
+                return;
+            }
+            next(err);
+            return;
+        }
+        next();
+    });
+}, (req, res) => {
+    if (!req.file) {
+        res.status(400).json({ error: 'no_file' });
+        return;
+    }
+    if (!String(req.file.mimetype || '').startsWith('image/')) {
+        res.status(400).json({ error: 'not_image' });
+        return;
+    }
+    try {
+        const stored = registerFile({
+            storedName: req.file.filename,
+            originalName: req.file.originalname || 'sticker.png',
+            mime: req.file.mimetype,
+            size: req.file.size,
+            uploaderId: req.userId,
+        });
+        const entry = updateUserStickerFile(req.userId, req.params.stickerId, stored.id);
+        res.json({ sticker: enrichSticker(entry) });
+    } catch (e) {
+        if (e.message === 'sticker_not_found') {
+            res.status(404).json({ error: 'sticker_not_found' });
+            return;
+        }
+        throw e;
+    }
+});
+
+app.delete('/me/stickers/:stickerId', authMiddleware, (req, res) => {
+    try {
+        removeUserSticker(req.userId, req.params.stickerId);
+        res.json({ ok: true });
+    } catch (e) {
+        if (e.message === 'sticker_not_found') {
+            res.status(404).json({ error: 'sticker_not_found' });
+            return;
+        }
+        throw e;
+    }
+});
+
+app.post('/me/stickers/import', authMiddleware, (req, res) => {
+    const fileId = String(req.body?.fileId || '');
+    if (!fileId) {
+        res.status(400).json({ error: 'invalid_file' });
+        return;
+    }
+    const file = getFileRecord(fileId);
+    if (!file || !String(file.mime).startsWith('image/')) {
+        res.status(400).json({ error: 'not_sticker' });
+        return;
+    }
+    try {
+        const entry = addUserSticker(req.userId, fileId);
+        res.json({ sticker: enrichSticker(entry) });
+    } catch (e) {
+        if (e.message === 'duplicate_sticker') {
+            res.status(409).json({ error: 'duplicate_sticker' });
+            return;
+        }
+        if (e.message === 'sticker_pack_full') {
+            res.status(400).json({ error: 'sticker_pack_full' });
+            return;
+        }
+        throw e;
+    }
+});
+
 app.get('/chats', authMiddleware, (req, res) => {
     res.json({ chats: buildChatList(req.userId) });
 });
@@ -543,6 +692,34 @@ app.post('/chats/:chatId/messages', authMiddleware, maybeUpload, (req, res) => {
                     senderId: req.userId,
                     text: req.body?.text,
                     files: storedFiles,
+                }),
+                req.userId,
+            );
+        } else if (req.body?.fileId) {
+            const fileRec = getFileRecord(String(req.body.fileId));
+            if (!fileRec) {
+                res.status(400).json({ error: 'invalid_file' });
+                return;
+            }
+            const kind = String(req.body.kind || '') === 'sticker'
+                ? 'sticker'
+                : guessKind(fileRec.mime, req.body.kind);
+            if (kind === 'sticker' && !String(fileRec.mime).startsWith('image/')) {
+                res.status(400).json({ error: 'not_sticker' });
+                return;
+            }
+            message = enrichMessage(
+                addMessage({
+                    chatId,
+                    senderId: req.userId,
+                    kind,
+                    file: {
+                        id: fileRec.id,
+                        name: fileRec.originalName,
+                        mime: fileRec.mime,
+                        size: fileRec.size,
+                        kind,
+                    },
                 }),
                 req.userId,
             );

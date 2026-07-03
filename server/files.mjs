@@ -25,6 +25,7 @@ export function guessKind(mime, hint = '') {
     if (h === 'file') return 'file';
     if (h === 'video_note') return 'video_note';
     if (h === 'voice') return 'voice';
+    if (h === 'sticker') return 'sticker';
     if (h === 'audio') return 'audio';
     if (h === 'video') return 'video';
     if (h === 'image') return 'image';

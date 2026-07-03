@@ -310,6 +310,146 @@
     #mediaBtn { touch-action: none; user-select: none; -webkit-user-select: none; }
     #mediaBtn .media-icon { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; }
     #mediaBtn .media-icon svg { width: 100%; height: 100%; display: block; }
+    .sticker-sheet {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      z-index: 40;
+      background: rgba(255, 236, 244, 0.98);
+      border-top: 1px solid rgba(252, 231, 243, 0.95);
+      max-height: min(52vh, 360px);
+      display: flex;
+      flex-direction: column;
+      border-radius: 18px 18px 0 0;
+      box-shadow: 0 -8px 28px rgba(92, 51, 71, 0.14);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .sticker-sheet.hidden { display: none !important; }
+    .sticker-sheet-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px 8px;
+      flex-shrink: 0;
+    }
+    .sticker-sheet-title {
+      flex: 1;
+      font-weight: 700;
+      color: #9d174d;
+      font-size: 0.95rem;
+    }
+    .sticker-upload-btn {
+      border: none;
+      background: rgba(249, 197, 223, 0.85);
+      color: #9d174d;
+      font: inherit;
+      font-weight: 600;
+      font-size: 0.85rem;
+      padding: 7px 12px;
+      border-radius: 14px;
+      cursor: pointer;
+    }
+    .sticker-sheet-close {
+      width: 34px; height: 34px;
+      border: none; background: transparent;
+      color: #b07a94; font-size: 1.1rem;
+      cursor: pointer; border-radius: 50%;
+    }
+    .sticker-grid {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+      gap: 8px;
+      padding: 4px 12px 10px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .sticker-grid-empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      color: #b07a94;
+      font-size: 0.9rem;
+      padding: 24px 12px;
+    }
+    .sticker-grid-item {
+      aspect-ratio: 1;
+      border: none;
+      background: rgba(255, 255, 255, 0.72);
+      border-radius: 14px;
+      padding: 6px;
+      cursor: pointer;
+      touch-action: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 4px rgba(92, 51, 71, 0.08);
+    }
+    .sticker-grid-item.holding {
+      transform: scale(0.94);
+      background: rgba(249, 197, 223, 0.55);
+    }
+    .sticker-grid-item img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+      display: block;
+    }
+    .sticker-sheet-hint {
+      flex-shrink: 0;
+      text-align: center;
+      font-size: 0.72rem;
+      color: #b07a94;
+      padding: 0 12px 10px;
+    }
+    .sticker-crop-stage {
+      border-radius: 16px;
+    }
+    .bubble.has-sticker {
+      padding: 0;
+      background: transparent !important;
+      border: none !important;
+      border-radius: 0;
+      overflow: visible;
+    }
+    .bubble.has-sticker:not(.has-caption):not(.has-reactions) {
+      position: relative;
+    }
+    .msg-sticker img {
+      width: 168px;
+      height: 168px;
+      object-fit: contain;
+      display: block;
+      cursor: context-menu;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .msg-sticker.opacity-60 { opacity: 0.6; }
+    .bubble.has-sticker:not(.has-caption) .msg-foot {
+      position: absolute;
+      right: 4px;
+      bottom: 2px;
+      left: auto;
+      margin: 0;
+      padding: 2px 7px;
+      border-radius: 10px;
+      background: rgba(28, 20, 24, 0.42);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      pointer-events: none;
+    }
+    .bubble.has-sticker:not(.has-caption) .msg-foot .msg-time,
+    .bubble.has-sticker:not(.has-caption) .msg-foot .edited-mark,
+    .bubble.has-sticker:not(.has-caption) .msg-foot .ticks {
+      color: rgba(255, 255, 255, 0.9);
+    }
+    .bubble.has-sticker.has-reactions:not(.has-caption) {
+      padding: 0 6px 6px;
+      background: rgba(249, 197, 223, 0.55) !important;
+      border-radius: 18px;
+    }
+    .msg-menu-actions button.danger-text { color: #e11d48; }
     @keyframes pulse { 50% { opacity: 0.7; } }
     #login {
       flex: 1;
@@ -1637,6 +1777,15 @@
         <textarea id="msgInput" rows="1" placeholder="Сообщение…"></textarea>
         <button id="sendBtn" class="icon">♡</button>
       </div>
+      <div id="stickerSheet" class="sticker-sheet hidden">
+        <div class="sticker-sheet-head">
+          <span class="sticker-sheet-title">мои стикеры</span>
+          <button type="button" id="stickerUploadBtn" class="sticker-upload-btn">+ загрузить</button>
+          <button type="button" id="stickerSheetClose" class="sticker-sheet-close" title="Закрыть" aria-label="Закрыть">✕</button>
+        </div>
+        <div id="stickerGrid" class="sticker-grid"></div>
+        <div class="sticker-sheet-hint">нажми — отправить · зажми — обрезать или удалить</div>
+      </div>
     </div>
   </div>
   <div id="profileSheet" class="profile-sheet hidden">
@@ -1669,6 +1818,30 @@
     <div class="avatar-crop-actions">
       <button type="button" id="avatarCropCancel">отмена</button>
       <button type="button" id="avatarCropSave">готово</button>
+    </div>
+  </div>
+  <input id="stickerInput" type="file" accept="image/*" class="hidden" />
+  <div id="stickerCropSheet" class="avatar-crop-sheet hidden">
+    <div class="avatar-crop-head">подгони стикер</div>
+    <div id="stickerCropStage" class="avatar-crop-stage sticker-crop-stage">
+      <canvas id="stickerCropCanvas"></canvas>
+    </div>
+    <div class="avatar-crop-hint">двигай пальцем · ползунок — масштаб</div>
+    <input type="range" id="stickerCropZoom" min="1" max="3" step="0.01" value="1" />
+    <div class="avatar-crop-actions">
+      <button type="button" id="stickerCropCancel">отмена</button>
+      <button type="button" id="stickerCropSave">готово</button>
+    </div>
+  </div>
+  <div id="stickerManageMenu" class="msg-menu hidden" role="menu">
+    <div class="msg-menu-actions">
+      <button type="button" id="stickerManageCrop">обрезать</button>
+      <button type="button" id="stickerManageDelete" class="danger-text">удалить из набора</button>
+    </div>
+  </div>
+  <div id="stickerChatMenu" class="msg-menu hidden" role="menu">
+    <div class="msg-menu-actions">
+      <button type="button" id="stickerChatAdd">добавить в мой набор</button>
     </div>
   </div>
   <div id="msgMenu" class="msg-menu hidden" role="menu">
@@ -1859,6 +2032,9 @@
       empty_message: 'сообщение не может быть пустым',
       too_many_files: 'слишком много файлов',
       invalid_file: 'не удалось обновить вложения',
+      duplicate_sticker: 'этот стикер уже в наборе',
+      sticker_pack_full: 'набор переполнен',
+      not_sticker: 'не подходит как стикер',
     };
 
     function errText(code) {
@@ -2438,6 +2614,14 @@
       if (kind === 'image' && url && !pending) {
         return `<img src="${url}" alt="фото" onclick="window.open(this.src,'_blank')" />`;
       }
+      if (kind === 'sticker' && url) {
+        const fid = escapeHtml(f.id || '');
+        const mid = escapeHtml(m?.id || '');
+        const pend = pending ? ' opacity-60' : '';
+        return `<div class="msg-sticker${pend}" data-file-id="${fid}" data-msg-id="${mid}">` +
+          `<img src="${url}" alt="стикер" draggable="false" /></div>`;
+      }
+      if (kind === 'sticker' && pending) return '<div class="album-pending">🎭</div>';
       if (kind === 'image' && pending) return '<div class="album-pending">📷</div>';
       if (kind === 'voice' && url && !pending) {
         const src = escapeHtml(url);
@@ -2545,7 +2729,7 @@
     function isPlainTextBubble(m) {
       if (messageFiles(m).length) return false;
       const kind = m.kind || 'text';
-      return !['voice', 'video_note', 'video', 'audio', 'image', 'file', 'album'].includes(kind);
+      return !['voice', 'video_note', 'video', 'audio', 'image', 'file', 'album', 'sticker'].includes(kind);
     }
 
     function useInlineTextMeta(m) {
@@ -2778,7 +2962,7 @@
     }
 
     function isMsgInteractiveTarget(el) {
-      return Boolean(el.closest('.voice-play, .video-note, .file-card, video, audio, img, a'));
+      return Boolean(el.closest('.voice-play, .video-note, .msg-sticker, .file-card, video, audio, img, a'));
     }
 
     function findMsgRowFromHit(e) {
@@ -2890,7 +3074,8 @@
           : (sk === 'video' ? (' has-media-video' + cap)
             : (sk === 'audio' ? (' has-media-audio' + cap)
               : (sk === 'voice' ? (' has-voice' + cap)
-                : (sk === 'image' ? (' has-image' + cap) : cap)))));
+                : (sk === 'sticker' ? (' has-sticker' + cap)
+                  : (sk === 'image' ? (' has-image' + cap) : cap))))));
       const pendingCls = m._pending ? ' pending' : '';
       const reactCls = hasReactions(m) ? ' has-reactions' : '';
       const body = plainText
@@ -3362,6 +3547,7 @@
       if (kind === 'image') return '📷 фото';
       if (kind === 'voice') return '🎤 голосовое';
       if (kind === 'video_note') return '⭕ кружок';
+      if (kind === 'sticker') return '🎭 стикер';
       if (kind === 'video') return '🎬 видео';
       if (kind === 'audio') return '🎵 аудио';
       if (kind === 'file') return '📎 ' + (m.file?.name || 'файл');
@@ -5731,6 +5917,7 @@
       pollTimer = null;
       cancelVoiceRecording();
       cancelVideoRecording();
+      closeStickerSheet();
       $('unreadJumpBtn')?.classList.add('hidden');
       $('chatList').classList.remove('hidden');
       $('chatView').classList.add('hidden');
@@ -5739,6 +5926,22 @@
     }
 
     function dismissUiLayers() {
+      if (!$('stickerCropSheet').classList.contains('hidden')) {
+        closeStickerCrop();
+        return true;
+      }
+      if (!$('stickerManageMenu').classList.contains('hidden')) {
+        closeStickerManageMenu();
+        return true;
+      }
+      if (!$('stickerChatMenu').classList.contains('hidden')) {
+        closeStickerChatMenu();
+        return true;
+      }
+      if (!$('stickerSheet').classList.contains('hidden')) {
+        closeStickerSheet();
+        return true;
+      }
       if (!$('avatarCropSheet').classList.contains('hidden')) {
         closeAvatarCrop();
         return true;
@@ -5846,6 +6049,7 @@
       bindChatActivity();
       try {
         await loadChats();
+        await loadMyStickers();
         await restoreActiveChat();
         if (!activeChat) {
           history.replaceState({ glink: 'list' }, '', location.pathname + location.search);
@@ -6349,16 +6553,440 @@
     $('fileInput').onchange = onFilePicked;
     document.addEventListener('paste', onPasteImage);
 
+    let myStickers = [];
+    let stickerCrop = null;
+    let stickerCropPan = null;
+    let stickerCropReplaceId = null;
+    let stickerManageTarget = null;
+    let stickerChatImport = null;
+    const STICKER_CROP_SIZE = 280;
+    const STICKER_EXPORT_SIZE = 512;
+    const STICKER_ITEM_HOLD_MS = 420;
+
+    async function loadMyStickers() {
+      try {
+        const data = await api('/me/stickers');
+        myStickers = data.stickers || [];
+      } catch (_) {
+        myStickers = [];
+      }
+      renderStickerGrid();
+    }
+
+    function renderStickerGrid() {
+      const grid = $('stickerGrid');
+      if (!grid) return;
+      if (!myStickers.length) {
+        grid.innerHTML = '<div class="sticker-grid-empty">пока пусто — загрузи первый стикер</div>';
+        return;
+      }
+      grid.innerHTML = myStickers.map((s) =>
+        `<button type="button" class="sticker-grid-item" data-id="${escapeHtml(s.id)}" data-file-id="${escapeHtml(s.fileId)}">` +
+        `<img src="${fileUrl(s.fileUrl)}" alt="" /></button>`,
+      ).join('');
+      grid.querySelectorAll('.sticker-grid-item').forEach(wireStickerGridItem);
+    }
+
+    function openStickerSheet() {
+      if (!activeChat) return;
+      renderStickerGrid();
+      $('stickerSheet').classList.remove('hidden');
+    }
+
+    function closeStickerSheet() {
+      $('stickerSheet').classList.add('hidden');
+      closeStickerManageMenu();
+    }
+
+    function closeStickerManageMenu() {
+      stickerManageTarget = null;
+      $('stickerManageMenu').classList.add('hidden');
+    }
+
+    function closeStickerChatMenu() {
+      stickerChatImport = null;
+      $('stickerChatMenu').classList.add('hidden');
+    }
+
+    function openStickerManageMenu(sticker, x, y) {
+      stickerManageTarget = sticker;
+      const menu = $('stickerManageMenu');
+      menu.classList.remove('hidden');
+      const pad = 8;
+      const rect = menu.getBoundingClientRect();
+      let left = x;
+      let top = y;
+      left = Math.max(pad, Math.min(left, window.innerWidth - rect.width - pad));
+      top = Math.max(pad, Math.min(top, window.innerHeight - rect.height - pad));
+      menu.style.left = left + 'px';
+      menu.style.top = top + 'px';
+    }
+
+    function openStickerChatMenu(fileId, msgId, x, y) {
+      stickerChatImport = { fileId, msgId };
+      const menu = $('stickerChatMenu');
+      menu.classList.remove('hidden');
+      const pad = 8;
+      const rect = menu.getBoundingClientRect();
+      let left = x;
+      let top = y;
+      left = Math.max(pad, Math.min(left, window.innerWidth - rect.width - pad));
+      top = Math.max(pad, Math.min(top, window.innerHeight - rect.height - pad));
+      menu.style.left = left + 'px';
+      menu.style.top = top + 'px';
+    }
+
+    function wireStickerGridItem(btn) {
+      if (btn.dataset.stickerWired) return;
+      btn.dataset.stickerWired = '1';
+      let holdTimer = null;
+      let holdFired = false;
+      const sticker = () => myStickers.find((s) => s.id === btn.dataset.id);
+
+      btn.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        holdFired = false;
+        btn.setPointerCapture(e.pointerId);
+        btn.classList.add('holding');
+        holdTimer = setTimeout(() => {
+          holdFired = true;
+          btn.classList.remove('holding');
+          const s = sticker();
+          if (s) openStickerManageMenu(s, e.clientX, e.clientY);
+        }, STICKER_ITEM_HOLD_MS);
+      });
+      const endHold = (e) => {
+        clearTimeout(holdTimer);
+        btn.classList.remove('holding');
+        if (e?.pointerId != null && btn.hasPointerCapture?.(e.pointerId)) {
+          btn.releasePointerCapture(e.pointerId);
+        }
+        if (!holdFired) {
+          const s = sticker();
+          if (s) sendStickerMessage(s);
+        }
+      };
+      btn.addEventListener('pointerup', endHold);
+      btn.addEventListener('pointercancel', () => {
+        holdFired = true;
+        clearTimeout(holdTimer);
+        btn.classList.remove('holding');
+      });
+    }
+
+    async function sendStickerMessage(sticker) {
+      if (!activeChat || !sticker?.fileId) return;
+      userPinnedBottom = true;
+      const pendingId = 'pending-' + Date.now();
+      appendMessage({
+        id: pendingId,
+        senderId: user.id,
+        kind: 'sticker',
+        text: '',
+        file: { id: sticker.fileId, name: 'sticker.png' },
+        files: [{ id: sticker.fileId, kind: 'sticker', fileUrl: sticker.fileUrl }],
+        fileUrl: sticker.fileUrl,
+        status: 'sent',
+        _pending: true,
+      }, { forceBottom: true });
+      closeStickerSheet();
+      try {
+        const data = await api('/chats/' + activeChat.id + '/messages', {
+          method: 'POST',
+          body: JSON.stringify({ fileId: sticker.fileId, kind: 'sticker' }),
+        });
+        replaceMessage(pendingId, data.message);
+        upsertActiveMessage(data.message);
+        refreshChatList();
+      } catch (e) {
+        removeMessage(pendingId);
+        showAppErr(e.message || 'не удалось отправить стикер');
+      }
+    }
+
+    async function importStickerToPack(fileId) {
+      if (!fileId) return;
+      try {
+        const data = await api('/me/stickers/import', {
+          method: 'POST',
+          body: JSON.stringify({ fileId }),
+        });
+        if (data.sticker) {
+          myStickers = myStickers.filter((s) => s.id !== data.sticker.id && s.fileId !== data.sticker.fileId);
+          myStickers.push(data.sticker);
+          renderStickerGrid();
+        }
+        showAppErr('');
+      } catch (e) {
+        showAppErr(e.message || 'не удалось добавить');
+      }
+    }
+
+    async function deleteStickerFromPack(stickerId) {
+      if (!stickerId) return;
+      try {
+        await api('/me/stickers/' + encodeURIComponent(stickerId), { method: 'DELETE' });
+        myStickers = myStickers.filter((s) => s.id !== stickerId);
+        renderStickerGrid();
+        closeStickerManageMenu();
+      } catch (e) {
+        showAppErr(e.message || 'не удалось удалить');
+      }
+    }
+
+    function stickerCropScale() {
+      if (!stickerCrop) return 1;
+      return stickerCrop.baseScale * stickerCrop.zoom;
+    }
+
+    function clampStickerCropPan() {
+      if (!stickerCrop) return;
+      const s = stickerCropScale();
+      const w = stickerCrop.img.width * s;
+      const h = stickerCrop.img.height * s;
+      const maxOx = Math.max(0, (w - STICKER_CROP_SIZE) / 2);
+      const maxOy = Math.max(0, (h - STICKER_CROP_SIZE) / 2);
+      stickerCrop.ox = Math.min(maxOx, Math.max(-maxOx, stickerCrop.ox));
+      stickerCrop.oy = Math.min(maxOy, Math.max(-maxOy, stickerCrop.oy));
+    }
+
+    function drawStickerCrop() {
+      if (!stickerCrop) return;
+      const canvas = $('stickerCropCanvas');
+      const size = STICKER_CROP_SIZE;
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, size, size);
+      const s = stickerCropScale();
+      const w = stickerCrop.img.width * s;
+      const h = stickerCrop.img.height * s;
+      ctx.drawImage(
+        stickerCrop.img,
+        size / 2 - w / 2 + stickerCrop.ox,
+        size / 2 - h / 2 + stickerCrop.oy,
+        w,
+        h,
+      );
+    }
+
+    function closeStickerCrop() {
+      if (stickerCrop?.blobUrl) URL.revokeObjectURL(stickerCrop.blobUrl);
+      stickerCrop = null;
+      stickerCropPan = null;
+      stickerCropReplaceId = null;
+      $('stickerCropSheet').classList.add('hidden');
+    }
+
+    function openStickerCropFromFile(file, replaceStickerId = null) {
+      if (!file || !String(file.type || '').startsWith('image/')) {
+        showAppErr('нужно фото');
+        return;
+      }
+      stickerCropReplaceId = replaceStickerId;
+      const blobUrl = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const baseScale = Math.max(STICKER_CROP_SIZE / img.width, STICKER_CROP_SIZE / img.height);
+        stickerCrop = { img, baseScale, zoom: 1, ox: 0, oy: 0, blobUrl };
+        $('stickerCropZoom').value = '1';
+        drawStickerCrop();
+        closeStickerSheet();
+        closeStickerManageMenu();
+        $('stickerCropSheet').classList.remove('hidden');
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(blobUrl);
+        showAppErr('не удалось открыть фото');
+      };
+      img.src = blobUrl;
+    }
+
+    function openStickerCropFromUrl(url, replaceStickerId) {
+      fetch(url).then((res) => {
+        if (!res.ok) throw new Error('fetch failed');
+        return res.blob();
+      }).then((blob) => {
+        openStickerCropFromFile(new File([blob], 'sticker.png', { type: blob.type || 'image/png' }), replaceStickerId);
+      }).catch(() => showAppErr('не удалось открыть стикер'));
+    }
+
+    function exportStickerCropBlob() {
+      return new Promise((resolve, reject) => {
+        if (!stickerCrop) {
+          reject(new Error('no crop'));
+          return;
+        }
+        const out = document.createElement('canvas');
+        out.width = STICKER_EXPORT_SIZE;
+        out.height = STICKER_EXPORT_SIZE;
+        const ctx = out.getContext('2d');
+        const ratio = STICKER_EXPORT_SIZE / STICKER_CROP_SIZE;
+        const s = stickerCropScale() * ratio;
+        const w = stickerCrop.img.width * s;
+        const h = stickerCrop.img.height * s;
+        ctx.drawImage(
+          stickerCrop.img,
+          STICKER_EXPORT_SIZE / 2 - w / 2 + stickerCrop.ox * ratio,
+          STICKER_EXPORT_SIZE / 2 - h / 2 + stickerCrop.oy * ratio,
+          w,
+          h,
+        );
+        out.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('export failed'));
+        }, 'image/png');
+      });
+    }
+
+    async function saveStickerCrop() {
+      try {
+        const blob = await exportStickerCropBlob();
+        const fd = new FormData();
+        fd.append('file', blob, 'sticker.png');
+        let data;
+        if (stickerCropReplaceId) {
+          data = await api('/me/stickers/' + encodeURIComponent(stickerCropReplaceId), {
+            method: 'PATCH',
+            body: fd,
+          });
+          myStickers = myStickers.map((s) => (s.id === data.sticker.id ? data.sticker : s));
+        } else {
+          data = await api('/me/stickers', { method: 'POST', body: fd });
+          myStickers.push(data.sticker);
+        }
+        renderStickerGrid();
+        closeStickerCrop();
+        showAppErr('');
+      } catch (e) {
+        showAppErr(e.message || 'не удалось сохранить');
+      }
+    }
+
+    $('stickerUploadBtn').onclick = (e) => { e.preventDefault(); $('stickerInput').click(); };
+    $('stickerSheetClose').onclick = (e) => { e.preventDefault(); closeStickerSheet(); };
+    $('stickerInput').onchange = (e) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (file) openStickerCropFromFile(file);
+    };
+    $('stickerCropCancel').onclick = (e) => { e.preventDefault(); closeStickerCrop(); };
+    $('stickerCropSave').onclick = (e) => { e.preventDefault(); saveStickerCrop(); };
+    $('stickerCropZoom').oninput = () => {
+      if (!stickerCrop) return;
+      stickerCrop.zoom = parseFloat($('stickerCropZoom').value) || 1;
+      clampStickerCropPan();
+      drawStickerCrop();
+    };
+    $('stickerManageCrop').onclick = (e) => {
+      e.preventDefault();
+      const s = stickerManageTarget;
+      closeStickerManageMenu();
+      if (s?.fileUrl) openStickerCropFromUrl(fileUrl(s.fileUrl), s.id);
+    };
+    $('stickerManageDelete').onclick = (e) => {
+      e.preventDefault();
+      const id = stickerManageTarget?.id;
+      closeStickerManageMenu();
+      if (id) deleteStickerFromPack(id);
+    };
+    $('stickerChatAdd').onclick = (e) => {
+      e.preventDefault();
+      const fileId = stickerChatImport?.fileId;
+      closeStickerChatMenu();
+      if (fileId) importStickerToPack(fileId);
+    };
+
+    (function bindStickerCropPan() {
+      const stage = $('stickerCropStage');
+      stage.addEventListener('pointerdown', (e) => {
+        if (!stickerCrop) return;
+        stickerCropPan = {
+          id: e.pointerId,
+          x: e.clientX,
+          y: e.clientY,
+          ox: stickerCrop.ox,
+          oy: stickerCrop.oy,
+        };
+        stage.setPointerCapture(e.pointerId);
+      });
+      stage.addEventListener('pointermove', (e) => {
+        if (!stickerCropPan || stickerCropPan.id !== e.pointerId || !stickerCrop) return;
+        stickerCrop.ox = stickerCropPan.ox + (e.clientX - stickerCropPan.x);
+        stickerCrop.oy = stickerCropPan.oy + (e.clientY - stickerCropPan.y);
+        clampStickerCropPan();
+        drawStickerCrop();
+      });
+      const endPan = (e) => {
+        if (stickerCropPan?.id === e.pointerId) stickerCropPan = null;
+      };
+      stage.addEventListener('pointerup', endPan);
+      stage.addEventListener('pointercancel', endPan);
+    })();
+
+    document.addEventListener('contextmenu', (e) => {
+      const stickerEl = e.target.closest('.msg-sticker');
+      if (!stickerEl || !activeChat) return;
+      const row = stickerEl.closest('.msg-row');
+      const msg = row ? getMessage(row.dataset.id) : null;
+      if (!msg || msg.kind !== 'sticker') return;
+      if (msg.senderId === user?.id) return;
+      const fileId = stickerEl.dataset.fileId || msg.file?.id || msg.files?.[0]?.id;
+      if (!fileId) return;
+      e.preventDefault();
+      openStickerChatMenu(fileId, msg.id, e.clientX, e.clientY);
+    });
+
+    (function bindStickerMsgHold() {
+      let holdTimer = null;
+      let holdTarget = null;
+      $('messages').addEventListener('pointerdown', (e) => {
+        const stickerEl = e.target.closest('.msg-sticker');
+        if (!stickerEl || !activeChat) return;
+        const row = stickerEl.closest('.msg-row');
+        const msg = row ? getMessage(row.dataset.id) : null;
+        if (!msg || msg.kind !== 'sticker' || msg.senderId === user?.id || msg._pending) return;
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        holdTarget = { stickerEl, msg };
+        holdTimer = setTimeout(() => {
+          const fileId = holdTarget.stickerEl.dataset.fileId || holdTarget.msg.file?.id || holdTarget.msg.files?.[0]?.id;
+          if (fileId) openStickerChatMenu(fileId, holdTarget.msg.id, e.clientX, e.clientY);
+          holdTarget = null;
+        }, STICKER_ITEM_HOLD_MS);
+      }, true);
+      const clearHold = () => {
+        clearTimeout(holdTimer);
+        holdTarget = null;
+      };
+      $('messages').addEventListener('pointerup', clearHold, true);
+      $('messages').addEventListener('pointercancel', clearHold, true);
+      $('messages').addEventListener('pointermove', (e) => {
+        if (!holdTarget) return;
+        if (Math.hypot(e.movementX, e.movementY) > 8) clearHold();
+      }, true);
+    })();
+
+    document.addEventListener('pointerdown', (e) => {
+      if (!$('stickerManageMenu').classList.contains('hidden') && !e.target.closest('#stickerManageMenu')) {
+        closeStickerManageMenu();
+      }
+      if (!$('stickerChatMenu').classList.contains('hidden') && !e.target.closest('#stickerChatMenu')) {
+        closeStickerChatMenu();
+      }
+    }, true);
+
     const MEDIA_ICONS = {
       attach: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.5 6v11.5a4 4 0 01-8 0V5a2.5 2.5 0 015 0v10.5a1 1 0 11-2 0V6H9v9.5a3.5 3.5 0 007 0V5a4 4 0 00-8 0v12.5a5.5 5.5 0 0011 0V6h-1.5z"/></svg>',
       voice: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 14a3 3 0 003-3V5a3 3 0 10-6 0v6a3 3 0 003 3zm5-3a5 5 0 01-5 5 5 5 0 01-5-5H5a7 7 0 0014 0h-2zM11 21h2v-2h-2v2z"/></svg>',
       video: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 3 7.17 5H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V7a2 2 0 00-2-2h-3.17L15 3H9zm3 15a4 4 0 110-8 4 4 0 010 8z"/></svg>',
+      sticker: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 3h9a2 2 0 012 2v11.1l-4.9 4.9A2 2 0 0112.1 22H8a2 2 0 01-2-2V5a2 2 0 012-2zm1.5 6.5a1.5 1.5 0 103 0 1.5 1.5 0 00-3 0zm6.8 4.9-1.4-1.4-3.5 3.5 1.4 1.4 3.5-3.5z"/></svg>',
     };
 
     const MEDIA_MODES = [
       { id: 'attach', title: 'Файл · нажми — сменить, зажми — выбрать' },
       { id: 'voice', title: 'Голос · нажми — сменить, зажми — записать' },
       { id: 'video', title: 'Кружок · нажми — сменить, зажми — записать' },
+      { id: 'sticker', title: 'Стикер · нажми — сменить, зажми — набор' },
     ];
     let mediaModeIndex = 0;
     let mediaHoldTimer = null;
@@ -6384,6 +7012,7 @@
       if (mode === 'attach') $('fileInput').click();
       else if (mode === 'voice') openVoiceRecorder();
       else if (mode === 'video') openVideoRecorder();
+      else if (mode === 'sticker') openStickerSheet();
     }
 
     function clearMediaHold() {
