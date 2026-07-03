@@ -1308,7 +1308,7 @@
     }
     .vid-ring-track { display: none; }
     .vid-ring-fill {
-      fill: none; stroke: #e879a9; stroke-width: 4; stroke-linecap: round;
+      fill: none; stroke: #e879a9; stroke-width: 4; stroke-linecap: butt;
       transform: rotate(-90deg); transform-origin: 100px 100px;
       transition: none;
       opacity: 0;
@@ -3946,6 +3946,7 @@
       }
       const pct = Math.min(1, Math.max(0, vid.currentTime / dur));
       ring.style.opacity = '1';
+      ring.style.strokeLinecap = pct >= 0.995 ? 'round' : 'butt';
       ring.style.strokeDashoffset = String(VID_RING_LEN * (1 - pct));
       wrap.classList.toggle('viewed', pct > 0.005);
     }
