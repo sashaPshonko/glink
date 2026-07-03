@@ -491,8 +491,6 @@
     }
     .msg-group.theirs .msg-group-body { align-items: flex-start; }
     .msg-group.mine .msg-group-body { align-items: flex-end; }
-    .msg-group-body .msg-row.theirs .msg-hit-left { flex: 0 0 8px; min-width: 8px; }
-    .msg-group-body .msg-row.mine .msg-hit-right { flex: 0 0 8px; min-width: 8px; }
     .msg-group.no-avatar .msg-group-body { width: 100%; }
     #composer {
       display: flex; gap: 8px; padding: 10px 12px;
@@ -556,31 +554,43 @@
     .bubble.has-image {
       padding: 0; background: transparent !important; border: none !important;
       width: fit-content; max-width: min(280px, 100%);
-      overflow: visible;
+      overflow: hidden;
       border-radius: 0;
     }
-    .bubble.mine.has-image:not(.has-caption),
-    .bubble.mine.has-album-photos:not(.has-caption):not(.has-reactions) {
-      display: inline-flex;
-      flex-direction: column;
-      align-items: flex-end;
+    .bubble.has-image:not(.has-caption):not(.has-reactions) {
+      position: relative;
+      display: block;
     }
-    .bubble.theirs.has-image:not(.has-caption),
-    .bubble.theirs.has-album-photos:not(.has-caption):not(.has-reactions) {
-      display: inline-flex;
-      flex-direction: column;
-      align-items: flex-start;
-    }
-    .bubble.has-image:not(.has-caption) .msg-foot,
-    .bubble.has-album-photos:not(.has-caption):not(.has-reactions) .msg-foot {
+    .bubble.has-image:not(.has-caption) .msg-foot {
+      position: absolute;
+      right: 8px;
+      bottom: 6px;
+      left: auto;
+      margin: 0;
+      padding: 2px 7px;
+      border-radius: 10px;
+      background: rgba(28, 20, 24, 0.42);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
       width: auto;
-      max-width: 100%;
-      margin-top: 2px;
-      align-self: flex-end;
+      max-width: calc(100% - 12px);
+      justify-content: flex-end;
+      gap: 3px;
+      pointer-events: none;
     }
-    .bubble.theirs.has-image:not(.has-caption) .msg-foot,
-    .bubble.theirs.has-album-photos:not(.has-caption):not(.has-reactions) .msg-foot {
-      align-self: flex-start;
+    .bubble.has-image:not(.has-caption) .msg-foot .msg-time {
+      color: rgba(255, 255, 255, 0.92);
+      margin-right: 0;
+    }
+    .bubble.has-image:not(.has-caption) .msg-foot .edited-mark {
+      color: rgba(255, 255, 255, 0.78);
+      margin-right: 0;
+    }
+    .bubble.has-image:not(.has-caption) .msg-foot .ticks {
+      color: rgba(255, 255, 255, 0.88);
+    }
+    .bubble.has-image:not(.has-caption) .msg-foot .ticks.read {
+      color: #93c5fd;
     }
     .bubble.has-image.has-caption {
       padding: 0;
@@ -736,16 +746,24 @@
     }
     .bubble.mine.editable { cursor: default; }
     .msg-row {
-      width: 100%;
       max-width: 100%;
       display: flex;
       flex-direction: column;
     }
-    .msg-row.mine { align-items: flex-end; }
-    .msg-row.theirs { align-items: flex-start; }
+    .msg-row.mine {
+      align-self: flex-end;
+      width: fit-content;
+      max-width: 100%;
+    }
+    .msg-row.theirs {
+      align-self: flex-start;
+      width: fit-content;
+      max-width: 100%;
+    }
     .msg-row-line {
       display: flex;
-      width: 100%;
+      width: fit-content;
+      max-width: 100%;
       align-items: stretch;
     }
     .msg-hit {
@@ -764,10 +782,20 @@
     }
     .msg-hit-left { flex: 0 0 44px; }
     .msg-hit-right { flex: 1 1 0; min-width: 44px; }
-    .msg-row.mine .msg-hit-left { flex: 1 1 0; min-width: 44px; }
-    .msg-row.mine .msg-hit-right { flex: 0 0 44px; }
-    .msg-row.theirs .msg-hit-left { flex: 0 0 44px; }
-    .msg-row.theirs .msg-hit-right { flex: 1 1 0; min-width: 44px; }
+    .msg-row.mine .msg-hit-left {
+      flex: 0 0 0;
+      width: 0;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .msg-row.mine .msg-hit-right { flex: 0 0 44px; min-width: 44px; }
+    .msg-row.theirs .msg-hit-left { flex: 0 0 44px; min-width: 44px; }
+    .msg-row.theirs .msg-hit-right {
+      flex: 0 0 0;
+      width: 0;
+      min-width: 0;
+      overflow: hidden;
+    }
     .msg-stack {
       flex: 0 0 auto;
       width: fit-content;
@@ -781,8 +809,6 @@
       width: fit-content;
       max-width: 100%;
     }
-    .msg-row.mine .msg-row-inner { margin-left: auto; }
-    .msg-row.theirs .msg-row-inner { margin-right: auto; }
     .msg-reactions {
       display: flex; flex-wrap: wrap; gap: 4px;
       align-items: center;
@@ -1096,8 +1122,36 @@
       padding: 0;
       background: transparent !important;
       border: none !important;
-      overflow: visible;
+      overflow: hidden;
       border-radius: 0;
+      position: relative;
+    }
+    .bubble.has-album-photos:not(.has-caption):not(.has-reactions) .msg-foot {
+      position: absolute;
+      right: 8px;
+      bottom: 6px;
+      left: auto;
+      margin: 0;
+      padding: 2px 7px;
+      border-radius: 10px;
+      background: rgba(28, 20, 24, 0.42);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      width: auto;
+      max-width: calc(100% - 12px);
+      justify-content: flex-end;
+      gap: 3px;
+      pointer-events: none;
+    }
+    .bubble.has-album-photos:not(.has-caption):not(.has-reactions) .msg-foot .msg-time {
+      color: rgba(255, 255, 255, 0.92);
+      margin-right: 0;
+    }
+    .bubble.has-album-photos:not(.has-caption):not(.has-reactions) .msg-foot .ticks {
+      color: rgba(255, 255, 255, 0.88);
+    }
+    .bubble.has-album-photos:not(.has-caption):not(.has-reactions) .msg-foot .ticks.read {
+      color: #93c5fd;
     }
     .bubble.has-album-photos.has-caption {
       padding: 0;
