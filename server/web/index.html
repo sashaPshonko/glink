@@ -354,8 +354,8 @@
     .bubble {
       width: fit-content;
       max-width: 100%;
-      padding: 11px 16px;
-      line-height: 1.4; word-break: break-word;
+      padding: 7px 14px 8px;
+      line-height: 1.38; word-break: break-word;
       overflow: hidden;
       border-radius: 28px;
     }
@@ -368,7 +368,7 @@
       background: rgba(255, 255, 255, 0.92);
       border: 1px solid rgba(252, 231, 243, 0.95);
     }
-    .sender { font-size: 0.75rem; color: #db2777; font-weight: 600; margin-bottom: 4px; }
+    .sender { font-size: 0.75rem; color: #db2777; font-weight: 600; margin-bottom: 2px; }
     .bubble a { color: #be185d; text-decoration: underline; }
     .bubble img {
       max-width: min(280px, 100%); border-radius: 22px; display: block;
@@ -403,7 +403,7 @@
       padding: 4px 12px 0;
     }
     .bubble.has-image.has-caption .msg-foot {
-      padding: 4px 12px 8px;
+      padding: 2px 12px 6px;
     }
     .voice-msg {
       display: flex; align-items: center; gap: 10px;
@@ -455,7 +455,7 @@
     }
     .msg-foot {
       display: flex; justify-content: flex-end; flex-wrap: wrap;
-      margin-top: 5px; gap: 4px; align-items: center;
+      margin-top: 3px; gap: 4px; align-items: center;
     }
     .msg-time {
       font-size: 0.68rem; color: rgba(92, 51, 71, 0.48);
@@ -797,12 +797,19 @@
       border-radius: 0;
     }
     .bubble.has-caption .msg-caption {
-      padding: 8px 12px 0;
-      line-height: 1.4;
+      padding: 6px 14px 0;
+      line-height: 1.38;
       word-break: break-word;
     }
+    .bubble.has-caption:not(.has-image):not(.has-video):not(.has-album):not(.has-voice):not(.has-media-video):not(.has-media-audio) {
+      padding: 0;
+    }
+    .bubble.has-caption:not(.has-image):not(.has-video):not(.has-album):not(.has-voice):not(.has-media-video):not(.has-media-audio) .sender {
+      padding: 5px 14px 0;
+      margin-bottom: 0;
+    }
     .bubble.has-caption .msg-foot {
-      padding: 4px 12px 8px;
+      padding: 2px 14px 6px;
       margin-top: 0;
       width: 100%;
       box-sizing: border-box;
@@ -855,17 +862,17 @@
     .bubble.has-voice.has-caption,
     .bubble.has-media-video.has-caption,
     .bubble.has-media-audio.has-caption {
-      padding: 8px 10px;
+      padding: 6px 10px 7px;
     }
     .bubble.has-voice.has-caption .msg-caption,
     .bubble.has-media-video.has-caption .msg-caption,
     .bubble.has-media-audio.has-caption .msg-caption {
-      padding: 6px 2px 0;
+      padding: 4px 2px 0;
     }
     .bubble.has-voice.has-caption .msg-foot,
     .bubble.has-media-video.has-caption .msg-foot,
     .bubble.has-media-audio.has-caption .msg-foot {
-      padding: 4px 2px 0;
+      padding: 2px 2px 0;
     }
     .album-pending {
       font-size: 0.85rem; color: #9d174d; padding: 6px 10px;
