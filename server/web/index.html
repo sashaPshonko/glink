@@ -84,6 +84,14 @@
       transition: background 0.15s ease, transform 0.12s ease;
     }
     #profileBtn svg { width: 26px; height: 26px; display: block; }
+    #profileBtn .profile-btn-avatar {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+    #profileBtn.has-avatar {
+      overflow: hidden;
+      background: transparent;
+      border-color: rgba(232, 121, 169, 0.45);
+    }
     #profileBtn:active {
       background: rgba(255, 236, 244, 0.98);
       transform: scale(0.94);
@@ -191,9 +199,6 @@
     }
     #profileName {
       font-size: 1.15rem; font-weight: 700; color: #9d174d;
-    }
-    #profileHint {
-      margin-top: 6px; font-size: 0.82rem; color: #b07a94;
     }
     #profileLogout {
       margin-top: 22px;
@@ -1479,7 +1484,6 @@
         <span id="profileAvatarLetter">?</span>
       </button>
       <div id="profileName">Профиль</div>
-      <div id="profileHint">нажми на кружок — фото</div>
       <input id="avatarInput" type="file" accept="image/*" class="hidden" />
       <button type="button" id="profileLogout">выйти</button>
     </div>
@@ -1954,6 +1958,20 @@
       afterMessagesDomUpdate(box, { ...opts, anchor });
     }
 
+    const PROFILE_BTN_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm0 2c-3.87 0-7 2.13-7 4.75V21h14v-2.25C19 16.13 15.87 14 12 14z"/></svg>';
+
+    function updateProfileBtnAvatar() {
+      const btn = $('profileBtn');
+      if (!btn || !user) return;
+      if (user.avatarUrl) {
+        btn.innerHTML = `<img class="profile-btn-avatar" src="${escapeHtml(fileUrl(user.avatarUrl))}" alt="" />`;
+        btn.classList.add('has-avatar');
+      } else {
+        btn.innerHTML = PROFILE_BTN_ICON;
+        btn.classList.remove('has-avatar');
+      }
+    }
+
     function updateProfileUI() {
       if (!user) return;
       const letter = (user.displayName || user.username || '?')[0].toUpperCase();
@@ -1969,6 +1987,7 @@
         img.classList.add('hidden');
         $('profileAvatarLetter').classList.remove('hidden');
       }
+      updateProfileBtnAvatar();
     }
 
     function openProfileSheet() {

@@ -2,19 +2,60 @@ import { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
+    Image,
     Pressable,
     RefreshControl,
     StyleSheet,
     Text,
     View,
 } from 'react-native';
-import { fetchChats } from '../lib/api';
+import { fetchChats, fileUrl } from '../lib/api';
 import { chatSubtitle } from '../lib/messageFormat';
 import { theme } from '../lib/theme';
 
 function chatTitle(chat) {
     if (chat.type === 'group') return chat.title || 'Группа';
     return chat.peer?.displayName || chat.peer?.username || '?';
+}
+
+function ChatRowAvatar({ chat }) {
+    const [uri, setUri] = useState(null);
+
+    useEffect(() => {
+        let live = true;
+        if (chat.type !== 'group' && chat.peer?.avatarUrl) {
+            fileUrl(chat.peer.avatarUrl).then((url) => {
+                if (live) setUri(url);
+            }).catch(() => {
+                if (live) setUri(null);
+            });
+        } else {
+            setUri(null);
+        }
+        return () => { live = false; };
+    }, [chat.type, chat.peer?.avatarUrl]);
+
+    if (chat.type === 'group') {
+        return (
+            <View style={[styles.avatar, styles.avatarGroup]}>
+                <Text style={styles.avatarText}>♡</Text>
+            </View>
+        );
+    }
+    if (uri) {
+        return (
+            <View style={styles.avatar}>
+                <Image source={{ uri }} style={styles.avatarImg} />
+            </View>
+        );
+    }
+    return (
+        <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+                {(chatTitle(chat)[0] || '?').toUpperCase()}
+            </Text>
+        </View>
+    );
 }
 
 export default function ChatsListScreen({ user, onOpenChat, onLogout }) {
@@ -66,18 +107,7 @@ export default function ChatsListScreen({ user, onOpenChat, onLogout }) {
                             onPress={() => !item.waiting && onOpenChat(item)}
                             disabled={item.waiting}
                         >
-                            <View
-                                style={[
-                                    styles.avatar,
-                                    item.type === 'group' && styles.avatarGroup,
-                                ]}
-                            >
-                                <Text style={styles.avatarText}>
-                                    {item.type === 'group'
-                                        ? '♡'
-                                        : (chatTitle(item)[0] || '?').toUpperCase()}
-                                </Text>
-                            </View>
+                            <ChatRowAvatar chat={item} />
                             <View style={styles.rowBody}>
                                 <Text style={styles.name}>{chatTitle(item)}</Text>
                                 <Text style={styles.preview} numberOfLines={1}>
@@ -128,6 +158,7 @@ const styles = StyleSheet.create({
     },
     avatarGroup: { backgroundColor: theme.avatarGroup },
     avatarText: { color: theme.primaryDark, fontWeight: '700', fontSize: 18 },
+    avatarImg: { width: '100%', height: '100%', borderRadius: 24 },
     rowBody: { flex: 1, justifyContent: 'center' },
     name: { color: theme.text, fontSize: 17, fontWeight: '600' },
     preview: { color: theme.textMuted, marginTop: 3 },

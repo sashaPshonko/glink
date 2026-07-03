@@ -170,6 +170,13 @@ export function listChatsForUser(userId) {
         .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
 }
 
+function userPublicFields(u) {
+    if (!u) return null;
+    const base = { id: u.id, username: u.username, displayName: u.displayName };
+    if (u.avatarFileId) base.avatarUrl = `/files/${u.avatarFileId}`;
+    return base;
+}
+
 function formatChatRow(chat, userId) {
     const last = lastMessageFor(chat.id);
     const base = {
@@ -192,16 +199,14 @@ function formatChatRow(chat, userId) {
             members: chat.memberIds
                 .map((id) => findUserById(id))
                 .filter(Boolean)
-                .map(({ id, username, displayName }) => ({ id, username, displayName })),
+                .map(userPublicFields),
         };
     }
     const peerId = chat.memberIds.find((id) => id !== userId);
     const peer = peerId ? findUserById(peerId) : null;
     return {
         ...base,
-        peer: peer
-            ? { id: peer.id, username: peer.username, displayName: peer.displayName }
-            : null,
+        peer: userPublicFields(peer),
     };
 }
 
