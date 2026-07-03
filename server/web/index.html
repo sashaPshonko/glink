@@ -435,6 +435,10 @@
       align-items: stretch;
       -webkit-overflow-scrolling: touch;
     }
+    #messages.messages-preparing {
+      opacity: 0;
+      pointer-events: none;
+    }
     .msg-group {
       display: flex;
       width: 100%;
@@ -1840,7 +1844,8 @@
 
     function afterMessagesDomUpdate(box, opts = {}) {
       syncSigFromBox();
-      if (opts.forceBottom || userPinnedBottom) scrollToBottom(box);
+      const stick = opts.forceBottom || userPinnedBottom;
+      if (stick) scrollToBottom(box, true);
       else if (opts.anchor) {
         restoreScrollAnchor(box, opts.anchor);
         maintainScrollAnchor(box, opts.anchor);
@@ -1849,11 +1854,30 @@
       wireVideoNotes(box);
       wireInlineMedia(box);
       if (!opts.skipRead) scheduleMarkVisibleRead();
+      if (opts.reveal) revealMessagesBox(box);
+    }
+
+    function revealMessagesBox(box = $('messages')) {
+      scrollToBottom(box, true);
+      requestAnimationFrame(() => {
+        scrollToBottom(box, true);
+        requestAnimationFrame(() => {
+          box.classList.remove('messages-preparing');
+        });
+      });
+    }
+
+    function prepMessagesBox(box = $('messages')) {
+      box.classList.add('messages-preparing');
+      box.innerHTML = '';
+      box.scrollTop = 0;
     }
 
     function relayoutMessages(box = $('messages'), opts = {}) {
-      const anchor = (opts.forceBottom || userPinnedBottom) ? null : saveScrollAnchor(box);
+      const stick = opts.forceBottom || userPinnedBottom;
+      const anchor = stick ? null : saveScrollAnchor(box);
       box.innerHTML = renderMessagesHtml(activeMessages);
+      if (stick) box.scrollTop = box.scrollHeight;
       afterMessagesDomUpdate(box, { ...opts, anchor });
     }
 
@@ -2714,6 +2738,7 @@
           ? { messages: opts.messages }
           : await api('/chats/' + activeChat.id + '/messages');
       } catch (_) {
+        if (opts.reveal) revealMessagesBox(box);
         return;
       }
       if (gen !== loadMsgGen) return;
@@ -2728,7 +2753,7 @@
       lastMsgCount = data.messages?.length || 0;
       activeMessages = data.messages || [];
 
-      relayoutMessages(box, { forceBottom: stick, skipRead: false });
+      relayoutMessages(box, { forceBottom: stick, skipRead: false, reveal: stick && opts.reveal });
       if (gen !== loadMsgGen) return;
 
       updateInChatUnreadBadge();
@@ -2756,9 +2781,18 @@
       requestAnimationFrame(() => { suppressScrollTrack = false; });
     }
 
-    function scrollToBottom(box) {
-      setScrollTop(box, box.scrollHeight);
-      requestAnimationFrame(() => setScrollTop(box, box.scrollHeight));
+    function scrollToBottom(box, instant = false) {
+      const top = box.scrollHeight;
+      suppressScrollTrack = true;
+      box.scrollTop = top;
+      if (instant) {
+        suppressScrollTrack = false;
+        return;
+      }
+      requestAnimationFrame(() => {
+        box.scrollTop = box.scrollHeight;
+        requestAnimationFrame(() => { suppressScrollTrack = false; });
+      });
     }
 
     function saveScrollAnchor(box) {
@@ -4500,7 +4534,8 @@
     }
 
     async function openChat(chat, opts = {}) {
-      if (activeChat?.id !== chat.id) {
+      const switchingChat = activeChat?.id !== chat.id;
+      if (switchingChat) {
         persistActiveChatDraft();
         cancelEdit();
       }
@@ -4510,6 +4545,10 @@
       lastMsgCount = 0;
       lastMessagesSig = '';
       userPinnedBottom = true;
+      if (switchingChat) {
+        activeMessages = [];
+        prepMessagesBox($('messages'));
+      }
       $('chatList').classList.add('hidden');
       $('chatView').classList.remove('hidden');
       updateChatHeader(chat);
@@ -4522,7 +4561,11 @@
           '#chat/' + encodeURIComponent(chat.id),
         );
       }
-      await loadMessages({ forceBottom: true });
+      try {
+        await loadMessages({ forceBottom: true, reveal: true });
+      } catch (_) {
+        revealMessagesBox($('messages'));
+      }
       setChatUnreadCount(chat.id, countActiveChatUnread());
       updateChatListBadges();
       updateInChatUnreadBadge();
