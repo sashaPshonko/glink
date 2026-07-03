@@ -690,27 +690,31 @@
       word-break: break-word;
       font-size: 0.98rem;
     }
-    .msg-meta-spacer {
-      display: inline-block;
-      width: 54px;
-      height: calc(1.38em - 1px);
-      float: right;
+    .msg-text-block.msg-text-inline {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
     }
-    .msg-text-tail {
-      display: block;
-      clear: both;
-      height: 0;
+    .msg-text-block.msg-text-inline .msg-text {
+      flex: 1 1 auto;
+      min-width: 0;
     }
     .msg-inline-meta {
-      float: right;
-      margin: 0.24em 0 0 8px;
+      flex: 0 0 auto;
       display: inline-flex;
-      align-items: flex-end;
+      align-items: baseline;
       gap: 3px;
       user-select: none;
       -webkit-user-select: none;
       white-space: nowrap;
       line-height: 1;
+    }
+    .bubble.text-only .msg-text-foot {
+      padding: 0 11px 8px;
+      margin-top: -4px;
     }
     .msg-inline-meta .msg-time {
       font-size: 0.68rem;
@@ -956,14 +960,12 @@
     .draft-vnote {
       position: relative; width: 56px; height: 56px;
       border-radius: 50%; overflow: hidden; flex-shrink: 0; cursor: pointer;
-      background: transparent;
+      background: #1a1a1a;
     }
     .draft-vnote video {
       width: 100%; height: 100%; object-fit: cover; display: block;
-      opacity: 0;
+      border-radius: 50%;
     }
-    .draft-vnote.preview-ready video,
-    .draft-vnote.playing video { opacity: 1; }
     .draft-vnote-play {
       position: absolute; inset: 0; border: none; background: transparent;
       color: #fff; font-size: 1.4rem; cursor: pointer;
@@ -1293,14 +1295,12 @@
     }
     .video-note-hole {
       position: absolute; inset: 0; border-radius: 50%;
-      overflow: hidden; background: transparent; z-index: 1;
+      overflow: hidden; background: #1a1a1a; z-index: 1;
     }
     .video-note-hole video {
       width: 100%; height: 100%; object-fit: cover; display: block;
-      opacity: 0;
+      border-radius: 50%;
     }
-    .video-note.preview-ready .video-note-hole video,
-    .video-note.playing .video-note-hole video { opacity: 1; }
     .vid-ring {
       position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2;
       pointer-events: none;
@@ -2327,29 +2327,39 @@
       return !['voice', 'video_note', 'video', 'audio', 'image', 'file', 'album'].includes(kind);
     }
 
+    function useInlineTextMeta(m) {
+      const raw = (m.text || '').trim();
+      if (!raw || raw.includes('\n')) return false;
+      return raw.length <= 56;
+    }
+
     function renderPlainTextBlock(m, mine) {
       const text = m.text ? linkify(m.text) : '…';
       const meta = renderMsgMeta(m, mine);
-      const metaHtml = meta
-        ? `<span class="msg-meta-spacer" aria-hidden="true"></span><span class="msg-inline-meta">${meta}</span><span class="msg-text-tail" aria-hidden="true"></span>`
-        : '';
-      return `<div class="msg-text-block">${text}${metaHtml}</div>`;
+      if (useInlineTextMeta(m) && meta) {
+        return `<div class="msg-text-block msg-text-inline"><span class="msg-text">${text}</span><span class="msg-inline-meta">${meta}</span></div>`;
+      }
+      const foot = meta ? `<div class="msg-foot msg-text-foot">${meta}</div>` : '';
+      return `<div class="msg-text-block">${text}</div>${foot}`;
     }
 
     function applyMsgMetaToBubble(bubble, m, mine) {
       const meta = renderMsgMeta(m, mine);
       if (bubble.classList.contains('text-only')) {
-        const block = bubble.querySelector('.msg-text-block');
-        if (!block) return;
-        block.querySelector('.msg-meta-spacer')?.remove();
-        block.querySelector('.msg-inline-meta')?.remove();
-        block.querySelector('.msg-text-tail')?.remove();
-        if (meta) {
-          block.insertAdjacentHTML(
-            'beforeend',
-            `<span class="msg-meta-spacer" aria-hidden="true"></span><span class="msg-inline-meta">${meta}</span><span class="msg-text-tail" aria-hidden="true"></span>`,
-          );
+        const inlineMeta = bubble.querySelector('.msg-inline-meta');
+        const foot = bubble.querySelector('.msg-text-foot');
+        if (inlineMeta) {
+          if (meta) inlineMeta.innerHTML = meta;
+          else inlineMeta.remove();
+          return;
         }
+        if (foot) {
+          if (meta) foot.innerHTML = meta;
+          else foot.remove();
+          return;
+        }
+        const sender = bubble.querySelector('.sender');
+        bubble.innerHTML = (sender ? sender.outerHTML : '') + renderPlainTextBlock(m, mine);
         return;
       }
       const html = renderBubbleFoot(m, mine);
@@ -3418,10 +3428,7 @@
         else vid.pause();
       };
       primeVideoNotePreview(vid, wrap);
-      vid.onplay = () => {
-        markVideoNotePreviewReady(vid, wrap);
-        sync();
-      };
+      vid.onplay = sync;
       vid.onpause = sync;
       vid.onended = () => {
         restoreVideoNotePreview(vid);
@@ -3548,15 +3555,6 @@
     const VID_RING_LEN = 2 * Math.PI * VID_RING_R;
     const VIDEO_NOTE_PREVIEW_SEC = 0.5;
 
-    function videoNotePreviewHost(vid, wrap) {
-      return wrap || vid?.closest('.video-note, .draft-vnote, .review-video-note');
-    }
-
-    function markVideoNotePreviewReady(vid, wrap) {
-      const host = videoNotePreviewHost(vid, wrap);
-      if (host) host.classList.add('preview-ready');
-    }
-
     function videoNotePreviewTime(vid) {
       const dur = saneDur(vid?.duration);
       if (!dur) return 0;
@@ -3571,28 +3569,10 @@
 
     function primeVideoNotePreview(vid, wrap) {
       if (!vid) return;
-      const host = videoNotePreviewHost(vid, wrap);
-      const failSafe = () => {
-        if (host?.classList.contains('preview-ready')) return;
-        markVideoNotePreviewReady(vid, wrap);
-      };
-      const failTimer = setTimeout(failSafe, 2500);
-      const done = () => {
-        clearTimeout(failTimer);
-        resetVideoNotePreviewRing(wrap);
-        markVideoNotePreviewReady(vid, wrap);
-      };
       const apply = () => {
-        if (!saneDur(vid.duration)) return;
-        const t = videoNotePreviewTime(vid);
-        if (Math.abs(vid.currentTime - t) < 0.03 && vid.readyState >= 2) {
-          done();
-          return;
-        }
-        vid.addEventListener('seeked', done, { once: true });
-        try { vid.currentTime = t; } catch { failSafe(); }
+        seekVideoNotePreview(vid);
+        if (wrap && wrap.dataset.vnotePlayed !== '1') resetVideoNotePreviewRing(wrap);
       };
-      vid.addEventListener('error', failSafe, { once: true });
       if (vid.readyState >= 1) apply();
       else vid.addEventListener('loadedmetadata', apply, { once: true });
     }
@@ -4001,14 +3981,12 @@
       if (!vid.src) vid.src = src;
       if (vid.paused) {
         vid.play().then(() => {
-          markVideoNotePreviewReady(vid, wrap);
           wrap.dataset.vnotePlayed = '1';
           wrap.classList.add('playing');
           activeVideoEl = vid;
           trackVideoProgress(wrap, vid);
         }).catch(() => showAppErr('не удалось воспроизвести видео'));
       } else {
-        markVideoNotePreviewReady(vid, wrap);
         wrap.dataset.vnotePlayed = '1';
         wrap.classList.add('playing');
         activeVideoEl = vid;
@@ -4228,7 +4206,6 @@
         seekVideoNotePreview(vid);
       };
       vid.onplay = () => {
-        markVideoNotePreviewReady(vid, wrap);
         wrap.dataset.vnotePlayed = '1';
         wrap.classList.add('playing');
         trackVideoReviewProgress(wrap, vid);
@@ -4301,7 +4278,7 @@
       const wrap = $('videoReviewNote');
       const pb = $('videoRecPlayback');
       if (wrap) {
-        wrap.classList.remove('playing', 'seeking', 'viewed', 'preview-ready');
+        wrap.classList.remove('playing', 'seeking', 'viewed');
         delete wrap.dataset.seeking;
         delete wrap.dataset.reviewWired;
         delete wrap.dataset.vnotePlayed;
