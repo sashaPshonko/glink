@@ -394,6 +394,19 @@ app.post('/me/avatar', authMiddleware, (req, res, next) => {
     }
 });
 
+app.delete('/me/avatar', authMiddleware, (req, res) => {
+    try {
+        const user = setUserAvatar(req.userId, null);
+        res.json({ user: publicUser(user) });
+    } catch (e) {
+        if (e.message === 'user_not_found') {
+            res.status(404).json({ error: 'user_not_found' });
+            return;
+        }
+        throw e;
+    }
+});
+
 app.get('/chats', authMiddleware, (req, res) => {
     res.json({ chats: buildChatList(req.userId) });
 });
