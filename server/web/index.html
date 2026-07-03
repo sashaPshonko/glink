@@ -2121,6 +2121,8 @@
     let voiceScrubbing = false;
     let voiceScrubResumeChat = null;
     let voiceScrubResumeReview = false;
+    let videoScrubbing = false;
+    let videoScrubResume = null;
     const waveCache = new Map();
     const voicePos = new Map();
     let videoRecorder = null;
@@ -4752,7 +4754,7 @@
       updateVideoRing(wrap, vid);
       const tick = () => {
         if (videoRafVid !== vid || videoRafWrap !== wrap) return;
-        if (vid.paused || vid.ended) return;
+        if (vid.paused || vid.ended || videoScrubbing) return;
         updateVideoRing(wrap, vid);
         videoRaf = requestAnimationFrame(tick);
       };
@@ -5102,8 +5104,8 @@
         wrap.setPointerCapture(e.pointerId);
         wrap.classList.add('seeking');
         wrap.dataset.seeking = '1';
+        beginVideoScrub(wrap, vid, src);
         seekVideoNote(wrap, vid, e.clientX, e.clientY);
-        playVideoNote(wrap, vid, src);
         return;
       }
       vnotePinDrag = {
@@ -5143,6 +5145,7 @@
         if (e?.pointerId != null && wrap.hasPointerCapture?.(e.pointerId)) {
           wrap.releasePointerCapture(e.pointerId);
         }
+        finishVideoScrub(wrap);
         wrap.dataset.seeking = '';
         wrap.classList.remove('seeking');
         return;
@@ -5181,6 +5184,54 @@
       return dist >= half * 0.78 && dist <= half + 4;
     }
 
+    function ensureVideoNoteSrc(vid, src, isReview = false) {
+      if (!vid || vid.src) return;
+      if (isReview && videoReviewUrl) vid.src = videoReviewUrl;
+      else if (src) vid.src = videoNoteMediaSrc(src);
+    }
+
+    function beginVideoScrub(wrap, vid, src, opts = {}) {
+      videoScrubbing = true;
+      const wasPlaying = !vid.paused && wrap.classList.contains('playing');
+      videoScrubResume = { wrap, vid, src, wasPlaying, isReview: !!opts.isReview };
+      delete wrap.dataset.vnoteIntent;
+      ensureVideoNoteSrc(vid, src, opts.isReview);
+      if (!vid.paused) {
+        vid.pause();
+        if (opts.isReview) stopVideoReviewRaf();
+        else stopVideoRaf();
+      }
+      vid.muted = true;
+    }
+
+    function finishVideoScrub(wrap) {
+      if (!videoScrubResume || videoScrubResume.wrap !== wrap) {
+        videoScrubbing = false;
+        return;
+      }
+      const { vid, src, wasPlaying, isReview } = videoScrubResume;
+      videoScrubbing = false;
+      videoScrubResume = null;
+      updateVideoRing(wrap, vid);
+      if (wasPlaying) {
+        vid.muted = false;
+        activeVideoEl = vid;
+        wrap.dataset.vnoteIntent = '1';
+        const trackFn = isReview ? trackVideoReviewProgress : trackVideoProgress;
+        vid.play().then(() => {
+          if (wrap.dataset.vnoteIntent !== '1') return;
+          delete wrap.dataset.vnoteIntent;
+          startVideoNotePlayback(wrap, vid, trackFn);
+        }).catch(() => showAppErr('не удалось воспроизвести видео'));
+      } else {
+        vid.pause();
+        vid.muted = false;
+        if (videoNoteDuration(vid) > 0 && vid.currentTime > 0.01) {
+          wrap.classList.add('viewed');
+        }
+      }
+    }
+
     function seekVideoNote(wrap, vid, x, y) {
       const rect = wrap.getBoundingClientRect();
       const cx = rect.left + rect.width / 2;
@@ -5191,6 +5242,7 @@
       const dur = videoNoteDuration(vid);
       if (!dur) return;
       vid.currentTime = Math.max(0, Math.min(dur, pct * dur));
+      if (videoScrubbing) vid.pause();
       wrap.classList.add('seeking');
       updateVideoRing(wrap, vid);
     }
@@ -5200,6 +5252,7 @@
       vid.onpause = () => {
         stopVideoRaf();
         if (vid.ended) return;
+        if (videoScrubbing || wrap.dataset.seeking === '1') return;
         if (wrap.classList.contains('playing')) return;
         if (wrap.dataset.pinned === '1' && wrap.dataset.vnotePlayReady === '1') return;
         delete wrap.dataset.vnotePlayReady;
@@ -5260,8 +5313,8 @@
             wrap.setPointerCapture(e.pointerId);
             wrap.classList.add('seeking');
             wrap.dataset.seeking = '1';
+            beginVideoScrub(wrap, vid, src);
             seekVideoNote(wrap, vid, e.clientX, e.clientY);
-            playVideoNote(wrap, vid, src);
           } else {
             toggleVideoNote(wrap, vid, src);
           }
@@ -5285,6 +5338,7 @@
           if (e?.pointerId != null && wrap.hasPointerCapture?.(e.pointerId)) {
             wrap.releasePointerCapture(e.pointerId);
           }
+          finishVideoScrub(wrap);
           wrap.dataset.seeking = '';
           wrap.classList.remove('seeking');
         };
@@ -5491,7 +5545,7 @@
       stopVideoReviewRaf();
       updateVideoRing(wrap, vid);
       const tick = () => {
-        if (!vid || vid.paused || vid.ended) return;
+        if (!vid || vid.paused || vid.ended || videoScrubbing) return;
         updateVideoRing(wrap, vid);
         videoReviewRaf = requestAnimationFrame(tick);
       };
@@ -5577,17 +5631,8 @@
           wrap.setPointerCapture(e.pointerId);
           wrap.classList.add('seeking');
           wrap.dataset.seeking = '1';
+          beginVideoScrub(wrap, vid, null, { isReview: true });
           seekVideoNote(wrap, vid, e.clientX, e.clientY);
-          if (vid.paused) {
-            wrap.dataset.vnoteIntent = '1';
-            vid.play().then(() => {
-              if (wrap.dataset.vnoteIntent !== '1') return;
-              delete wrap.dataset.vnoteIntent;
-              startVideoNotePlayback(wrap, vid, trackVideoReviewProgress);
-            }).catch(() => showAppErr('не удалось воспроизвести'));
-          } else {
-            trackVideoReviewProgress(wrap, vid);
-          }
         } else {
           if (!vid.paused) {
             vid.pause();
@@ -5616,6 +5661,7 @@
         if (e?.pointerId != null && wrap.hasPointerCapture?.(e.pointerId)) {
           wrap.releasePointerCapture(e.pointerId);
         }
+        finishVideoScrub(wrap);
         wrap.dataset.seeking = '';
         wrap.classList.remove('seeking');
       };
