@@ -4787,6 +4787,11 @@
         wrap.dataset.wired = '1';
         const vid = wrap.querySelector('video');
         const src = wrap.dataset.src;
+        if (wrap.classList.contains('playing') && (!vid || vid.paused)) {
+          wrap.classList.remove('playing', 'seeking');
+          delete wrap.dataset.vnotePlayReady;
+          delete wrap.dataset.vnoteIntent;
+        }
         initVideoRing(wrap);
         hookVideoProgress(wrap, vid);
         wireVideoNotePlayback(wrap, vid);
