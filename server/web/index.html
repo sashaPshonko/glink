@@ -1315,10 +1315,9 @@
     }
     .video-note.playing .vid-ring-fill,
     .video-note.seeking .vid-ring-fill,
-    .video-note.viewed .vid-ring-fill { opacity: 1; }
-    .video-note.seeking .vid-ring-fill { transition: none; }
-    .video-note:not(.playing):not(.seeking) .vid-ring-fill {
-      transition: stroke-dashoffset 0.12s ease-out;
+    .video-note.viewed .vid-ring-fill {
+      opacity: 1;
+      transition: none;
     }
     .video-note .vid-badge {
       position: absolute; inset: 0; display: flex;
@@ -2240,13 +2239,14 @@
       }
       if (kind === 'voice' && pending) return '<div class="album-pending">🎤</div>';
       if (kind === 'video_note' && url && !pending) {
-        const src = escapeHtml(url);
-        return `<div class="video-note" data-src="${src}">` +
+        const src = escapeHtml(videoNoteMediaSrc(url));
+        const rawSrc = escapeHtml(url);
+        return `<div class="video-note" data-src="${rawSrc}">` +
           `<svg class="vid-ring" viewBox="0 0 200 200" aria-hidden="true">` +
           `<circle class="vid-ring-track" cx="100" cy="100" r="${VID_RING_R}"/>` +
           `<circle class="vid-ring-fill" cx="100" cy="100" r="${VID_RING_R}"/>` +
           `</svg><div class="video-note-hole">` +
-          `<video playsinline preload="auto" src="${src}"></video>` +
+          `<video playsinline webkit-playsinline muted preload="auto" src="${src}"></video>` +
           `<div class="vid-badge">▶</div></div></div>`;
       }
       if (kind === 'video_note' && pending) return '<div class="album-pending">⭕</div>';
@@ -3438,7 +3438,10 @@
         else vid.pause();
       };
       primeVideoNotePreview(vid, wrap);
-      vid.onplay = sync;
+      vid.onplay = () => {
+        vid.muted = false;
+        sync();
+      };
       vid.onpause = sync;
       vid.onended = () => {
         restoreVideoNotePreview(vid);
@@ -3476,7 +3479,7 @@
           `<span class="draft-voice-label">🎤</span>`;
       }
       if (kind === 'video_note') {
-        return `<div class="draft-vnote"><video playsinline preload="auto" src="${url}"></video>` +
+        return `<div class="draft-vnote"><video playsinline webkit-playsinline muted preload="auto" src="${escapeHtml(videoNoteMediaSrc(url))}"></video>` +
           `<span class="draft-vnote-play">▶</span></div>`;
       }
       if (kind === 'video') {
@@ -3565,10 +3568,25 @@
     const VID_RING_LEN = 2 * Math.PI * VID_RING_R;
     const VIDEO_NOTE_PREVIEW_SEC = 1;
 
+    function videoNoteMediaSrc(url) {
+      if (!url) return url;
+      const base = String(url).split('#')[0];
+      return `${base}#t=${VIDEO_NOTE_PREVIEW_SEC}`;
+    }
+
     function videoNotePreviewTime(vid) {
-      const dur = saneDur(vid?.duration);
-      if (!dur) return 0;
+      const dur = videoNoteDuration(vid);
+      if (!dur) return VIDEO_NOTE_PREVIEW_SEC;
       return Math.min(VIDEO_NOTE_PREVIEW_SEC, Math.max(0, dur - 0.05));
+    }
+
+    function videoNoteDuration(vid) {
+      if (!vid) return 0;
+      let d = saneDur(vid.duration);
+      if (!d && vid.buffered?.length) {
+        d = saneDur(vid.buffered.end(vid.buffered.length - 1));
+      }
+      return d;
     }
 
     function resetVideoNotePreviewRing(wrap) {
@@ -3577,31 +3595,70 @@
       wrap.classList.remove('viewed');
     }
 
-    function primeVideoNotePreview(vid, wrap) {
-      if (!vid) return;
-      const seek = () => {
-        if (!saneDur(vid.duration)) return;
+    function captureVideoNotePoster(vid) {
+      if (!vid?.videoWidth) return '';
+      try {
+        const size = Math.max(vid.videoWidth, vid.videoHeight, 120);
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const vw = vid.videoWidth;
+        const vh = vid.videoHeight;
+        const side = Math.min(vw, vh);
+        const sx = (vw - side) / 2;
+        const sy = (vh - side) / 2;
+        ctx.drawImage(vid, sx, sy, side, side, 0, 0, size, size);
+        return canvas.toDataURL('image/jpeg', 0.84);
+      } catch {
+        return '';
+      }
+    }
+
+    async function ensureVideoNotePreviewFrame(vid, wrap) {
+      if (!vid || vid.dataset.previewPrimed === '1') return;
+      const waitFor = (event, test) => new Promise((resolve) => {
+        if (test()) resolve();
+        else vid.addEventListener(event, () => resolve(), { once: true });
+      });
+      const seekToPreview = () => new Promise((resolve) => {
         const t = videoNotePreviewTime(vid);
-        const done = () => {
-          if (wrap && wrap.dataset.vnotePlayed !== '1') resetVideoNotePreviewRing(wrap);
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          resolve();
         };
-        if (Math.abs(vid.currentTime - t) < 0.03 && vid.readyState >= 2) {
-          done();
-          return;
-        }
-        vid.addEventListener('seeked', done, { once: true });
-        try { vid.currentTime = t; } catch { /* ignore */ }
-      };
-      const loadFrame = () => {
-        if (vid.readyState >= 2) seek();
-        else vid.addEventListener('loadeddata', seek, { once: true });
-      };
-      if (vid.readyState >= 1) loadFrame();
-      else vid.addEventListener('loadedmetadata', loadFrame, { once: true });
+        vid.addEventListener('seeked', finish, { once: true });
+        setTimeout(finish, 500);
+        try { vid.currentTime = t; } catch { finish(); }
+      });
+      try {
+        await waitFor('loadedmetadata', () => vid.readyState >= 1);
+        await waitFor('loadeddata', () => vid.readyState >= 2);
+        await seekToPreview();
+        const wasMuted = vid.muted;
+        vid.muted = true;
+        try {
+          await vid.play();
+          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+          vid.pause();
+          await seekToPreview();
+        } catch { /* WebKit may block until gesture — poster still attempted */ }
+        vid.muted = wasMuted;
+        const poster = captureVideoNotePoster(vid);
+        if (poster) vid.poster = poster;
+        vid.dataset.previewPrimed = '1';
+        if (wrap && wrap.dataset.vnotePlayed !== '1') resetVideoNotePreviewRing(wrap);
+      } catch { /* ignore */ }
+    }
+
+    function primeVideoNotePreview(vid, wrap) {
+      ensureVideoNotePreviewFrame(vid, wrap);
     }
 
     function seekVideoNotePreview(vid) {
-      if (!vid || !saneDur(vid.duration)) return;
+      if (!vid) return;
       try { vid.currentTime = videoNotePreviewTime(vid); } catch { /* ignore */ }
     }
 
@@ -3879,11 +3936,41 @@
     function updateVideoRing(wrap, vid) {
       const ring = wrap.querySelector('.vid-ring-fill');
       if (!ring || !vid) return;
-      const dur = vid.duration;
-      if (!dur || !Number.isFinite(dur) || dur <= 0) return;
+      const dur = videoNoteDuration(vid);
+      if (!dur) {
+        if (wrap.classList.contains('playing') || wrap.classList.contains('seeking')) {
+          ring.style.opacity = '1';
+          ring.style.strokeDashoffset = String(VID_RING_LEN * 0.985);
+        }
+        return;
+      }
       const pct = Math.min(1, Math.max(0, vid.currentTime / dur));
+      ring.style.opacity = '1';
       ring.style.strokeDashoffset = String(VID_RING_LEN * (1 - pct));
       wrap.classList.toggle('viewed', pct > 0.005);
+    }
+
+    function beginVideoNotePlay(wrap, vid) {
+      wrap.dataset.vnotePlayed = '1';
+      wrap.classList.add('playing');
+      initVideoRing(wrap);
+      updateVideoRing(wrap, vid);
+    }
+
+    function wireVideoNotePlayback(wrap, vid, trackFn = trackVideoProgress) {
+      if (vid.dataset.playbackWired) return;
+      vid.dataset.playbackWired = '1';
+      vid.addEventListener('playing', () => {
+        beginVideoNotePlay(wrap, vid);
+        trackFn(wrap, vid);
+      });
+      vid.addEventListener('timeupdate', () => {
+        if (vid.paused || vid.ended || !wrap.classList.contains('playing')) return;
+        updateVideoRing(wrap, vid);
+      });
+      const refreshRing = () => updateVideoRing(wrap, vid);
+      vid.addEventListener('durationchange', refreshRing);
+      vid.addEventListener('loadedmetadata', refreshRing);
     }
 
     function isOnVideoRing(wrap, x, y) {
@@ -3902,9 +3989,10 @@
       let angle = Math.atan2(x - cx, -(y - cy));
       if (angle < 0) angle += Math.PI * 2;
       const pct = angle / (Math.PI * 2);
-      const dur = vid.duration;
-      if (!dur || !Number.isFinite(dur) || dur <= 0) return;
+      const dur = videoNoteDuration(vid);
+      if (!dur) return;
       vid.currentTime = Math.max(0, Math.min(dur, pct * dur));
+      wrap.classList.add('seeking');
       updateVideoRing(wrap, vid);
     }
 
@@ -3948,6 +4036,7 @@
         const src = wrap.dataset.src;
         initVideoRing(wrap);
         hookVideoProgress(wrap, vid);
+        wireVideoNotePlayback(wrap, vid);
 
         wrap.addEventListener('pointerdown', (e) => {
           if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -4002,17 +4091,13 @@
         if (voiceBtnEl) voiceBtnEl.textContent = '▶';
         stopVoiceRaf();
       }
-      if (!vid.src) vid.src = src;
-      wrap.dataset.vnotePlayed = '1';
-      wrap.classList.add('playing');
-      updateVideoRing(wrap, vid);
+      if (!vid.src) vid.src = videoNoteMediaSrc(src);
+      vid.muted = false;
+      beginVideoNotePlay(wrap, vid);
+      activeVideoEl = vid;
       if (vid.paused) {
-        vid.play().then(() => {
-          activeVideoEl = vid;
-          trackVideoProgress(wrap, vid);
-        }).catch(() => showAppErr('не удалось воспроизвести видео'));
+        vid.play().catch(() => showAppErr('не удалось воспроизвести видео'));
       } else {
-        activeVideoEl = vid;
         trackVideoProgress(wrap, vid);
       }
     }
@@ -4213,6 +4298,7 @@
       if (!wrap || !vid || wrap.dataset.reviewWired) return;
       wrap.dataset.reviewWired = '1';
       initVideoRing(wrap);
+      wireVideoNotePlayback(wrap, vid, trackVideoReviewProgress);
 
       primeVideoNotePreview(vid, wrap);
       vid.onpause = () => {
@@ -4228,12 +4314,6 @@
         const ring = wrap.querySelector('.vid-ring-fill');
         if (ring) ring.style.strokeDashoffset = '0';
         seekVideoNotePreview(vid);
-      };
-      vid.onplay = () => {
-        wrap.dataset.vnotePlayed = '1';
-        wrap.classList.add('playing');
-        updateVideoRing(wrap, vid);
-        trackVideoReviewProgress(wrap, vid);
       };
 
       wrap.addEventListener('pointerdown', (e) => {
@@ -4317,6 +4397,9 @@
       }
       if (pb) {
         pb.pause();
+        pb.removeAttribute('poster');
+        delete pb.dataset.previewPrimed;
+        delete pb.dataset.playbackWired;
         pb.removeAttribute('src');
         pb.load();
       }
@@ -4377,8 +4460,10 @@
       $('videoRecOverlay').classList.remove('hidden');
       $('mediaBtn').classList.remove('recording');
       const pb = $('videoRecPlayback');
-      pb.src = videoReviewUrl;
+      pb.src = videoNoteMediaSrc(videoReviewUrl);
+      pb.muted = true;
       wireVideoReviewUI();
+      primeVideoNotePreview(pb, $('videoReviewNote'));
     }
 
     function toggleVoiceReviewPlay() {
