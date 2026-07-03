@@ -555,9 +555,32 @@
     }
     .bubble.has-image {
       padding: 0; background: transparent !important; border: none !important;
-      width: fit-content; max-width: min(280px, 88%);
+      width: fit-content; max-width: min(280px, 100%);
       overflow: visible;
       border-radius: 0;
+    }
+    .bubble.mine.has-image:not(.has-caption),
+    .bubble.mine.has-album-photos:not(.has-caption):not(.has-reactions) {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+    .bubble.theirs.has-image:not(.has-caption),
+    .bubble.theirs.has-album-photos:not(.has-caption):not(.has-reactions) {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .bubble.has-image:not(.has-caption) .msg-foot,
+    .bubble.has-album-photos:not(.has-caption):not(.has-reactions) .msg-foot {
+      width: auto;
+      max-width: 100%;
+      margin-top: 2px;
+      align-self: flex-end;
+    }
+    .bubble.theirs.has-image:not(.has-caption) .msg-foot,
+    .bubble.theirs.has-album-photos:not(.has-caption):not(.has-reactions) .msg-foot {
+      align-self: flex-start;
     }
     .bubble.has-image.has-caption {
       padding: 0;
@@ -577,6 +600,7 @@
     .bubble.has-image img {
       margin-top: 0; border-radius: 28px;
       box-shadow: 0 2px 14px rgba(92, 51, 71, 0.1);
+      display: block;
     }
     .bubble.has-image.has-caption .msg-caption {
       padding: 4px 12px 0;
