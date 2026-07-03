@@ -748,7 +748,6 @@
       font-size: 0.85rem;
     }
     .review-video-note {
-      width: min(72vw, 280px); height: min(72vw, 280px);
       touch-action: none; cursor: pointer;
     }
     .review-video-note .vid-ring-fill { stroke: #fbcfe8; }
@@ -771,6 +770,10 @@
       flex-shrink: 0; touch-action: none; cursor: pointer;
       border-radius: 50%; overflow: hidden;
       display: block;
+    }
+    .video-note.review-video-note {
+      width: min(72vw, 280px);
+      height: min(72vw, 280px);
     }
     .video-note-hole {
       position: absolute; inset: 0; border-radius: 50%;
