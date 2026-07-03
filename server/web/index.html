@@ -746,24 +746,16 @@
     }
     .bubble.mine.editable { cursor: default; }
     .msg-row {
+      width: 100%;
       max-width: 100%;
       display: flex;
       flex-direction: column;
     }
-    .msg-row.mine {
-      align-self: flex-end;
-      width: fit-content;
-      max-width: 100%;
-    }
-    .msg-row.theirs {
-      align-self: flex-start;
-      width: fit-content;
-      max-width: 100%;
-    }
+    .msg-row.mine { align-items: flex-end; }
+    .msg-row.theirs { align-items: flex-start; }
     .msg-row-line {
       display: flex;
-      width: fit-content;
-      max-width: 100%;
+      width: 100%;
       align-items: stretch;
     }
     .msg-hit {
@@ -782,20 +774,10 @@
     }
     .msg-hit-left { flex: 0 0 44px; }
     .msg-hit-right { flex: 1 1 0; min-width: 44px; }
-    .msg-row.mine .msg-hit-left {
-      flex: 0 0 0;
-      width: 0;
-      min-width: 0;
-      overflow: hidden;
-    }
-    .msg-row.mine .msg-hit-right { flex: 0 0 44px; min-width: 44px; }
-    .msg-row.theirs .msg-hit-left { flex: 0 0 44px; min-width: 44px; }
-    .msg-row.theirs .msg-hit-right {
-      flex: 0 0 0;
-      width: 0;
-      min-width: 0;
-      overflow: hidden;
-    }
+    .msg-row.mine .msg-hit-left { flex: 1 1 0; min-width: 44px; }
+    .msg-row.mine .msg-hit-right { flex: 0 0 44px; }
+    .msg-row.theirs .msg-hit-left { flex: 0 0 44px; }
+    .msg-row.theirs .msg-hit-right { flex: 1 1 0; min-width: 44px; }
     .msg-stack {
       flex: 0 0 auto;
       width: fit-content;
@@ -809,6 +791,8 @@
       width: fit-content;
       max-width: 100%;
     }
+    .msg-row.mine .msg-row-inner { margin-left: auto; }
+    .msg-row.theirs .msg-row-inner { margin-right: auto; }
     .msg-reactions {
       display: flex; flex-wrap: wrap; gap: 4px;
       align-items: center;
