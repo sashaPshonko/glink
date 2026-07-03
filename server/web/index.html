@@ -1584,6 +1584,8 @@
     let voiceMsgEl = null;
     let voiceRaf = null;
     let voiceScrubbing = false;
+    let voiceScrubResumeChat = null;
+    let voiceScrubResumeReview = false;
     const waveCache = new Map();
     const voicePos = new Map();
     let videoRecorder = null;
@@ -3792,13 +3794,15 @@
       return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     }
 
-    function wireVoiceWaveScrub(waveEl, seekFn) {
-      if (!waveEl || waveEl.dataset.scrubWired) return;
+    function wireVoiceWaveScrub(waveEl, opts) {
+      const config = typeof opts === 'function' ? { seek: opts } : opts;
+      const { seek, onStart, onEnd } = config;
+      if (!waveEl || waveEl.dataset.scrubWired || !seek) return;
       waveEl.dataset.scrubWired = '1';
       let scrubbing = false;
 
       const applySeek = (clientX) => {
-        seekFn(wavePctFromPointer(waveEl, clientX));
+        seek(wavePctFromPointer(waveEl, clientX));
       };
 
       const endScrub = (e) => {
@@ -3806,6 +3810,7 @@
         scrubbing = false;
         voiceScrubbing = false;
         waveEl.classList.remove('scrubbing');
+        onEnd?.();
         try { waveEl.releasePointerCapture(e.pointerId); } catch (_) {}
       };
 
@@ -3814,6 +3819,7 @@
         scrubbing = true;
         voiceScrubbing = true;
         waveEl.classList.add('scrubbing');
+        onStart?.();
         waveEl.setPointerCapture(e.pointerId);
         applySeek(e.clientX);
         e.preventDefault();
@@ -3828,6 +3834,53 @@
 
       waveEl.addEventListener('pointerup', endScrub);
       waveEl.addEventListener('pointercancel', endScrub);
+    }
+
+    function beginVoiceScrubChat(el, src) {
+      voiceScrubResumeChat = null;
+      if (voiceAudio && !voiceAudio.paused) {
+        if (voiceAudio.dataset.glinkSrc === src) voiceScrubResumeChat = { el, src };
+        voiceAudio.pause();
+        if (voiceBtnEl) voiceBtnEl.textContent = '▶';
+        stopVoiceRaf();
+      }
+    }
+
+    function finishVoiceScrubChat(el, src) {
+      const resume = voiceScrubResumeChat?.src === src;
+      voiceScrubResumeChat = null;
+      if (voiceAudio?.dataset.glinkSrc !== src) return;
+      voiceAudio.currentTime = voicePos.get(src) || 0;
+      if (!resume) return;
+      const btn = el.querySelector('.voice-play');
+      voiceBtnEl = btn;
+      voiceMsgEl = el;
+      btn.textContent = '⏸';
+      voiceAudio.play().then(() => {
+        cacheVoiceDuration(el, voiceAudio);
+        updateVoiceProgress(el, voiceAudio.currentTime, voiceDuration(el, voiceAudio));
+        trackVoiceProgress(el);
+      }).catch(() => {
+        btn.textContent = '▶';
+        showAppErr('не удалось воспроизвести голосовое');
+      });
+    }
+
+    function beginVoiceReviewScrub() {
+      voiceScrubResumeReview = Boolean(voiceReviewAudio && !voiceReviewAudio.paused);
+      if (voiceReviewAudio && !voiceReviewAudio.paused) {
+        voiceReviewAudio.pause();
+        stopVoiceReviewRaf();
+      }
+    }
+
+    function finishVoiceReviewScrub() {
+      const resume = voiceScrubResumeReview;
+      voiceScrubResumeReview = false;
+      if (!voiceReviewAudio || !voiceReviewUrl) return;
+      voiceReviewAudio.currentTime = voicePos.get(voiceReviewUrl) || 0;
+      if (!resume) return;
+      voiceReviewAudio.play().catch(() => showAppErr('не удалось воспроизвести'));
     }
 
     function updateVoiceProgress(el, current, duration) {
@@ -3849,6 +3902,7 @@
       const time = Math.max(0, Math.min(dur, pct * dur));
       voicePos.set(src, time);
       updateVoiceProgress(el, time, dur);
+      if (voiceScrubbing) return;
       if (voiceAudio?.dataset.glinkSrc === src) voiceAudio.currentTime = time;
     }
 
@@ -3922,7 +3976,11 @@
       const saved = voicePos.get(src) || 0;
       if (saved > 0) updateVoiceProgress(el, saved, Number(el.dataset.duration) || 0);
       el.dataset.ready = '1';
-      wireVoiceWaveScrub(el.querySelector('.voice-wave'), (pct) => seekVoice(el, src, pct));
+      wireVoiceWaveScrub(el.querySelector('.voice-wave'), {
+        seek: (pct) => seekVoice(el, src, pct),
+        onStart: () => beginVoiceScrubChat(el, src),
+        onEnd: () => finishVoiceScrubChat(el, src),
+      });
     }
 
     function wireVoicePlayers(container) {
@@ -4357,12 +4415,14 @@
 
     function seekVoiceReview(pct) {
       const el = $('voiceReviewMsg');
-      if (!el) return;
+      if (!el || !voiceReviewUrl) return;
       const dur = saneDur(voiceReviewAudio?.duration) || saneDur(Number(el.dataset.duration));
       if (!dur) return;
       const time = Math.max(0, Math.min(dur, pct * dur));
-      if (voiceReviewAudio) voiceReviewAudio.currentTime = time;
+      voicePos.set(voiceReviewUrl, time);
       updateVoiceProgress(el, time, dur);
+      if (voiceScrubbing) return;
+      if (voiceReviewAudio) voiceReviewAudio.currentTime = time;
     }
 
     async function prepareVoiceReviewUI() {
@@ -4390,7 +4450,11 @@
           el.querySelector('.voice-dur').textContent = fmtTime(duration);
         }
       }
-      wireVoiceWaveScrub(el.querySelector('.voice-wave'), seekVoiceReview);
+      wireVoiceWaveScrub(el.querySelector('.voice-wave'), {
+        seek: seekVoiceReview,
+        onStart: beginVoiceReviewScrub,
+        onEnd: finishVoiceReviewScrub,
+      });
       updateVoiceProgress(el, 0, Number(el.dataset.duration) || 0);
     }
 
@@ -4542,6 +4606,7 @@
         trackVoiceReviewProgress();
       };
       voiceReviewAudio.ontimeupdate = () => {
+        if (voiceScrubbing) return;
         updateVoiceProgress($('voiceReviewMsg'), voiceReviewAudio.currentTime, voiceReviewAudio.duration);
       };
       prepareVoiceReviewUI();
