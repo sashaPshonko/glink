@@ -1564,7 +1564,7 @@
           <circle class="vid-ring-fill" cx="100" cy="100" r="96"/>
         </svg>
         <div class="video-note-hole">
-          <video id="videoRecPlayback" playsinline webkit-playsinline></video>
+          <video id="videoRecPlayback" playsinline webkit-playsinline preload="auto"></video>
           <div class="vid-badge">▶</div>
         </div>
       </div>
@@ -2246,7 +2246,7 @@
           `<circle class="vid-ring-track" cx="100" cy="100" r="${VID_RING_R}"/>` +
           `<circle class="vid-ring-fill" cx="100" cy="100" r="${VID_RING_R}"/>` +
           `</svg><div class="video-note-hole">` +
-          `<video playsinline preload="metadata" src="${src}"></video>` +
+          `<video playsinline preload="auto" src="${src}"></video>` +
           `<div class="vid-badge">▶</div></div></div>`;
       }
       if (kind === 'video_note' && pending) return '<div class="album-pending">⭕</div>';
@@ -3476,7 +3476,7 @@
           `<span class="draft-voice-label">🎤</span>`;
       }
       if (kind === 'video_note') {
-        return `<div class="draft-vnote"><video playsinline preload="metadata" src="${url}"></video>` +
+        return `<div class="draft-vnote"><video playsinline preload="auto" src="${url}"></video>` +
           `<span class="draft-vnote-play">▶</span></div>`;
       }
       if (kind === 'video') {
@@ -3563,7 +3563,7 @@
 
     const VID_RING_R = 96;
     const VID_RING_LEN = 2 * Math.PI * VID_RING_R;
-    const VIDEO_NOTE_PREVIEW_SEC = 0.5;
+    const VIDEO_NOTE_PREVIEW_SEC = 1;
 
     function videoNotePreviewTime(vid) {
       const dur = saneDur(vid?.duration);
@@ -3579,12 +3579,25 @@
 
     function primeVideoNotePreview(vid, wrap) {
       if (!vid) return;
-      const apply = () => {
-        seekVideoNotePreview(vid);
-        if (wrap && wrap.dataset.vnotePlayed !== '1') resetVideoNotePreviewRing(wrap);
+      const seek = () => {
+        if (!saneDur(vid.duration)) return;
+        const t = videoNotePreviewTime(vid);
+        const done = () => {
+          if (wrap && wrap.dataset.vnotePlayed !== '1') resetVideoNotePreviewRing(wrap);
+        };
+        if (Math.abs(vid.currentTime - t) < 0.03 && vid.readyState >= 2) {
+          done();
+          return;
+        }
+        vid.addEventListener('seeked', done, { once: true });
+        try { vid.currentTime = t; } catch { /* ignore */ }
       };
-      if (vid.readyState >= 1) apply();
-      else vid.addEventListener('loadedmetadata', apply, { once: true });
+      const loadFrame = () => {
+        if (vid.readyState >= 2) seek();
+        else vid.addEventListener('loadeddata', seek, { once: true });
+      };
+      if (vid.readyState >= 1) loadFrame();
+      else vid.addEventListener('loadedmetadata', loadFrame, { once: true });
     }
 
     function seekVideoNotePreview(vid) {
@@ -3845,6 +3858,7 @@
       stopVideoRaf();
       videoRafWrap = wrap;
       videoRafVid = vid;
+      updateVideoRing(wrap, vid);
       const tick = () => {
         if (videoRafVid !== vid || videoRafWrap !== wrap) return;
         if (vid.paused || vid.ended) return;
@@ -3989,16 +4003,15 @@
         stopVoiceRaf();
       }
       if (!vid.src) vid.src = src;
+      wrap.dataset.vnotePlayed = '1';
+      wrap.classList.add('playing');
+      updateVideoRing(wrap, vid);
       if (vid.paused) {
         vid.play().then(() => {
-          wrap.dataset.vnotePlayed = '1';
-          wrap.classList.add('playing');
           activeVideoEl = vid;
           trackVideoProgress(wrap, vid);
         }).catch(() => showAppErr('не удалось воспроизвести видео'));
       } else {
-        wrap.dataset.vnotePlayed = '1';
-        wrap.classList.add('playing');
         activeVideoEl = vid;
         trackVideoProgress(wrap, vid);
       }
@@ -4142,6 +4155,7 @@
 
     function trackVideoReviewProgress(wrap, vid) {
       stopVideoReviewRaf();
+      updateVideoRing(wrap, vid);
       const tick = () => {
         if (!vid || vid.paused || vid.ended) return;
         updateVideoRing(wrap, vid);
@@ -4218,6 +4232,7 @@
       vid.onplay = () => {
         wrap.dataset.vnotePlayed = '1';
         wrap.classList.add('playing');
+        updateVideoRing(wrap, vid);
         trackVideoReviewProgress(wrap, vid);
       };
 
@@ -4230,6 +4245,8 @@
           wrap.dataset.seeking = '1';
           seekVideoNote(wrap, vid, e.clientX, e.clientY);
           if (vid.paused) {
+            wrap.classList.add('playing');
+            updateVideoRing(wrap, vid);
             vid.play().catch(() => showAppErr('не удалось воспроизвести'));
           } else {
             trackVideoReviewProgress(wrap, vid);
