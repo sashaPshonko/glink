@@ -693,7 +693,7 @@
     .msg-meta-spacer {
       display: inline-block;
       width: 54px;
-      height: 0;
+      height: calc(1.38em - 1px);
       float: right;
     }
     .msg-text-tail {
@@ -703,15 +703,14 @@
     }
     .msg-inline-meta {
       float: right;
-      clear: right;
-      margin: 0 0 0 8px;
+      margin: 0.24em 0 0 8px;
       display: inline-flex;
-      align-items: center;
+      align-items: flex-end;
       gap: 3px;
       user-select: none;
       -webkit-user-select: none;
       white-space: nowrap;
-      line-height: 1.1;
+      line-height: 1;
     }
     .msg-inline-meta .msg-time {
       font-size: 0.68rem;
@@ -957,16 +956,20 @@
     .draft-vnote {
       position: relative; width: 56px; height: 56px;
       border-radius: 50%; overflow: hidden; flex-shrink: 0; cursor: pointer;
-      background: #1a1a1a;
+      background: transparent;
     }
     .draft-vnote video {
       width: 100%; height: 100%; object-fit: cover; display: block;
+      opacity: 0;
     }
+    .draft-vnote.preview-ready video,
+    .draft-vnote.playing video { opacity: 1; }
     .draft-vnote-play {
-      position: absolute; inset: 0; border: none; background: rgba(0, 0, 0, 0.28);
+      position: absolute; inset: 0; border: none; background: transparent;
       color: #fff; font-size: 1.4rem; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       pointer-events: none;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
     }
     .draft-vnote.playing .draft-vnote-play { opacity: 0; }
     .draft-video, .draft-audio {
@@ -1290,11 +1293,14 @@
     }
     .video-note-hole {
       position: absolute; inset: 0; border-radius: 50%;
-      overflow: hidden; background: #1a1a1a; z-index: 1;
+      overflow: hidden; background: transparent; z-index: 1;
     }
     .video-note-hole video {
       width: 100%; height: 100%; object-fit: cover; display: block;
+      opacity: 0;
     }
+    .video-note.preview-ready .video-note-hole video,
+    .video-note.playing .video-note-hole video { opacity: 1; }
     .vid-ring {
       position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2;
       pointer-events: none;
@@ -1316,8 +1322,9 @@
     .video-note .vid-badge {
       position: absolute; inset: 0; display: flex;
       align-items: center; justify-content: center;
-      background: rgba(0, 0, 0, 0.28); color: #fff;
+      background: transparent; color: #fff;
       font-size: 2.2rem; pointer-events: none;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
     }
     .video-note.playing .vid-badge { opacity: 0; }
     .bubble.has-video {
@@ -3410,8 +3417,11 @@
         if (vid.paused) vid.play().catch(() => {});
         else vid.pause();
       };
-      primeVideoNotePreview(vid);
-      vid.onplay = sync;
+      primeVideoNotePreview(vid, wrap);
+      vid.onplay = () => {
+        markVideoNotePreviewReady(vid, wrap);
+        sync();
+      };
       vid.onpause = sync;
       vid.onended = () => {
         restoreVideoNotePreview(vid);
@@ -3536,7 +3546,16 @@
 
     const VID_RING_R = 96;
     const VID_RING_LEN = 2 * Math.PI * VID_RING_R;
-    const VIDEO_NOTE_PREVIEW_SEC = 1;
+    const VIDEO_NOTE_PREVIEW_SEC = 0.5;
+
+    function videoNotePreviewHost(vid, wrap) {
+      return wrap || vid?.closest('.video-note, .draft-vnote, .review-video-note');
+    }
+
+    function markVideoNotePreviewReady(vid, wrap) {
+      const host = videoNotePreviewHost(vid, wrap);
+      if (host) host.classList.add('preview-ready');
+    }
 
     function videoNotePreviewTime(vid) {
       const dur = saneDur(vid?.duration);
@@ -3552,17 +3571,28 @@
 
     function primeVideoNotePreview(vid, wrap) {
       if (!vid) return;
+      const host = videoNotePreviewHost(vid, wrap);
+      const failSafe = () => {
+        if (host?.classList.contains('preview-ready')) return;
+        markVideoNotePreviewReady(vid, wrap);
+      };
+      const failTimer = setTimeout(failSafe, 2500);
+      const done = () => {
+        clearTimeout(failTimer);
+        resetVideoNotePreviewRing(wrap);
+        markVideoNotePreviewReady(vid, wrap);
+      };
       const apply = () => {
         if (!saneDur(vid.duration)) return;
         const t = videoNotePreviewTime(vid);
-        const paint = () => resetVideoNotePreviewRing(wrap);
         if (Math.abs(vid.currentTime - t) < 0.03 && vid.readyState >= 2) {
-          paint();
+          done();
           return;
         }
-        vid.addEventListener('seeked', paint, { once: true });
-        try { vid.currentTime = t; } catch { /* ignore */ }
+        vid.addEventListener('seeked', done, { once: true });
+        try { vid.currentTime = t; } catch { failSafe(); }
       };
+      vid.addEventListener('error', failSafe, { once: true });
       if (vid.readyState >= 1) apply();
       else vid.addEventListener('loadedmetadata', apply, { once: true });
     }
@@ -3971,12 +4001,14 @@
       if (!vid.src) vid.src = src;
       if (vid.paused) {
         vid.play().then(() => {
+          markVideoNotePreviewReady(vid, wrap);
           wrap.dataset.vnotePlayed = '1';
           wrap.classList.add('playing');
           activeVideoEl = vid;
           trackVideoProgress(wrap, vid);
         }).catch(() => showAppErr('не удалось воспроизвести видео'));
       } else {
+        markVideoNotePreviewReady(vid, wrap);
         wrap.dataset.vnotePlayed = '1';
         wrap.classList.add('playing');
         activeVideoEl = vid;
@@ -4196,6 +4228,7 @@
         seekVideoNotePreview(vid);
       };
       vid.onplay = () => {
+        markVideoNotePreviewReady(vid, wrap);
         wrap.dataset.vnotePlayed = '1';
         wrap.classList.add('playing');
         trackVideoReviewProgress(wrap, vid);
@@ -4268,7 +4301,7 @@
       const wrap = $('videoReviewNote');
       const pb = $('videoRecPlayback');
       if (wrap) {
-        wrap.classList.remove('playing', 'seeking', 'viewed');
+        wrap.classList.remove('playing', 'seeking', 'viewed', 'preview-ready');
         delete wrap.dataset.seeking;
         delete wrap.dataset.reviewWired;
         delete wrap.dataset.vnotePlayed;
