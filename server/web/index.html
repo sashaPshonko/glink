@@ -274,10 +274,14 @@
       border-radius: 0;
     }
     .bubble.has-image.has-caption {
-      padding: 0 0 8px;
+      padding: 0;
       background: rgba(249, 197, 223, 0.95) !important;
       border-radius: 28px 28px 12px 28px;
       overflow: hidden;
+    }
+    .bubble.has-image.has-caption img {
+      border-radius: 28px 28px 0 0;
+      margin-bottom: 0;
     }
     .bubble.theirs.has-image.has-caption {
       background: rgba(255, 255, 255, 0.92) !important;
@@ -288,9 +292,11 @@
       margin-top: 0; border-radius: 28px;
       box-shadow: 0 2px 14px rgba(92, 51, 71, 0.1);
     }
-    .bubble.has-image.has-caption img {
-      border-radius: 28px 28px 0 0;
-      margin-bottom: 4px;
+    .bubble.has-image.has-caption .msg-caption {
+      padding: 4px 12px 0;
+    }
+    .bubble.has-image.has-caption .msg-foot {
+      padding: 4px 12px 8px;
     }
     .voice-msg {
       display: flex; align-items: center; gap: 10px;
@@ -443,10 +449,28 @@
       border-radius: 28px 28px 12px 28px;
       width: fit-content; max-width: min(220px, 88%);
     }
+    .bubble.has-video.has-caption {
+      padding: 0 10px 8px;
+      background: rgba(249, 197, 223, 0.95) !important;
+      border-radius: 28px 28px 12px 28px;
+      width: fit-content; max-width: min(220px, 88%);
+      overflow: hidden;
+    }
     .bubble.theirs.has-video.has-reactions {
       background: rgba(255, 255, 255, 0.92) !important;
       border: 1px solid rgba(252, 231, 243, 0.95) !important;
       border-radius: 28px 28px 28px 12px;
+    }
+    .bubble.theirs.has-video.has-caption {
+      background: rgba(255, 255, 255, 0.92) !important;
+      border: 1px solid rgba(252, 231, 243, 0.95) !important;
+      border-radius: 28px 28px 28px 12px;
+    }
+    .bubble.has-video.has-caption .msg-caption {
+      padding: 6px 2px 0;
+    }
+    .bubble.has-video.has-caption .msg-foot {
+      padding: 4px 2px 0;
     }
     .bubble.has-image.has-reactions:not(.has-caption) {
       padding: 0 8px 8px;
@@ -660,10 +684,33 @@
       justify-content: center;
       border-radius: 0;
     }
-    .bubble.has-album { padding: 4px; }
-    .bubble.has-album.has-caption { padding: 4px 8px 8px; }
-    .bubble.has-album.has-caption .msg-album { margin-bottom: 4px; }
-    .bubble.has-album-photos:not(.has-caption) {
+    .bubble.has-caption .msg-caption {
+      padding: 8px 12px 0;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+    .bubble.has-caption .msg-foot {
+      padding: 4px 12px 8px;
+      margin-top: 0;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .bubble.has-album {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      width: fit-content;
+      max-width: min(280px, 88%);
+      padding: 0;
+    }
+    .bubble.has-album .msg-album {
+      width: 100%;
+      max-width: 100%;
+    }
+    .bubble.has-album:not(.has-album-photos) {
+      padding: 4px;
+    }
+    .bubble.has-album-photos:not(.has-caption):not(.has-reactions) {
       padding: 0;
       background: transparent !important;
       border: none !important;
@@ -671,7 +718,7 @@
       border-radius: 0;
     }
     .bubble.has-album-photos.has-caption {
-      padding: 0 0 8px;
+      padding: 0;
       overflow: hidden;
     }
     .bubble.mine.has-album-photos.has-caption {
@@ -682,6 +729,31 @@
       background: rgba(255, 255, 255, 0.92) !important;
       border: 1px solid rgba(252, 231, 243, 0.95) !important;
       border-radius: 28px 28px 28px 12px;
+    }
+    .bubble.has-album-photos.has-reactions:not(.has-caption) {
+      padding: 0 8px 8px;
+      background: rgba(249, 197, 223, 0.95) !important;
+      border-radius: 28px 28px 12px 28px;
+    }
+    .bubble.theirs.has-album-photos.has-reactions:not(.has-caption) {
+      background: rgba(255, 255, 255, 0.92) !important;
+      border: 1px solid rgba(252, 231, 243, 0.95) !important;
+      border-radius: 28px 28px 28px 12px;
+    }
+    .bubble.has-voice.has-caption,
+    .bubble.has-media-video.has-caption,
+    .bubble.has-media-audio.has-caption {
+      padding: 8px 10px;
+    }
+    .bubble.has-voice.has-caption .msg-caption,
+    .bubble.has-media-video.has-caption .msg-caption,
+    .bubble.has-media-audio.has-caption .msg-caption {
+      padding: 6px 2px 0;
+    }
+    .bubble.has-voice.has-caption .msg-foot,
+    .bubble.has-media-video.has-caption .msg-foot,
+    .bubble.has-media-audio.has-caption .msg-foot {
+      padding: 4px 2px 0;
     }
     .album-pending {
       font-size: 0.85rem; color: #9d174d; padding: 6px 10px;
@@ -1403,7 +1475,7 @@
         else if (kind === 'audio' && pending) parts.push('<div>🎵 …</div>');
       }
 
-      if (m.text) parts.push(`<div>${linkify(m.text)}</div>`);
+      if (m.text) parts.push(`<div class="msg-caption">${linkify(m.text)}</div>`);
       if (!parts.length) parts.push('<div>…</div>');
       return parts.join('');
     }
@@ -1700,12 +1772,14 @@
       const single = attachments[0];
       const sk = single ? attachmentKind(single) : m.kind;
       const allPhotos = multi && attachments.length > 0 && attachments.every(isImageAttachment);
+      const cap = m.text ? ' has-caption' : '';
       const extraCls = multi
-        ? (' has-album' + (allPhotos ? ' has-album-photos' : '') + (m.text ? ' has-caption' : ''))
-        : (sk === 'video_note' ? ' has-video'
-          : (sk === 'video' ? ' has-media-video'
-            : (sk === 'audio' ? ' has-media-audio'
-              : (sk === 'image' ? (' has-image' + (m.text ? ' has-caption' : '')) : ''))));
+        ? (' has-album' + (allPhotos ? ' has-album-photos' : '') + cap)
+        : (sk === 'video_note' ? (' has-video' + cap)
+          : (sk === 'video' ? (' has-media-video' + cap)
+            : (sk === 'audio' ? (' has-media-audio' + cap)
+              : (sk === 'voice' ? (' has-voice' + cap)
+                : (sk === 'image' ? (' has-image' + cap) : cap)))));
       const pendingCls = m._pending ? ' pending' : '';
       const reactCls = hasReactions(m) ? ' has-reactions' : '';
       return `<div class="bubble ${mine ? 'mine' : 'theirs'}${extraCls}${reactCls}${pendingCls}">${sender}${renderMessageBody(m)}${renderBubbleFoot(m, mine)}</div>`;
