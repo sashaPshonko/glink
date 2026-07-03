@@ -694,7 +694,7 @@
       display: flex;
       flex-direction: row;
       flex-wrap: nowrap;
-      align-items: baseline;
+      align-items: flex-end;
       justify-content: space-between;
       gap: 8px;
     }
@@ -705,12 +705,13 @@
     .msg-inline-meta {
       flex: 0 0 auto;
       display: inline-flex;
-      align-items: baseline;
+      align-items: flex-end;
       gap: 3px;
       user-select: none;
       -webkit-user-select: none;
       white-space: nowrap;
       line-height: 1;
+      transform: translateY(2px);
     }
     .bubble.text-only .msg-text-foot {
       padding: 0 11px 8px;
@@ -2199,10 +2200,19 @@
     }
 
     function isVideoNote(m) {
+      if (!m) return false;
       if (m.kind === 'video_note') return true;
-      if (m.kind !== 'video') return false;
-      const name = m.file?.name || '';
-      return /^video\.(webm|mp4|mov)$/i.test(name);
+      const name = m.file?.name || m.files?.[0]?.name || '';
+      if (/^video\.(webm|mp4|mov)$/i.test(name)) return true;
+      return false;
+    }
+
+    function effectiveAttachmentKind(f, m) {
+      if (!f) return m?.kind || 'file';
+      if (f.kind === 'video_note') return 'video_note';
+      if (isVideoNote(m)) return 'video_note';
+      if (f.kind === 'video' && /^video\.(webm|mp4|mov)$/i.test(f.name || '')) return 'video_note';
+      return f.kind || 'file';
     }
 
     function uploadKind(file) {
@@ -2214,7 +2224,7 @@
     }
 
     function renderAttachmentPart(f, pending, m) {
-      const kind = attachmentKind(f);
+      const kind = effectiveAttachmentKind(f, m);
       const url = attachmentUrl(f);
       if (kind === 'image' && url && !pending) {
         return `<img src="${url}" alt="фото" onclick="window.open(this.src,'_blank')" />`;
@@ -2661,7 +2671,7 @@
       const attachments = messageFiles(m);
       const multi = attachments.length > 1 || m.kind === 'album';
       const single = attachments[0];
-      const sk = single ? attachmentKind(single) : m.kind;
+      const sk = single ? effectiveAttachmentKind(single, m) : (isVideoNote(m) ? 'video_note' : m.kind);
       const allPhotos = multi && attachments.length > 0 && attachments.every(isImageAttachment);
       const plainText = isPlainTextBubble(m) && !hasReactions(m);
       const cap = (!plainText && m.text) ? ' has-caption' : '';

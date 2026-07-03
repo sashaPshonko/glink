@@ -101,17 +101,27 @@ function publicUser(user) {
     return base;
 }
 
+function resolvedMessageKind(msg) {
+    if (!msg) return 'text';
+    if (msg.kind === 'video_note') return 'video_note';
+    const name = msg.file?.name || msg.files?.[0]?.name || '';
+    if (msg.kind === 'video' && /^video\.(webm|mp4|mov)$/i.test(name)) return 'video_note';
+    return msg.kind || 'text';
+}
+
 function enrichMessage(msg, viewerId = null) {
     const sender = findUserById(msg.senderId);
     const chat = findChatById(msg.chatId);
+    const kind = resolvedMessageKind(msg);
     const base = {
         ...msg,
-        kind: msg.kind || 'text',
+        kind,
         senderName: sender?.displayName || sender?.username || '?',
     };
     if (msg.files?.length) {
         base.files = msg.files.map((f) => ({
             ...f,
+            kind: kind === 'video_note' && f.kind === 'video' ? 'video_note' : f.kind,
             fileUrl: f.id ? `/files/${f.id}` : undefined,
         }));
     }
@@ -120,7 +130,7 @@ function enrichMessage(msg, viewerId = null) {
         if (!base.files?.length) {
             base.files = [{
                 ...msg.file,
-                kind: msg.kind,
+                kind,
                 fileUrl: base.fileUrl,
             }];
         }
