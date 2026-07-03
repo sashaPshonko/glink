@@ -439,6 +439,9 @@
       display: flex; flex-direction: column; gap: 10px;
       align-items: stretch;
       -webkit-overflow-scrolling: touch;
+      --vnote-edge: 64px;
+      --vnote-idle: min(200px, calc(100vw - var(--vnote-edge)));
+      --vnote-play: min(300px, calc(100vw - var(--vnote-edge)));
     }
     #messages.messages-preparing {
       opacity: 0;
@@ -530,8 +533,16 @@
         width: 38px; height: 38px; font-size: 1.05rem;
       }
       #composer { gap: 5px; padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); }
-      #messages { padding: 12px 10px; }
+      #messages {
+        padding: 12px 10px;
+        --vnote-edge: calc(20px + 44px);
+        --vnote-idle: min(200px, calc(100vw - var(--vnote-edge)));
+        --vnote-play: min(300px, calc(100vw - var(--vnote-edge)));
+      }
       .msg-stack { max-width: 88%; }
+      .msg-stack:has(.video-note) {
+        max-width: calc(100vw - var(--vnote-edge));
+      }
     }
     .bubble {
       width: fit-content;
@@ -1274,8 +1285,9 @@
     .rec-cancel { background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.5); }
     .rec-send { background: #e879a9; border: 2px solid #fff; }
     .video-note {
-      --vnote-size: 200px;
+      --vnote-size: var(--vnote-idle, 200px);
       width: var(--vnote-size); height: var(--vnote-size);
+      max-width: 100%;
       position: relative; margin-top: 0;
       flex-shrink: 0; touch-action: none; cursor: pointer;
       border-radius: 50%; overflow: hidden;
@@ -1285,7 +1297,7 @@
       z-index: 1;
     }
     .video-note.playing {
-      --vnote-size: 300px;
+      --vnote-size: var(--vnote-play, 300px);
       z-index: 3;
     }
     .video-note.review-video-note {
@@ -1341,13 +1353,13 @@
     .video-note.playing .vid-badge { opacity: 0; }
     .bubble.has-video {
       padding: 0; background: transparent !important; border: none !important;
-      width: fit-content; max-width: min(200px, 88%);
+      width: fit-content; max-width: var(--vnote-idle, min(200px, 88%));
       overflow: visible;
       border-radius: 0;
       transition: max-width 0.38s cubic-bezier(0.34, 1.12, 0.64, 1);
     }
     .bubble.has-video:has(.video-note.playing) {
-      max-width: min(300px, 94%);
+      max-width: var(--vnote-play, min(300px, 94%));
     }
     .bubble.has-video.has-reactions,
     .bubble.has-video.has-caption {
@@ -1355,7 +1367,7 @@
     }
     .bubble.has-video.has-reactions:has(.video-note.playing),
     .bubble.has-video.has-caption:has(.video-note.playing) {
-      max-width: min(320px, 94%);
+      max-width: var(--vnote-play, min(320px, 94%));
     }
     .bubble.has-media-video {
       padding: 6px 8px; width: fit-content; max-width: min(320px, 88%);
