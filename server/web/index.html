@@ -5713,7 +5713,24 @@
       refreshChatList();
     }
 
-    function userGoBack() {
+    function dismissUiLayers() {
+      if (!$('avatarCropSheet').classList.contains('hidden')) {
+        closeAvatarCrop();
+        return true;
+      }
+      if (!$('avatarMenuSheet').classList.contains('hidden')) {
+        closeAvatarMenu();
+        return true;
+      }
+      if (!$('profileSheet').classList.contains('hidden')) {
+        closeProfileSheet();
+        return true;
+      }
+      if (!$('msgMenu').classList.contains('hidden')) {
+        closeMsgMenu();
+        blockMsgMenuOpen();
+        return true;
+      }
       if (!$('videoRecOverlay').classList.contains('hidden')) {
         cancelVideoRecording();
         return true;
@@ -5722,6 +5739,15 @@
         cancelVoiceRecording();
         return true;
       }
+      if (editingMessageId) {
+        cancelEdit();
+        return true;
+      }
+      return false;
+    }
+
+    function userGoBack() {
+      if (dismissUiLayers()) return true;
       if (!activeChat) return false;
       if (history.state?.glink === 'chat') {
         history.back();
@@ -6289,7 +6315,6 @@
         sendText();
         return;
       }
-      if (e.key === 'Escape' && editingMessageId) cancelEdit();
     };
     $('msgInput').addEventListener('input', () => {
       showAppErr('');
@@ -6527,17 +6552,10 @@
       }
     }, true);
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !$('msgMenu').classList.contains('hidden')) {
-        closeMsgMenu();
-      }
-      if (e.key === 'Escape' && !$('profileSheet').classList.contains('hidden')) {
-        closeProfileSheet();
-      }
-      if (e.key === 'Escape' && !$('avatarCropSheet').classList.contains('hidden')) {
-        closeAvatarCrop();
-      }
-      if (e.key === 'Escape' && !$('avatarMenuSheet').classList.contains('hidden')) {
-        closeAvatarMenu();
+      if (e.key !== 'Escape') return;
+      if (dismissUiLayers()) {
+        e.preventDefault();
+        e.stopPropagation();
       }
     });
 
