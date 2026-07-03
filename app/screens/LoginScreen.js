@@ -78,7 +78,7 @@ export default function LoginScreen({ onAuthed }) {
             style={styles.root}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-            <Text style={styles.logo}>Glink ♡</Text>
+            <Text style={styles.logo}>максим ♡</Text>
             <Text style={styles.sub}>нажми на себя — и в чат</Text>
 
             <View style={styles.whoRow}>

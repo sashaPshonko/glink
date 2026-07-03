@@ -80,7 +80,7 @@ export default function ChatsListScreen({ user, onOpenChat, onLogout }) {
         <View style={styles.root}>
             <View style={styles.header}>
                 <View>
-                    <Text style={styles.title}>Glink</Text>
+                    <Text style={styles.title}>максим</Text>
                     <Text style={styles.me}>@{user.username}</Text>
                 </View>
                 <Pressable onPress={onLogout}>

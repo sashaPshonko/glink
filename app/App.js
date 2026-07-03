@@ -71,7 +71,7 @@ export default function App() {
             if (msg.type === 'notify') {
                 await Notifications.scheduleNotificationAsync({
                     content: {
-                        title: msg.title || 'Glink',
+                        title: msg.title || 'максим',
                         body: msg.body || '',
                         data: { chatId: msg.chatId || '' },
                     },

@@ -1,4 +1,4 @@
-/** Нежно-розовая тема Glink */
+/** Нежно-розовая тема максим */
 export const theme = {
     bg: '#fff5f9',
     bgSoft: '#ffecf4',
