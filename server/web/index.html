@@ -500,6 +500,7 @@
     .msg-group.theirs .msg-group-body { align-items: flex-start; }
     .msg-group.mine .msg-group-body { align-items: flex-end; }
     .msg-group.no-avatar .msg-group-body { width: 100%; }
+    .msg-group.no-avatar { --vnote-edge: 32px; }
     #composer {
       display: flex; gap: 8px; padding: 10px 12px;
       padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
@@ -543,6 +544,7 @@
       .msg-stack:has(.video-note) {
         max-width: calc(100vw - var(--vnote-edge));
       }
+      .msg-group.no-avatar { --vnote-edge: 24px; }
     }
     .bubble {
       width: fit-content;
@@ -839,14 +841,18 @@
       padding: 0 10px 8px;
       background: rgba(249, 197, 223, 0.95) !important;
       border-radius: 28px 28px 12px 28px;
-      width: fit-content; max-width: min(220px, 88%);
+      width: fit-content; max-width: min(220px, var(--vnote-idle, 88%));
     }
     .bubble.has-video.has-caption {
       padding: 0 10px 8px;
       background: rgba(249, 197, 223, 0.95) !important;
       border-radius: 28px 28px 12px 28px;
-      width: fit-content; max-width: min(220px, 88%);
+      width: fit-content; max-width: min(220px, var(--vnote-idle, 88%));
       overflow: hidden;
+    }
+    .bubble.has-video.has-reactions:has(.video-note.playing),
+    .bubble.has-video.has-caption:has(.video-note.playing) {
+      max-width: var(--vnote-play, min(320px, 94%));
     }
     .bubble.theirs.has-video.has-reactions {
       background: rgba(255, 255, 255, 0.92) !important;
