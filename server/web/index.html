@@ -426,6 +426,42 @@
       flex-shrink: 0;
     }
     #chatView { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; position: relative; }
+    .chat-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+    #videoNotePinHost {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 25;
+      overflow: visible;
+    }
+    #videoNotePinHost .video-note {
+      pointer-events: auto;
+      position: absolute;
+      margin: 0;
+      top: 42%;
+      transform: translateY(-50%);
+      transition: width 0.32s cubic-bezier(0.34, 1.12, 0.64, 1),
+        height 0.32s cubic-bezier(0.34, 1.12, 0.64, 1);
+    }
+    #videoNotePinHost .video-note.pin-mine {
+      right: max(10px, env(safe-area-inset-right, 0px));
+      left: auto;
+    }
+    #videoNotePinHost .video-note.pin-theirs {
+      left: max(10px, env(safe-area-inset-left, 0px));
+      right: auto;
+    }
+    .video-note-placeholder {
+      flex-shrink: 0;
+      border-radius: 50%;
+      pointer-events: none;
+    }
     #unreadJumpBtn {
       position: absolute;
       left: 50%; transform: translateX(-50%);
@@ -435,7 +471,7 @@
     }
     #unreadJumpBtn.hidden { display: none; }
     #messages {
-      flex: 1; overflow: auto; padding: 16px;
+      flex: 1; min-height: 0; overflow: auto; padding: 16px;
       display: flex; flex-direction: column; gap: 10px;
       align-items: stretch;
       -webkit-overflow-scrolling: touch;
@@ -1510,7 +1546,10 @@
         </div>
         <div class="chat-header-spacer" aria-hidden="true"></div>
       </header>
-      <div id="messages"></div>
+      <div class="chat-body">
+        <div id="messages"></div>
+        <div id="videoNotePinHost" aria-hidden="true"></div>
+      </div>
       <button type="button" id="unreadJumpBtn" class="hidden">1</button>
       <div id="composer">
         <div id="draftAttach" class="hidden">
@@ -1670,6 +1709,9 @@
     let videoRecTimer = null;
     let videoRecStarted = 0;
     let activeVideoEl = null;
+    let pinnedVideoWrap = null;
+    let pinnedVideoPlaceholder = null;
+    let pinnedVideoOrigin = null;
     let videoRaf = null;
     let videoRafWrap = null;
     let videoRafVid = null;
@@ -2028,6 +2070,7 @@
     }
 
     function relayoutMessages(box = $('messages'), opts = {}) {
+      clearVideoNotePin();
       const stick = shouldStickToBottom(opts.forceBottom);
       const anchor = stick ? null : saveScrollAnchor(box);
       box.innerHTML = renderMessagesHtml(activeMessages);
@@ -4239,16 +4282,71 @@
       }, 0);
     }
 
+    function copyVideoNoteSizeVars(wrap) {
+      const stack = wrap.closest('.msg-stack');
+      if (!stack) return;
+      const idle = getComputedStyle(stack).getPropertyValue('--vnote-idle').trim();
+      const play = getComputedStyle(stack).getPropertyValue('--vnote-play').trim();
+      if (idle) wrap.style.setProperty('--vnote-idle', idle);
+      if (play) wrap.style.setProperty('--vnote-play', play);
+    }
+
+    function pinVideoNoteToScreen(wrap) {
+      if (!wrap || wrap.classList.contains('review-video-note') || wrap.dataset.pinned === '1') return;
+      const host = $('videoNotePinHost');
+      if (!host) return;
+      copyVideoNoteSizeVars(wrap);
+      const mine = wrap.closest('.msg-row')?.classList.contains('mine');
+      const idle = getComputedStyle(wrap).getPropertyValue('--vnote-idle').trim() || '200px';
+      const ph = document.createElement('div');
+      ph.className = 'video-note-placeholder';
+      ph.style.width = idle;
+      ph.style.height = idle;
+      pinnedVideoOrigin = { parent: wrap.parentNode, next: wrap.nextSibling };
+      wrap.parentNode.insertBefore(ph, wrap);
+      pinnedVideoPlaceholder = ph;
+      host.appendChild(wrap);
+      wrap.dataset.pinned = '1';
+      wrap.classList.add('pin-screen');
+      wrap.classList.toggle('pin-mine', !!mine);
+      wrap.classList.toggle('pin-theirs', !mine);
+      pinnedVideoWrap = wrap;
+    }
+
+    function unpinVideoNoteFromScreen(wrap = pinnedVideoWrap) {
+      if (!wrap || wrap.dataset.pinned !== '1') return;
+      wrap.classList.remove('pin-screen', 'pin-mine', 'pin-theirs');
+      delete wrap.dataset.pinned;
+      const parent = pinnedVideoOrigin?.parent;
+      if (parent?.isConnected) {
+        parent.insertBefore(wrap, pinnedVideoPlaceholder || pinnedVideoOrigin?.next || null);
+      } else {
+        wrap.remove();
+      }
+      pinnedVideoPlaceholder?.remove();
+      pinnedVideoPlaceholder = null;
+      pinnedVideoOrigin = null;
+      if (pinnedVideoWrap === wrap) pinnedVideoWrap = null;
+    }
+
+    function clearVideoNotePin() {
+      const wrap = pinnedVideoWrap || $('videoNotePinHost')?.querySelector('.video-note[data-pinned="1"]');
+      if (!wrap) return;
+      const vid = wrap.querySelector('video');
+      if (vid && !vid.paused) vid.pause();
+      else {
+        wrap.classList.remove('playing');
+        unpinVideoNoteFromScreen(wrap);
+      }
+    }
+
     function beginVideoNotePlay(wrap, vid) {
       wrap.dataset.vnotePlayed = '1';
       measureVideoNoteCaps(wrap);
+      if (!wrap.classList.contains('review-video-note')) pinVideoNoteToScreen(wrap);
       wrap.classList.add('playing');
       initVideoRing(wrap);
       updateVideoRing(wrap, vid);
-      requestAnimationFrame(() => {
-        measureVideoNoteCaps(wrap);
-        wrap.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
-      });
     }
 
     function wireVideoNotePlayback(wrap, vid, trackFn = trackVideoProgress) {
@@ -4294,6 +4392,7 @@
       primeVideoNotePreview(vid, wrap);
       vid.onpause = () => {
         wrap.classList.remove('playing');
+        unpinVideoNoteFromScreen(wrap);
         stopVideoRaf();
         if (wrap.dataset.vnotePlayed === '1') updateVideoRing(wrap, vid);
         else resetVideoNotePreviewRing(wrap);
@@ -4366,6 +4465,7 @@
 
         vid.onended = () => {
           wrap.classList.remove('playing');
+          unpinVideoNoteFromScreen(wrap);
           stopVideoRaf();
           if (activeVideoEl === vid) activeVideoEl = null;
           wrap.classList.add('viewed');
@@ -5138,6 +5238,7 @@
       persistActiveChatDraft();
       cancelEdit();
       closeMsgMenu();
+      clearVideoNotePin();
       activeMessages = [];
       activeChat = null;
       localStorage.removeItem('glink_active_chat');
