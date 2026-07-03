@@ -439,9 +439,6 @@
       display: flex; flex-direction: column; gap: 10px;
       align-items: stretch;
       -webkit-overflow-scrolling: touch;
-      --vnote-edge: 64px;
-      --vnote-idle: min(200px, calc(100vw - var(--vnote-edge)));
-      --vnote-play: min(300px, calc(100vw - var(--vnote-edge)));
     }
     #messages.messages-preparing {
       opacity: 0;
@@ -500,7 +497,9 @@
     .msg-group.theirs .msg-group-body { align-items: flex-start; }
     .msg-group.mine .msg-group-body { align-items: flex-end; }
     .msg-group.no-avatar .msg-group-body { width: 100%; }
-    .msg-group.no-avatar { --vnote-edge: 32px; }
+    .msg-stack:has(.video-note) {
+      max-width: 100%;
+    }
     #composer {
       display: flex; gap: 8px; padding: 10px 12px;
       padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
@@ -534,17 +533,9 @@
         width: 38px; height: 38px; font-size: 1.05rem;
       }
       #composer { gap: 5px; padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); }
-      #messages {
-        padding: 12px 10px;
-        --vnote-edge: calc(20px + 44px);
-        --vnote-idle: min(200px, calc(100vw - var(--vnote-edge)));
-        --vnote-play: min(300px, calc(100vw - var(--vnote-edge)));
-      }
+      #messages { padding: 12px 10px; }
       .msg-stack { max-width: 88%; }
-      .msg-stack:has(.video-note) {
-        max-width: calc(100vw - var(--vnote-edge));
-      }
-      .msg-group.no-avatar { --vnote-edge: 24px; }
+      .msg-stack:has(.video-note) { max-width: 100%; }
     }
     .bubble {
       width: fit-content;
@@ -770,7 +761,7 @@
     .msg-row-line {
       display: flex;
       width: 100%;
-      align-items: stretch;
+      align-items: flex-start;
     }
     .msg-hit {
       min-height: 44px;
@@ -841,18 +832,14 @@
       padding: 0 10px 8px;
       background: rgba(249, 197, 223, 0.95) !important;
       border-radius: 28px 28px 12px 28px;
-      width: fit-content; max-width: min(220px, var(--vnote-idle, 88%));
+      width: fit-content;
     }
     .bubble.has-video.has-caption {
       padding: 0 10px 8px;
       background: rgba(249, 197, 223, 0.95) !important;
       border-radius: 28px 28px 12px 28px;
-      width: fit-content; max-width: min(220px, var(--vnote-idle, 88%));
+      width: fit-content;
       overflow: hidden;
-    }
-    .bubble.has-video.has-reactions:has(.video-note.playing),
-    .bubble.has-video.has-caption:has(.video-note.playing) {
-      max-width: var(--vnote-play, min(320px, 94%));
     }
     .bubble.theirs.has-video.has-reactions {
       background: rgba(255, 255, 255, 0.92) !important;
@@ -1291,20 +1278,25 @@
     .rec-cancel { background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.5); }
     .rec-send { background: #e879a9; border: 2px solid #fff; }
     .video-note {
-      --vnote-size: var(--vnote-idle, 200px);
+      --vnote-idle: 200px;
+      --vnote-play: 280px;
+      --vnote-size: var(--vnote-idle);
       width: var(--vnote-size); height: var(--vnote-size);
       max-width: 100%;
-      position: relative; margin-top: 0;
+      box-sizing: border-box;
+      position: relative; margin: 0;
       flex-shrink: 0; touch-action: none; cursor: pointer;
       border-radius: 50%; overflow: hidden;
       display: block;
       transition: width 0.38s cubic-bezier(0.34, 1.12, 0.64, 1),
-        height 0.38s cubic-bezier(0.34, 1.12, 0.64, 1);
-      z-index: 1;
+        height 0.38s cubic-bezier(0.34, 1.12, 0.64, 1),
+        margin 0.38s cubic-bezier(0.34, 1.12, 0.64, 1);
     }
     .video-note.playing {
-      --vnote-size: var(--vnote-play, 300px);
-      z-index: 3;
+      --vnote-size: var(--vnote-play);
+    }
+    .msg-row:has(.video-note.playing) {
+      z-index: auto;
     }
     .video-note.review-video-note {
       --vnote-size: min(72vw, 280px);
@@ -1359,21 +1351,28 @@
     .video-note.playing .vid-badge { opacity: 0; }
     .bubble.has-video {
       padding: 0; background: transparent !important; border: none !important;
-      width: fit-content; max-width: var(--vnote-idle, min(200px, 88%));
+      width: fit-content; max-width: 100%;
       overflow: visible;
       border-radius: 0;
+    }
+    .bubble.has-video:has(.video-note) {
+      max-width: var(--vnote-idle, 200px);
       transition: max-width 0.38s cubic-bezier(0.34, 1.12, 0.64, 1);
     }
     .bubble.has-video:has(.video-note.playing) {
-      max-width: var(--vnote-play, min(300px, 94%));
+      max-width: var(--vnote-play, 280px);
     }
     .bubble.has-video.has-reactions,
     .bubble.has-video.has-caption {
       transition: max-width 0.38s cubic-bezier(0.34, 1.12, 0.64, 1);
     }
+    .bubble.has-video.has-reactions:has(.video-note),
+    .bubble.has-video.has-caption:has(.video-note) {
+      max-width: var(--vnote-idle, 200px);
+    }
     .bubble.has-video.has-reactions:has(.video-note.playing),
     .bubble.has-video.has-caption:has(.video-note.playing) {
-      max-width: var(--vnote-play, min(320px, 94%));
+      max-width: var(--vnote-play, 280px);
     }
     .bubble.has-media-video {
       padding: 6px 8px; width: fit-content; max-width: min(320px, 88%);
@@ -1985,6 +1984,7 @@
       wireVoicePlayers(box);
       wireVideoNotes(box);
       wireInlineMedia(box);
+      scheduleVideoNoteCaps(box);
       if (!opts.skipRead) scheduleMarkVisibleRead();
       if (opts.reveal) revealMessagesBox(box);
     }
@@ -4194,11 +4194,39 @@
       wrap.classList.toggle('viewed', pct > 0.005);
     }
 
+    function measureVideoNoteCaps(wrap) {
+      if (!wrap || wrap.classList.contains('review-video-note')) return;
+      const stack = wrap.closest('.msg-stack');
+      const line = wrap.closest('.msg-row-line');
+      if (!stack || !line) return;
+      const max = Math.max(136, line.clientWidth - 2);
+      const idle = Math.min(200, max);
+      const play = Math.min(280, Math.max(idle + 20, Math.round(idle * 1.36)));
+      stack.style.setProperty('--vnote-idle', idle + 'px');
+      stack.style.setProperty('--vnote-play', play + 'px');
+    }
+
+    let vnoteCapsTimer = null;
+    function scheduleVideoNoteCaps(box = $('messages')) {
+      if (!box) return;
+      clearTimeout(vnoteCapsTimer);
+      vnoteCapsTimer = setTimeout(() => {
+        requestAnimationFrame(() => {
+          box.querySelectorAll('.video-note:not(.review-video-note)').forEach(measureVideoNoteCaps);
+        });
+      }, 0);
+    }
+
     function beginVideoNotePlay(wrap, vid) {
       wrap.dataset.vnotePlayed = '1';
+      measureVideoNoteCaps(wrap);
       wrap.classList.add('playing');
       initVideoRing(wrap);
       updateVideoRing(wrap, vid);
+      requestAnimationFrame(() => {
+        measureVideoNoteCaps(wrap);
+        wrap.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+      });
     }
 
     function wireVideoNotePlayback(wrap, vid, trackFn = trackVideoProgress) {
@@ -4282,6 +4310,7 @@
         initVideoRing(wrap);
         hookVideoProgress(wrap, vid);
         wireVideoNotePlayback(wrap, vid);
+        measureVideoNoteCaps(wrap);
 
         wrap.addEventListener('pointerdown', (e) => {
           if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -5927,6 +5956,11 @@
         closeAvatarMenu();
       }
     });
+
+    window.addEventListener('resize', () => scheduleVideoNoteCaps(), { passive: true });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => scheduleVideoNoteCaps(), { passive: true });
+    }
 
     (async () => {
       if (!token) return showLogin();
