@@ -19,7 +19,7 @@
           "NSAllowsArbitraryLoads": true
         },
         "NSMicrophoneUsageDescription": "максим записывает голосовые сообщения",
-        "NSCameraUsageDescription": "максим записывает видео-кружки",
+        "NSCameraUsageDescription": "максим записывает кружочки",
         "NSPhotoLibraryUsageDescription": "максим отправляет фото и файлы в чат"
       }
     },

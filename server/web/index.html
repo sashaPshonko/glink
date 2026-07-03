@@ -405,6 +405,15 @@
     }
     .sticker-crop-stage {
       border-radius: 16px;
+      width: auto !important;
+      height: auto !important;
+      max-width: min(320px, 92vw);
+      max-height: min(320px, 52vh);
+    }
+    #stickerCropCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
     }
     .bubble.has-sticker {
       padding: 0;
@@ -412,13 +421,17 @@
       border: none !important;
       border-radius: 0;
       overflow: visible;
+      width: fit-content;
+      max-width: 100%;
     }
     .bubble.has-sticker:not(.has-caption):not(.has-reactions) {
       position: relative;
     }
     .msg-sticker img {
-      width: 168px;
-      height: 168px;
+      max-width: min(240px, 100%);
+      max-height: 240px;
+      width: auto;
+      height: auto;
       object-fit: contain;
       display: block;
       cursor: context-menu;
@@ -426,7 +439,7 @@
       -webkit-user-select: none;
     }
     .msg-sticker.opacity-60 { opacity: 0.6; }
-    .bubble.has-sticker:not(.has-caption) .msg-foot {
+    .bubble.has-sticker:not(.has-caption):not(.has-reactions) .msg-foot {
       position: absolute;
       right: 4px;
       bottom: 2px;
@@ -439,15 +452,29 @@
       -webkit-backdrop-filter: blur(4px);
       pointer-events: none;
     }
-    .bubble.has-sticker:not(.has-caption) .msg-foot .msg-time,
-    .bubble.has-sticker:not(.has-caption) .msg-foot .edited-mark,
-    .bubble.has-sticker:not(.has-caption) .msg-foot .ticks {
+    .bubble.has-sticker:not(.has-caption):not(.has-reactions) .msg-foot .msg-time,
+    .bubble.has-sticker:not(.has-caption):not(.has-reactions) .msg-foot .edited-mark,
+    .bubble.has-sticker:not(.has-caption):not(.has-reactions) .msg-foot .ticks {
       color: rgba(255, 255, 255, 0.9);
     }
     .bubble.has-sticker.has-reactions:not(.has-caption) {
-      padding: 0 6px 6px;
-      background: rgba(249, 197, 223, 0.55) !important;
-      border-radius: 18px;
+      padding: 0 8px 8px;
+      background: rgba(249, 197, 223, 0.95) !important;
+      border-radius: 28px 28px 12px 28px;
+    }
+    .bubble.theirs.has-sticker.has-reactions:not(.has-caption) {
+      background: rgba(255, 255, 255, 0.92) !important;
+      border: 1px solid rgba(252, 231, 243, 0.95) !important;
+      border-radius: 28px 28px 28px 12px;
+    }
+    .bubble.has-sticker.has-reactions:not(.has-caption) .msg-foot {
+      position: static;
+      pointer-events: auto;
+      background: transparent;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      padding: 0;
+      margin-top: 6px;
     }
     .msg-menu-actions button.danger-text { color: #e11d48; }
     @keyframes pulse { 50% { opacity: 0.7; } }
@@ -1132,10 +1159,11 @@
     }
     .msg-menu.hidden { display: none; }
     .msg-menu-reactions {
-      display: flex; gap: 6px; justify-content: center;
+      display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
       padding: 4px 4px 8px;
       border-bottom: 1px solid rgba(252, 231, 243, 0.85);
       margin-bottom: 4px;
+      max-width: 220px;
     }
     .msg-menu-reactions button {
       width: 42px; height: 42px; padding: 0; font-size: 1.35rem;
@@ -1822,14 +1850,15 @@
   </div>
   <input id="stickerInput" type="file" accept="image/*" class="hidden" />
   <div id="stickerCropSheet" class="avatar-crop-sheet hidden">
-    <div class="avatar-crop-head">подгони стикер</div>
+    <div class="avatar-crop-head">стикер</div>
     <div id="stickerCropStage" class="avatar-crop-stage sticker-crop-stage">
       <canvas id="stickerCropCanvas"></canvas>
     </div>
-    <div class="avatar-crop-hint">двигай пальцем · ползунок — масштаб</div>
+    <div class="avatar-crop-hint">двигай · масштаб · «как есть» — без обрезки</div>
     <input type="range" id="stickerCropZoom" min="1" max="3" step="0.01" value="1" />
     <div class="avatar-crop-actions">
       <button type="button" id="stickerCropCancel">отмена</button>
+      <button type="button" id="stickerCropAsIs">как есть</button>
       <button type="button" id="stickerCropSave">готово</button>
     </div>
   </div>
@@ -1850,6 +1879,10 @@
       <button type="button" data-reaction="thumbs" title="лайк">👍</button>
       <button type="button" data-reaction="fire" title="огонь">❤️‍🔥</button>
       <button type="button" data-reaction="strawberry" title="клубничка">🍓</button>
+      <button type="button" data-reaction="love" title="любовь">🥰</button>
+      <button type="button" data-reaction="cry" title="слёзы">😭</button>
+      <button type="button" data-reaction="kiss" title="поцелуй">💋</button>
+      <button type="button" data-reaction="hot" title="жарко">🥵</button>
     </div>
     <div class="msg-menu-actions">
       <button type="button" id="msgMenuCopy" data-action="copy">копировать</button>
@@ -2014,6 +2047,10 @@
       thumbs: '👍',
       fire: '❤️‍🔥',
       strawberry: '🍓',
+      love: '🥰',
+      cry: '😭',
+      kiss: '💋',
+      hot: '🥵',
     };
     const MSG_PRESS_MS = 480;
     const DBL_TAP_MS = 320;
@@ -2876,7 +2913,7 @@
       if (!m) return '';
       if (m.text) return m.text;
       if (m.kind === 'voice') return '🎤 голосовое';
-      if (m.kind === 'video_note') return '🎬 кружок';
+      if (m.kind === 'video_note') return '🎬 кружочек';
       if (m.kind === 'image') return '📷 фото';
       if (m.kind === 'file') return m.file?.name ? '📎 ' + m.file.name : '📎 файл';
       return '';
@@ -3546,7 +3583,7 @@
       const kind = m.kind || 'text';
       if (kind === 'image') return '📷 фото';
       if (kind === 'voice') return '🎤 голосовое';
-      if (kind === 'video_note') return '⭕ кружок';
+      if (kind === 'video_note') return '⭕ кружочек';
       if (kind === 'sticker') return '🎭 стикер';
       if (kind === 'video') return '🎬 видео';
       if (kind === 'audio') return '🎵 аудио';
@@ -6559,9 +6596,192 @@
     let stickerCropReplaceId = null;
     let stickerManageTarget = null;
     let stickerChatImport = null;
-    const STICKER_CROP_SIZE = 280;
-    const STICKER_EXPORT_SIZE = 512;
+    const STICKER_MAX_PREVIEW = 280;
+    const STICKER_MAX_EXPORT_EDGE = 1024;
     const STICKER_ITEM_HOLD_MS = 420;
+
+    function stickerStageDims(imgW, imgH) {
+      const fit = Math.min(STICKER_MAX_PREVIEW / imgW, STICKER_MAX_PREVIEW / imgH);
+      return {
+        w: Math.max(48, Math.round(imgW * fit)),
+        h: Math.max(48, Math.round(imgH * fit)),
+      };
+    }
+
+    function layoutStickerCropStage() {
+      if (!stickerCrop) return;
+      const stage = $('stickerCropStage');
+      stage.style.width = stickerCrop.stageW + 'px';
+      stage.style.height = stickerCrop.stageH + 'px';
+    }
+
+    function stickerCropScale() {
+      if (!stickerCrop) return 1;
+      return stickerCrop.baseScale * stickerCrop.zoom;
+    }
+
+    function clampStickerCropPan() {
+      if (!stickerCrop) return;
+      const s = stickerCropScale();
+      const w = stickerCrop.img.width * s;
+      const h = stickerCrop.img.height * s;
+      const maxOx = Math.max(0, (w - stickerCrop.stageW) / 2);
+      const maxOy = Math.max(0, (h - stickerCrop.stageH) / 2);
+      stickerCrop.ox = Math.min(maxOx, Math.max(-maxOx, stickerCrop.ox));
+      stickerCrop.oy = Math.min(maxOy, Math.max(-maxOy, stickerCrop.oy));
+    }
+
+    function drawStickerCrop() {
+      if (!stickerCrop) return;
+      const canvas = $('stickerCropCanvas');
+      canvas.width = stickerCrop.stageW;
+      canvas.height = stickerCrop.stageH;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const s = stickerCropScale();
+      const w = stickerCrop.img.width * s;
+      const h = stickerCrop.img.height * s;
+      ctx.drawImage(
+        stickerCrop.img,
+        canvas.width / 2 - w / 2 + stickerCrop.ox,
+        canvas.height / 2 - h / 2 + stickerCrop.oy,
+        w,
+        h,
+      );
+    }
+
+    function closeStickerCrop() {
+      if (stickerCrop?.blobUrl) URL.revokeObjectURL(stickerCrop.blobUrl);
+      stickerCrop = null;
+      stickerCropPan = null;
+      stickerCropReplaceId = null;
+      const stage = $('stickerCropStage');
+      stage.style.width = '';
+      stage.style.height = '';
+      $('stickerCropSheet').classList.add('hidden');
+    }
+
+    function initStickerCropImage(img, file, replaceStickerId, blobUrl = null) {
+      const { w, h } = stickerStageDims(img.width, img.height);
+      const baseScale = Math.min(w / img.width, h / img.height);
+      stickerCropReplaceId = replaceStickerId;
+      stickerCrop = {
+        img,
+        file: file || null,
+        stageW: w,
+        stageH: h,
+        baseScale,
+        zoom: 1,
+        ox: 0,
+        oy: 0,
+        blobUrl: blobUrl || (file ? URL.createObjectURL(file) : null),
+      };
+      $('stickerCropZoom').value = '1';
+      layoutStickerCropStage();
+      drawStickerCrop();
+      closeStickerSheet();
+      closeStickerManageMenu();
+      $('stickerCropSheet').classList.remove('hidden');
+    }
+
+    function openStickerCropFromFile(file, replaceStickerId = null) {
+      if (!file || !String(file.type || '').startsWith('image/')) {
+        showAppErr('нужно фото');
+        return;
+      }
+      const blobUrl = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => initStickerCropImage(img, file, replaceStickerId, blobUrl);
+      img.onerror = () => {
+        URL.revokeObjectURL(blobUrl);
+        showAppErr('не удалось открыть фото');
+      };
+      img.src = blobUrl;
+    }
+
+    function openStickerCropFromUrl(url, replaceStickerId) {
+      fetch(url).then((res) => {
+        if (!res.ok) throw new Error('fetch failed');
+        return res.blob();
+      }).then((blob) => {
+        openStickerCropFromFile(new File([blob], 'sticker.png', { type: blob.type || 'image/png' }), replaceStickerId);
+      }).catch(() => showAppErr('не удалось открыть стикер'));
+    }
+
+    function exportStickerCropBlob() {
+      return new Promise((resolve, reject) => {
+        if (!stickerCrop) {
+          reject(new Error('no crop'));
+          return;
+        }
+        const ratio = Math.min(
+          STICKER_MAX_EXPORT_EDGE / stickerCrop.stageW,
+          STICKER_MAX_EXPORT_EDGE / stickerCrop.stageH,
+        );
+        const outW = Math.max(1, Math.round(stickerCrop.stageW * ratio));
+        const outH = Math.max(1, Math.round(stickerCrop.stageH * ratio));
+        const out = document.createElement('canvas');
+        out.width = outW;
+        out.height = outH;
+        const ctx = out.getContext('2d');
+        const s = stickerCropScale() * ratio;
+        const w = stickerCrop.img.width * s;
+        const h = stickerCrop.img.height * s;
+        ctx.drawImage(
+          stickerCrop.img,
+          outW / 2 - w / 2 + stickerCrop.ox * ratio,
+          outH / 2 - h / 2 + stickerCrop.oy * ratio,
+          w,
+          h,
+        );
+        const mime = stickerCrop.file?.type?.startsWith('image/') ? stickerCrop.file.type : 'image/png';
+        out.toBlob((blob) => {
+          if (blob) resolve({ blob, mime });
+          else reject(new Error('export failed'));
+        }, mime === 'image/jpeg' ? 'image/jpeg' : 'image/png', mime === 'image/jpeg' ? 0.92 : undefined);
+      });
+    }
+
+    async function uploadStickerFile(file, replaceStickerId) {
+      const fd = new FormData();
+      fd.append('file', file, file.name || 'sticker.png');
+      if (replaceStickerId) {
+        return api('/me/stickers/' + encodeURIComponent(replaceStickerId), { method: 'PATCH', body: fd });
+      }
+      return api('/me/stickers', { method: 'POST', body: fd });
+    }
+
+    async function persistStickerUpload(data) {
+      if (stickerCropReplaceId) {
+        myStickers = myStickers.map((s) => (s.id === data.sticker.id ? data.sticker : s));
+      } else {
+        myStickers.push(data.sticker);
+      }
+      renderStickerGrid();
+      closeStickerCrop();
+      showAppErr('');
+    }
+
+    async function saveStickerCrop() {
+      try {
+        const { blob, mime } = await exportStickerCropBlob();
+        const ext = mime === 'image/jpeg' ? '.jpg' : '.png';
+        const data = await uploadStickerFile(new File([blob], 'sticker' + ext, { type: mime }), stickerCropReplaceId);
+        await persistStickerUpload(data);
+      } catch (e) {
+        showAppErr(e.message || 'не удалось сохранить');
+      }
+    }
+
+    async function saveStickerAsIs() {
+      if (!stickerCrop?.file) return;
+      try {
+        const data = await uploadStickerFile(stickerCrop.file, stickerCropReplaceId);
+        await persistStickerUpload(data);
+      } catch (e) {
+        showAppErr(e.message || 'не удалось сохранить');
+      }
+    }
 
     async function loadMyStickers() {
       try {
@@ -6734,135 +6954,6 @@
       }
     }
 
-    function stickerCropScale() {
-      if (!stickerCrop) return 1;
-      return stickerCrop.baseScale * stickerCrop.zoom;
-    }
-
-    function clampStickerCropPan() {
-      if (!stickerCrop) return;
-      const s = stickerCropScale();
-      const w = stickerCrop.img.width * s;
-      const h = stickerCrop.img.height * s;
-      const maxOx = Math.max(0, (w - STICKER_CROP_SIZE) / 2);
-      const maxOy = Math.max(0, (h - STICKER_CROP_SIZE) / 2);
-      stickerCrop.ox = Math.min(maxOx, Math.max(-maxOx, stickerCrop.ox));
-      stickerCrop.oy = Math.min(maxOy, Math.max(-maxOy, stickerCrop.oy));
-    }
-
-    function drawStickerCrop() {
-      if (!stickerCrop) return;
-      const canvas = $('stickerCropCanvas');
-      const size = STICKER_CROP_SIZE;
-      canvas.width = size;
-      canvas.height = size;
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, size, size);
-      const s = stickerCropScale();
-      const w = stickerCrop.img.width * s;
-      const h = stickerCrop.img.height * s;
-      ctx.drawImage(
-        stickerCrop.img,
-        size / 2 - w / 2 + stickerCrop.ox,
-        size / 2 - h / 2 + stickerCrop.oy,
-        w,
-        h,
-      );
-    }
-
-    function closeStickerCrop() {
-      if (stickerCrop?.blobUrl) URL.revokeObjectURL(stickerCrop.blobUrl);
-      stickerCrop = null;
-      stickerCropPan = null;
-      stickerCropReplaceId = null;
-      $('stickerCropSheet').classList.add('hidden');
-    }
-
-    function openStickerCropFromFile(file, replaceStickerId = null) {
-      if (!file || !String(file.type || '').startsWith('image/')) {
-        showAppErr('нужно фото');
-        return;
-      }
-      stickerCropReplaceId = replaceStickerId;
-      const blobUrl = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => {
-        const baseScale = Math.max(STICKER_CROP_SIZE / img.width, STICKER_CROP_SIZE / img.height);
-        stickerCrop = { img, baseScale, zoom: 1, ox: 0, oy: 0, blobUrl };
-        $('stickerCropZoom').value = '1';
-        drawStickerCrop();
-        closeStickerSheet();
-        closeStickerManageMenu();
-        $('stickerCropSheet').classList.remove('hidden');
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(blobUrl);
-        showAppErr('не удалось открыть фото');
-      };
-      img.src = blobUrl;
-    }
-
-    function openStickerCropFromUrl(url, replaceStickerId) {
-      fetch(url).then((res) => {
-        if (!res.ok) throw new Error('fetch failed');
-        return res.blob();
-      }).then((blob) => {
-        openStickerCropFromFile(new File([blob], 'sticker.png', { type: blob.type || 'image/png' }), replaceStickerId);
-      }).catch(() => showAppErr('не удалось открыть стикер'));
-    }
-
-    function exportStickerCropBlob() {
-      return new Promise((resolve, reject) => {
-        if (!stickerCrop) {
-          reject(new Error('no crop'));
-          return;
-        }
-        const out = document.createElement('canvas');
-        out.width = STICKER_EXPORT_SIZE;
-        out.height = STICKER_EXPORT_SIZE;
-        const ctx = out.getContext('2d');
-        const ratio = STICKER_EXPORT_SIZE / STICKER_CROP_SIZE;
-        const s = stickerCropScale() * ratio;
-        const w = stickerCrop.img.width * s;
-        const h = stickerCrop.img.height * s;
-        ctx.drawImage(
-          stickerCrop.img,
-          STICKER_EXPORT_SIZE / 2 - w / 2 + stickerCrop.ox * ratio,
-          STICKER_EXPORT_SIZE / 2 - h / 2 + stickerCrop.oy * ratio,
-          w,
-          h,
-        );
-        out.toBlob((blob) => {
-          if (blob) resolve(blob);
-          else reject(new Error('export failed'));
-        }, 'image/png');
-      });
-    }
-
-    async function saveStickerCrop() {
-      try {
-        const blob = await exportStickerCropBlob();
-        const fd = new FormData();
-        fd.append('file', blob, 'sticker.png');
-        let data;
-        if (stickerCropReplaceId) {
-          data = await api('/me/stickers/' + encodeURIComponent(stickerCropReplaceId), {
-            method: 'PATCH',
-            body: fd,
-          });
-          myStickers = myStickers.map((s) => (s.id === data.sticker.id ? data.sticker : s));
-        } else {
-          data = await api('/me/stickers', { method: 'POST', body: fd });
-          myStickers.push(data.sticker);
-        }
-        renderStickerGrid();
-        closeStickerCrop();
-        showAppErr('');
-      } catch (e) {
-        showAppErr(e.message || 'не удалось сохранить');
-      }
-    }
-
     $('stickerUploadBtn').onclick = (e) => { e.preventDefault(); $('stickerInput').click(); };
     $('stickerSheetClose').onclick = (e) => { e.preventDefault(); closeStickerSheet(); };
     $('stickerInput').onchange = (e) => {
@@ -6871,6 +6962,7 @@
       if (file) openStickerCropFromFile(file);
     };
     $('stickerCropCancel').onclick = (e) => { e.preventDefault(); closeStickerCrop(); };
+    $('stickerCropAsIs').onclick = (e) => { e.preventDefault(); saveStickerAsIs(); };
     $('stickerCropSave').onclick = (e) => { e.preventDefault(); saveStickerCrop(); };
     $('stickerCropZoom').oninput = () => {
       if (!stickerCrop) return;
@@ -6985,7 +7077,7 @@
     const MEDIA_MODES = [
       { id: 'attach', title: 'Файл · нажми — сменить, зажми — выбрать' },
       { id: 'voice', title: 'Голос · нажми — сменить, зажми — записать' },
-      { id: 'video', title: 'Кружок · нажми — сменить, зажми — записать' },
+      { id: 'video', title: 'Кружочек · нажми — сменить, зажми — записать' },
       { id: 'sticker', title: 'Стикер · нажми — сменить, зажми — набор' },
     ];
     let mediaModeIndex = 0;

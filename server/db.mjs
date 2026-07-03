@@ -153,7 +153,7 @@ export function messagePreview(msg) {
     if (!msg) return '';
     if (msg.kind === 'image') return msg.text ? `📷 ${msg.text}` : '📷 фото';
     if (msg.kind === 'voice') return '🎤 голосовое';
-    if (msg.kind === 'video_note') return '🎬 кружок';
+    if (msg.kind === 'video_note') return '🎬 кружочек';
     if (msg.kind === 'sticker') return '🎭 стикер';
     if (msg.kind === 'video') return msg.file?.name ? `🎬 ${msg.file.name}` : '🎬 видео';
     if (msg.kind === 'audio') return msg.file?.name ? `🎵 ${msg.file.name}` : '🎵 аудио';
@@ -377,7 +377,7 @@ function listMessageFiles(msg) {
     return [];
 }
 
-const REACTION_KEYS = new Set(['heart', 'thumbs', 'fire', 'strawberry']);
+const REACTION_KEYS = new Set(['heart', 'thumbs', 'fire', 'strawberry', 'love', 'cry', 'kiss', 'hot']);
 
 export function toggleMessageReaction({ messageId, chatId, userId, reaction }) {
     if (!REACTION_KEYS.has(reaction)) throw new Error('invalid_reaction');
