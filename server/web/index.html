@@ -4513,8 +4513,10 @@
       const msgPh = row?.querySelector('.video-note-placeholder');
       const bubble = row?.querySelector('.bubble');
       if (msgPh?.isConnected) msgPh.replaceWith(wrap);
-      else if (bubble?.isConnected) bubble.insertBefore(wrap, bubble.firstChild?.classList?.contains('sender') ? bubble.children[1] : bubble.firstChild);
-      else wrap.remove();
+      else if (bubble?.isConnected) {
+        const after = bubble.querySelector('.sender');
+        bubble.insertBefore(wrap, after ? after.nextSibling : bubble.firstChild);
+      } else wrap.remove();
       pinnedVideoPlaceholder = null;
       pinnedVideoOrigin = null;
       pinnedVideoWrap = null;
@@ -4595,6 +4597,7 @@
       const vid = wrap.querySelector('video');
       if (vid && !vid.paused) vid.pause();
       wrap.classList.remove('playing');
+      delete wrap.dataset.vnotePlayReady;
       unpinVideoNoteFromScreen(wrap);
     }
 
