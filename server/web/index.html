@@ -4727,10 +4727,11 @@
     function hookVideoProgress(wrap, vid) {
       primeVideoNotePreview(vid, wrap);
       vid.onpause = () => {
-        delete wrap.dataset.vnotePlayReady;
-        wrap.classList.remove('playing');
-        unpinVideoNoteFromScreen(wrap);
         stopVideoRaf();
+        if (vid.ended) return;
+        if (wrap.classList.contains('playing')) return;
+        delete wrap.dataset.vnotePlayReady;
+        unpinVideoNoteFromScreen(wrap);
         if (wrap.dataset.vnotePlayed === '1') updateVideoRing(wrap, vid);
         else resetVideoNotePreviewRing(wrap);
       };
