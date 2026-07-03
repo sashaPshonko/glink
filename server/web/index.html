@@ -512,6 +512,11 @@
       overflow: visible;
       width: fit-content;
       max-width: 100%;
+      margin-left: auto;
+    }
+    .bubble.theirs.has-sticker {
+      margin-left: 0;
+      margin-right: auto;
     }
     .bubble.has-sticker:not(.has-caption):not(.has-reactions) {
       position: relative;
@@ -847,11 +852,6 @@
       /* центр между твоими и чужими — не трогаем */
       .msg-row.theirs .msg-hit-right { flex: 1 1 0; min-width: 44px; }
       .msg-row.mine .msg-hit-left { flex: 1 1 0; min-width: 44px; }
-      .msg-row.mine .msg-row-line:has(.bubble.has-image) .msg-hit-left,
-      .msg-row.mine .msg-row-line:has(.bubble.has-album-photos) .msg-hit-left {
-        flex: 0 0 44px;
-        min-width: 44px;
-      }
       /* текст не наезжает через середину */
       .msg-stack { max-width: min(340px, calc(50vw - 24px)); }
       .msg-stack:has(.video-note) { max-width: 100%; }
@@ -888,6 +888,11 @@
       width: fit-content; max-width: min(280px, 100%);
       overflow: hidden;
       border-radius: 0;
+      margin-left: auto;
+    }
+    .bubble.theirs.has-image {
+      margin-left: 0;
+      margin-right: auto;
     }
     .bubble.has-image:not(.has-caption):not(.has-reactions) {
       position: relative;
@@ -943,6 +948,9 @@
       margin-top: 0; border-radius: 28px;
       box-shadow: 0 2px 14px rgba(92, 51, 71, 0.1);
       display: block;
+      width: auto;
+      max-width: 100%;
+      height: auto;
     }
     .bubble.has-image.has-caption .msg-caption {
       padding: 4px 12px 0;
@@ -1140,26 +1148,6 @@
     }
     .msg-row.mine .msg-stack { align-items: flex-end; }
     .msg-row.theirs .msg-stack { align-items: flex-start; }
-    /* фото/album: hit-left только зазор, stack тянется вправо — как у кружочков */
-    .msg-row.mine .msg-row-line:has(.bubble.has-image) .msg-hit-left,
-    .msg-row.mine .msg-row-line:has(.bubble.has-album-photos) .msg-hit-left {
-      flex: 0 0 44px;
-      min-width: 44px;
-    }
-    .msg-row.mine .msg-stack:has(.bubble.has-image),
-    .msg-row.mine .msg-stack:has(.bubble.has-album-photos) {
-      flex: 1 1 auto;
-      width: auto;
-      min-width: 0;
-      max-width: 100%;
-      align-items: flex-end;
-    }
-    .msg-row.mine .msg-stack:has(.bubble.has-image) .msg-row-inner,
-    .msg-row.mine .msg-stack:has(.bubble.has-album-photos) .msg-row-inner {
-      width: fit-content;
-      max-width: 100%;
-      margin-left: auto;
-    }
     .msg-stack:has(.video-note) {
       max-width: 100%;
     }
@@ -1492,6 +1480,13 @@
       overflow: hidden;
       border-radius: 0;
       position: relative;
+      width: fit-content;
+      max-width: min(280px, 100%);
+      margin-left: auto;
+    }
+    .bubble.theirs.has-album-photos:not(.has-caption):not(.has-reactions) {
+      margin-left: 0;
+      margin-right: auto;
     }
     .bubble.has-album-photos:not(.has-caption):not(.has-reactions) .msg-foot {
       position: absolute;
