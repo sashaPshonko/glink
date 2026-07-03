@@ -1321,13 +1321,10 @@
     .vid-ring-knob {
       fill: #e879a9;
       stroke: none;
-      opacity: 0;
       pointer-events: none;
     }
-    .video-note.playing .vid-ring-knob,
-    .video-note.seeking .vid-ring-knob,
-    .video-note.viewed .vid-ring-knob {
-      opacity: 1;
+    .video-note:not(.playing):not(.seeking):not(.viewed) .vid-ring-knob {
+      opacity: 0;
     }
     .review-video-note .vid-ring-knob {
       fill: #fbcfe8;
@@ -1573,7 +1570,7 @@
         <svg class="vid-ring" viewBox="0 0 200 200" aria-hidden="true">
           <circle class="vid-ring-track" cx="100" cy="100" r="94"/>
           <path class="vid-ring-fill" d="M 100 6 A 94 94 0 1 1 99.999 6"/>
-          <circle class="vid-ring-knob" cx="100" cy="6" r="2"/>
+          <circle class="vid-ring-knob" cx="100" cy="6" r="3"/>
         </svg>
         <div class="video-note-hole">
           <video id="videoRecPlayback" playsinline webkit-playsinline preload="auto"></video>
@@ -2290,7 +2287,7 @@
           `<svg class="vid-ring" viewBox="0 0 200 200" aria-hidden="true">` +
           `<circle class="vid-ring-track" cx="100" cy="100" r="${VID_RING_R}"/>` +
           `<path class="vid-ring-fill" d="${VID_RING_PATH}"/>` +
-          `<circle class="vid-ring-knob" cx="100" cy="${100 - VID_RING_R}" r="2"/>` +
+          `<circle class="vid-ring-knob" cx="100" cy="${100 - VID_RING_R}" r="3"/>` +
           `</svg><div class="video-note-hole">` +
           `<video playsinline webkit-playsinline muted preload="auto" src="${src}"></video>` +
           `<div class="vid-badge">▶</div></div></div>`;
@@ -4117,8 +4114,20 @@
       ring.setAttribute('stroke-dashoffset', String(offset));
     }
 
+    function ensureVideoRingKnob(wrap, ring) {
+      let knob = wrap.querySelector('.vid-ring-knob');
+      if (knob) return knob;
+      const svg = ring?.closest('svg');
+      if (!svg) return null;
+      knob = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      knob.setAttribute('class', 'vid-ring-knob');
+      knob.setAttribute('r', '3');
+      svg.appendChild(knob);
+      return knob;
+    }
+
     function updateVideoRingKnob(wrap, ring, pct) {
-      const knob = wrap.querySelector('.vid-ring-knob');
+      const knob = ensureVideoRingKnob(wrap, ring);
       if (!knob || !ring) return;
       const len = videoRingLen(ring);
       const at = Math.max(0, Math.min(len, len * pct));
@@ -4126,7 +4135,8 @@
         const pt = ring.getPointAtLength(at);
         knob.setAttribute('cx', String(pt.x));
         knob.setAttribute('cy', String(pt.y));
-        knob.style.opacity = pct > 0.003 ? '' : '0';
+        knob.style.opacity = '';
+        knob.style.display = pct > 0 ? '' : 'none';
       } catch (_) {}
     }
 
