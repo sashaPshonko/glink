@@ -4499,15 +4499,22 @@
     function recoverOrphanedVideoPin() {
       const wrap = pinnedVideoWrap;
       if (!wrap || wrap.dataset.pinned !== '1') return false;
-      if (pinnedVideoPlaceholder?.isConnected) return false;
+      const ph = pinnedVideoPlaceholder;
+      if (!ph || ph.isConnected) return false;
       const vid = wrap.querySelector('video');
       if (vid && !vid.paused) vid.pause();
-      wrap.classList.remove('playing', 'pin-screen', 'pin-dragging');
+      const msgId = wrap.dataset.pinnedMsgId;
+      wrap.classList.remove('pin-screen', 'pin-dragging', 'playing');
       delete wrap.dataset.pinned;
       delete wrap.dataset.vnotePlayReady;
       delete wrap.dataset.pinnedMsgId;
       clearPinnedVideoNoteStyle(wrap);
-      wrap.remove();
+      const row = msgId ? $('messages')?.querySelector('.msg-row[data-id="' + msgId + '"]') : null;
+      const msgPh = row?.querySelector('.video-note-placeholder');
+      const bubble = row?.querySelector('.bubble');
+      if (msgPh?.isConnected) msgPh.replaceWith(wrap);
+      else if (bubble?.isConnected) bubble.insertBefore(wrap, bubble.firstChild?.classList?.contains('sender') ? bubble.children[1] : bubble.firstChild);
+      else wrap.remove();
       pinnedVideoPlaceholder = null;
       pinnedVideoOrigin = null;
       pinnedVideoWrap = null;
@@ -4835,11 +4842,12 @@
       }
       if (!vid.src) vid.src = videoNoteMediaSrc(src);
       vid.muted = false;
-      beginVideoNotePlay(wrap, vid);
+      measureVideoNoteCaps(wrap);
       activeVideoEl = vid;
       if (vid.paused) {
         vid.play().catch(() => showAppErr('не удалось воспроизвести видео'));
       } else {
+        beginVideoNotePlay(wrap, vid);
         trackVideoProgress(wrap, vid);
       }
     }
@@ -4851,10 +4859,12 @@
         stopVideoRaf();
       }
       if (!vid.paused) {
-        vid.pause();
         wrap.classList.remove('playing');
+        delete wrap.dataset.vnotePlayReady;
+        vid.pause();
         stopVideoRaf();
         if (activeVideoEl === vid) activeVideoEl = null;
+        unpinVideoNoteFromScreen(wrap);
         updateVideoRing(wrap, vid);
         return;
       }
