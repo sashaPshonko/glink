@@ -685,16 +685,21 @@
       margin-bottom: 0;
     }
     .msg-text-block {
-      padding: 6px 11px 12px 11px;
+      padding: 6px 11px 10px 11px;
       line-height: 1.38;
       word-break: break-word;
       font-size: 0.98rem;
     }
     .msg-meta-spacer {
       display: inline-block;
-      width: 0;
-      height: 1.5em;
+      width: 54px;
+      height: 0;
       float: right;
+    }
+    .msg-text-tail {
+      display: block;
+      clear: both;
+      height: 0;
     }
     .msg-inline-meta {
       float: right;
@@ -706,8 +711,7 @@
       user-select: none;
       -webkit-user-select: none;
       white-space: nowrap;
-      vertical-align: bottom;
-      line-height: 1.15;
+      line-height: 1.1;
     }
     .msg-inline-meta .msg-time {
       font-size: 0.68rem;
@@ -2320,7 +2324,7 @@
       const text = m.text ? linkify(m.text) : '…';
       const meta = renderMsgMeta(m, mine);
       const metaHtml = meta
-        ? `<span class="msg-meta-spacer" aria-hidden="true"></span><span class="msg-inline-meta">${meta}</span>`
+        ? `<span class="msg-meta-spacer" aria-hidden="true"></span><span class="msg-inline-meta">${meta}</span><span class="msg-text-tail" aria-hidden="true"></span>`
         : '';
       return `<div class="msg-text-block">${text}${metaHtml}</div>`;
     }
@@ -2332,10 +2336,11 @@
         if (!block) return;
         block.querySelector('.msg-meta-spacer')?.remove();
         block.querySelector('.msg-inline-meta')?.remove();
+        block.querySelector('.msg-text-tail')?.remove();
         if (meta) {
           block.insertAdjacentHTML(
             'beforeend',
-            `<span class="msg-meta-spacer" aria-hidden="true"></span><span class="msg-inline-meta">${meta}</span>`,
+            `<span class="msg-meta-spacer" aria-hidden="true"></span><span class="msg-inline-meta">${meta}</span><span class="msg-text-tail" aria-hidden="true"></span>`,
           );
         }
         return;
