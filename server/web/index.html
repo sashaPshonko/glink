@@ -403,10 +403,11 @@
       color: #b07a94;
       padding: 0 12px 10px;
     }
-    .sticker-crop-stage {
-      border-radius: 16px;
-      width: auto !important;
-      height: auto !important;
+    .sticker-crop-wrap {
+      position: relative;
+      margin: 0 auto 12px;
+      touch-action: none;
+      flex-shrink: 0;
       max-width: min(320px, 92vw);
       max-height: min(320px, 52vh);
     }
@@ -414,7 +415,74 @@
       width: 100%;
       height: 100%;
       display: block;
+      border-radius: 12px;
     }
+    .sticker-crop-ui {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .sticker-crop-shade {
+      position: absolute;
+      background: rgba(20, 14, 18, 0.58);
+      pointer-events: none;
+    }
+    .sticker-crop-box {
+      position: absolute;
+      border: 2px solid rgba(255, 255, 255, 0.95);
+      box-shadow: 0 0 0 1px rgba(232, 121, 169, 0.85);
+      pointer-events: auto;
+      cursor: move;
+      touch-action: none;
+    }
+    .sticker-crop-handle {
+      position: absolute;
+      pointer-events: auto;
+      touch-action: none;
+    }
+    .sticker-crop-handle.corner {
+      width: 26px;
+      height: 26px;
+      transform: translate(-50%, -50%);
+    }
+    .sticker-crop-handle.corner::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 14px;
+      height: 14px;
+      transform: translate(-50%, -50%);
+      border: 2px solid #fff;
+      border-radius: 3px;
+      background: rgba(232, 121, 169, 0.55);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    }
+    .sticker-crop-handle.edge {
+      transform: translate(-50%, -50%);
+    }
+    .sticker-crop-handle.edge::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 255, 255, 0.92);
+      border-radius: 999px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    }
+    .sticker-crop-handle[data-h="nw"] { top: 0; left: 0; cursor: nwse-resize; }
+    .sticker-crop-handle[data-h="ne"] { top: 0; left: 100%; cursor: nesw-resize; }
+    .sticker-crop-handle[data-h="se"] { top: 100%; left: 100%; cursor: nwse-resize; }
+    .sticker-crop-handle[data-h="sw"] { top: 100%; left: 0; cursor: nesw-resize; }
+    .sticker-crop-handle[data-h="n"] { top: 0; left: 50%; cursor: ns-resize; }
+    .sticker-crop-handle[data-h="s"] { top: 100%; left: 50%; cursor: ns-resize; }
+    .sticker-crop-handle[data-h="e"] { top: 50%; left: 100%; cursor: ew-resize; }
+    .sticker-crop-handle[data-h="w"] { top: 50%; left: 0; cursor: ew-resize; }
+    .sticker-crop-handle.edge[data-h="n"]::after,
+    .sticker-crop-handle.edge[data-h="s"]::after { width: 36px; height: 8px; }
+    .sticker-crop-handle.edge[data-h="e"]::after,
+    .sticker-crop-handle.edge[data-h="w"]::after { width: 8px; height: 36px; }
     .bubble.has-sticker {
       padding: 0;
       background: transparent !important;
@@ -1850,15 +1918,29 @@
   </div>
   <input id="stickerInput" type="file" accept="image/*" class="hidden" />
   <div id="stickerCropSheet" class="avatar-crop-sheet hidden">
-    <div class="avatar-crop-head">стикер</div>
-    <div id="stickerCropStage" class="avatar-crop-stage sticker-crop-stage">
+    <div class="avatar-crop-head">обрежь стикер</div>
+    <div id="stickerCropWrap" class="sticker-crop-wrap">
       <canvas id="stickerCropCanvas"></canvas>
+      <div id="stickerCropUi" class="sticker-crop-ui">
+        <div id="stickerCropShadeTop" class="sticker-crop-shade"></div>
+        <div id="stickerCropShadeBottom" class="sticker-crop-shade"></div>
+        <div id="stickerCropShadeLeft" class="sticker-crop-shade"></div>
+        <div id="stickerCropShadeRight" class="sticker-crop-shade"></div>
+        <div id="stickerCropBox" class="sticker-crop-box">
+          <span class="sticker-crop-handle corner" data-h="nw"></span>
+          <span class="sticker-crop-handle edge" data-h="n"></span>
+          <span class="sticker-crop-handle corner" data-h="ne"></span>
+          <span class="sticker-crop-handle edge" data-h="e"></span>
+          <span class="sticker-crop-handle corner" data-h="se"></span>
+          <span class="sticker-crop-handle edge" data-h="s"></span>
+          <span class="sticker-crop-handle corner" data-h="sw"></span>
+          <span class="sticker-crop-handle edge" data-h="w"></span>
+        </div>
+      </div>
     </div>
-    <div class="avatar-crop-hint">двигай · масштаб · «как есть» — без обрезки</div>
-    <input type="range" id="stickerCropZoom" min="1" max="3" step="0.01" value="1" />
+    <div class="avatar-crop-hint">тяни за края и углы · можно двигать рамку</div>
     <div class="avatar-crop-actions">
       <button type="button" id="stickerCropCancel">отмена</button>
-      <button type="button" id="stickerCropAsIs">как есть</button>
       <button type="button" id="stickerCropSave">готово</button>
     </div>
   </div>
@@ -6592,43 +6674,17 @@
 
     let myStickers = [];
     let stickerCrop = null;
-    let stickerCropPan = null;
+    let stickerCropDrag = null;
     let stickerCropReplaceId = null;
     let stickerManageTarget = null;
     let stickerChatImport = null;
     const STICKER_MAX_PREVIEW = 280;
     const STICKER_MAX_EXPORT_EDGE = 1024;
+    const STICKER_MIN_CROP_PX = 24;
     const STICKER_ITEM_HOLD_MS = 420;
 
-    function stickerStageDims(imgW, imgH) {
-      const fit = Math.min(STICKER_MAX_PREVIEW / imgW, STICKER_MAX_PREVIEW / imgH);
-      return {
-        w: Math.max(48, Math.round(imgW * fit)),
-        h: Math.max(48, Math.round(imgH * fit)),
-      };
-    }
-
-    function layoutStickerCropStage() {
-      if (!stickerCrop) return;
-      const stage = $('stickerCropStage');
-      stage.style.width = stickerCrop.stageW + 'px';
-      stage.style.height = stickerCrop.stageH + 'px';
-    }
-
-    function stickerCropScale() {
-      if (!stickerCrop) return 1;
-      return stickerCrop.baseScale * stickerCrop.zoom;
-    }
-
-    function clampStickerCropPan() {
-      if (!stickerCrop) return;
-      const s = stickerCropScale();
-      const w = stickerCrop.img.width * s;
-      const h = stickerCrop.img.height * s;
-      const maxOx = Math.max(0, (w - stickerCrop.stageW) / 2);
-      const maxOy = Math.max(0, (h - stickerCrop.stageH) / 2);
-      stickerCrop.ox = Math.min(maxOx, Math.max(-maxOx, stickerCrop.ox));
-      stickerCrop.oy = Math.min(maxOy, Math.max(-maxOy, stickerCrop.oy));
+    function stickerPreviewScale(imgW, imgH) {
+      return Math.min(STICKER_MAX_PREVIEW / imgW, STICKER_MAX_PREVIEW / imgH);
     }
 
     function drawStickerCrop() {
@@ -6636,49 +6692,122 @@
       const canvas = $('stickerCropCanvas');
       canvas.width = stickerCrop.stageW;
       canvas.height = stickerCrop.stageH;
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const s = stickerCropScale();
-      const w = stickerCrop.img.width * s;
-      const h = stickerCrop.img.height * s;
-      ctx.drawImage(
-        stickerCrop.img,
-        canvas.width / 2 - w / 2 + stickerCrop.ox,
-        canvas.height / 2 - h / 2 + stickerCrop.oy,
-        w,
-        h,
-      );
+      canvas.getContext('2d').drawImage(stickerCrop.img, 0, 0, stickerCrop.stageW, stickerCrop.stageH);
+    }
+
+    function syncStickerCropUi() {
+      if (!stickerCrop) return;
+      const s = stickerCrop.scale;
+      const { x, y, w, h } = stickerCrop.crop;
+      const left = x * s;
+      const top = y * s;
+      const width = w * s;
+      const height = h * s;
+      const box = $('stickerCropBox');
+      box.style.left = left + 'px';
+      box.style.top = top + 'px';
+      box.style.width = width + 'px';
+      box.style.height = height + 'px';
+      const sw = stickerCrop.stageW;
+      const sh = stickerCrop.stageH;
+      $('stickerCropShadeTop').style.cssText = `left:0;top:0;width:${sw}px;height:${top}px`;
+      $('stickerCropShadeBottom').style.cssText = `left:0;top:${top + height}px;width:${sw}px;height:${Math.max(0, sh - top - height)}px`;
+      $('stickerCropShadeLeft').style.cssText = `left:0;top:${top}px;width:${left}px;height:${height}px`;
+      $('stickerCropShadeRight').style.cssText = `left:${left + width}px;top:${top}px;width:${Math.max(0, sw - left - width)}px;height:${height}px`;
+    }
+
+    function stickerCropPointerImage(clientX, clientY) {
+      const rect = $('stickerCropWrap').getBoundingClientRect();
+      return {
+        x: (clientX - rect.left) / stickerCrop.scale,
+        y: (clientY - rect.top) / stickerCrop.scale,
+      };
+    }
+
+    function applyStickerCropDrag(clientX, clientY) {
+      if (!stickerCrop || !stickerCropDrag) return;
+      const p = stickerCropPointerImage(clientX, clientY);
+      const imgW = stickerCrop.img.width;
+      const imgH = stickerCrop.img.height;
+      const s = stickerCropDrag.startCrop;
+      const handle = stickerCropDrag.handle;
+
+      if (handle === 'move') {
+        const dx = p.x - stickerCropDrag.startX;
+        const dy = p.y - stickerCropDrag.startY;
+        const nx = Math.min(Math.max(0, s.x + dx), imgW - s.w);
+        const ny = Math.min(Math.max(0, s.y + dy), imgH - s.h);
+        stickerCrop.crop = { x: nx, y: ny, w: s.w, h: s.h };
+        syncStickerCropUi();
+        return;
+      }
+
+      let x1 = s.x;
+      let y1 = s.y;
+      let x2 = s.x + s.w;
+      let y2 = s.y + s.h;
+      if (handle.includes('w')) x1 = p.x;
+      if (handle.includes('e')) x2 = p.x;
+      if (handle.includes('n')) y1 = p.y;
+      if (handle.includes('s')) y2 = p.y;
+      if (handle === 'w') x1 = p.x;
+      if (handle === 'e') x2 = p.x;
+      if (handle === 'n') y1 = p.y;
+      if (handle === 's') y2 = p.y;
+
+      if (x2 < x1) { const t = x1; x1 = x2; x2 = t; }
+      if (y2 < y1) { const t = y1; y1 = y2; y2 = t; }
+
+      if (x2 - x1 < STICKER_MIN_CROP_PX) {
+        if (handle.includes('w') || handle === 'w') x1 = x2 - STICKER_MIN_CROP_PX;
+        else x2 = x1 + STICKER_MIN_CROP_PX;
+      }
+      if (y2 - y1 < STICKER_MIN_CROP_PX) {
+        if (handle.includes('n') || handle === 'n') y1 = y2 - STICKER_MIN_CROP_PX;
+        else y2 = y1 + STICKER_MIN_CROP_PX;
+      }
+
+      x1 = Math.max(0, Math.min(x1, imgW - STICKER_MIN_CROP_PX));
+      y1 = Math.max(0, Math.min(y1, imgH - STICKER_MIN_CROP_PX));
+      x2 = Math.max(x1 + STICKER_MIN_CROP_PX, Math.min(x2, imgW));
+      y2 = Math.max(y1 + STICKER_MIN_CROP_PX, Math.min(y2, imgH));
+
+      stickerCrop.crop = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+      syncStickerCropUi();
     }
 
     function closeStickerCrop() {
       if (stickerCrop?.blobUrl) URL.revokeObjectURL(stickerCrop.blobUrl);
       stickerCrop = null;
-      stickerCropPan = null;
+      stickerCropDrag = null;
       stickerCropReplaceId = null;
-      const stage = $('stickerCropStage');
-      stage.style.width = '';
-      stage.style.height = '';
+      const wrap = $('stickerCropWrap');
+      wrap.style.width = '';
+      wrap.style.height = '';
       $('stickerCropSheet').classList.add('hidden');
     }
 
     function initStickerCropImage(img, file, replaceStickerId, blobUrl = null) {
-      const { w, h } = stickerStageDims(img.width, img.height);
-      const baseScale = Math.min(w / img.width, h / img.height);
+      const scale = stickerPreviewScale(img.width, img.height);
+      const stageW = Math.max(48, Math.round(img.width * scale));
+      const stageH = Math.max(48, Math.round(img.height * scale));
       stickerCropReplaceId = replaceStickerId;
       stickerCrop = {
         img,
         file: file || null,
-        stageW: w,
-        stageH: h,
-        baseScale,
-        zoom: 1,
-        ox: 0,
-        oy: 0,
         blobUrl: blobUrl || (file ? URL.createObjectURL(file) : null),
+        stageW,
+        stageH,
+        scale,
+        crop: { x: 0, y: 0, w: img.width, h: img.height },
+        sendAfter: Boolean(activeChat && !replaceStickerId),
       };
-      $('stickerCropZoom').value = '1';
-      layoutStickerCropStage();
+      const wrap = $('stickerCropWrap');
+      wrap.style.width = stageW + 'px';
+      wrap.style.height = stageH + 'px';
+      $('stickerCropSave').textContent = stickerCrop.sendAfter ? 'отправить' : 'готово';
       drawStickerCrop();
+      syncStickerCropUi();
       closeStickerSheet();
       closeStickerManageMenu();
       $('stickerCropSheet').classList.remove('hidden');
@@ -6714,26 +6843,14 @@
           reject(new Error('no crop'));
           return;
         }
-        const ratio = Math.min(
-          STICKER_MAX_EXPORT_EDGE / stickerCrop.stageW,
-          STICKER_MAX_EXPORT_EDGE / stickerCrop.stageH,
-        );
-        const outW = Math.max(1, Math.round(stickerCrop.stageW * ratio));
-        const outH = Math.max(1, Math.round(stickerCrop.stageH * ratio));
+        const { x, y, w, h } = stickerCrop.crop;
+        const ratio = Math.min(STICKER_MAX_EXPORT_EDGE / w, STICKER_MAX_EXPORT_EDGE / h);
+        const outW = Math.max(1, Math.round(w * ratio));
+        const outH = Math.max(1, Math.round(h * ratio));
         const out = document.createElement('canvas');
         out.width = outW;
         out.height = outH;
-        const ctx = out.getContext('2d');
-        const s = stickerCropScale() * ratio;
-        const w = stickerCrop.img.width * s;
-        const h = stickerCrop.img.height * s;
-        ctx.drawImage(
-          stickerCrop.img,
-          outW / 2 - w / 2 + stickerCrop.ox * ratio,
-          outH / 2 - h / 2 + stickerCrop.oy * ratio,
-          w,
-          h,
-        );
+        out.getContext('2d').drawImage(stickerCrop.img, x, y, w, h, 0, 0, outW, outH);
         const mime = stickerCrop.file?.type?.startsWith('image/') ? stickerCrop.file.type : 'image/png';
         out.toBlob((blob) => {
           if (blob) resolve({ blob, mime });
@@ -6751,33 +6868,26 @@
       return api('/me/stickers', { method: 'POST', body: fd });
     }
 
-    async function persistStickerUpload(data) {
-      if (stickerCropReplaceId) {
-        myStickers = myStickers.map((s) => (s.id === data.sticker.id ? data.sticker : s));
-      } else {
-        myStickers.push(data.sticker);
-      }
-      renderStickerGrid();
-      closeStickerCrop();
-      showAppErr('');
-    }
-
     async function saveStickerCrop() {
       try {
+        const sendAfter = stickerCrop?.sendAfter;
+        const replaceId = stickerCropReplaceId;
         const { blob, mime } = await exportStickerCropBlob();
         const ext = mime === 'image/jpeg' ? '.jpg' : '.png';
-        const data = await uploadStickerFile(new File([blob], 'sticker' + ext, { type: mime }), stickerCropReplaceId);
-        await persistStickerUpload(data);
-      } catch (e) {
-        showAppErr(e.message || 'не удалось сохранить');
-      }
-    }
-
-    async function saveStickerAsIs() {
-      if (!stickerCrop?.file) return;
-      try {
-        const data = await uploadStickerFile(stickerCrop.file, stickerCropReplaceId);
-        await persistStickerUpload(data);
+        const data = await uploadStickerFile(new File([blob], 'sticker' + ext, { type: mime }), replaceId);
+        const sticker = data.sticker;
+        if (replaceId) {
+          myStickers = myStickers.map((s) => (s.id === sticker.id ? sticker : s));
+        } else {
+          myStickers.push(sticker);
+        }
+        closeStickerCrop();
+        showAppErr('');
+        if (sendAfter && activeChat && sticker) {
+          await sendStickerMessage(sticker);
+        } else {
+          renderStickerGrid();
+        }
       } catch (e) {
         showAppErr(e.message || 'не удалось сохранить');
       }
@@ -6962,14 +7072,7 @@
       if (file) openStickerCropFromFile(file);
     };
     $('stickerCropCancel').onclick = (e) => { e.preventDefault(); closeStickerCrop(); };
-    $('stickerCropAsIs').onclick = (e) => { e.preventDefault(); saveStickerAsIs(); };
     $('stickerCropSave').onclick = (e) => { e.preventDefault(); saveStickerCrop(); };
-    $('stickerCropZoom').oninput = () => {
-      if (!stickerCrop) return;
-      stickerCrop.zoom = parseFloat($('stickerCropZoom').value) || 1;
-      clampStickerCropPan();
-      drawStickerCrop();
-    };
     $('stickerManageCrop').onclick = (e) => {
       e.preventDefault();
       const s = stickerManageTarget;
@@ -6989,31 +7092,40 @@
       if (fileId) importStickerToPack(fileId);
     };
 
-    (function bindStickerCropPan() {
-      const stage = $('stickerCropStage');
-      stage.addEventListener('pointerdown', (e) => {
+    (function bindStickerCropHandles() {
+      const wrap = $('stickerCropWrap');
+      const box = $('stickerCropBox');
+      const startDrag = (e, handle) => {
         if (!stickerCrop) return;
-        stickerCropPan = {
+        e.preventDefault();
+        e.stopPropagation();
+        const p = stickerCropPointerImage(e.clientX, e.clientY);
+        stickerCropDrag = {
           id: e.pointerId,
-          x: e.clientX,
-          y: e.clientY,
-          ox: stickerCrop.ox,
-          oy: stickerCrop.oy,
+          handle,
+          startX: p.x,
+          startY: p.y,
+          startCrop: { ...stickerCrop.crop },
         };
-        stage.setPointerCapture(e.pointerId);
-      });
-      stage.addEventListener('pointermove', (e) => {
-        if (!stickerCropPan || stickerCropPan.id !== e.pointerId || !stickerCrop) return;
-        stickerCrop.ox = stickerCropPan.ox + (e.clientX - stickerCropPan.x);
-        stickerCrop.oy = stickerCropPan.oy + (e.clientY - stickerCropPan.y);
-        clampStickerCropPan();
-        drawStickerCrop();
-      });
-      const endPan = (e) => {
-        if (stickerCropPan?.id === e.pointerId) stickerCropPan = null;
+        wrap.setPointerCapture(e.pointerId);
       };
-      stage.addEventListener('pointerup', endPan);
-      stage.addEventListener('pointercancel', endPan);
+      box.addEventListener('pointerdown', (e) => {
+        if (e.target !== box) return;
+        startDrag(e, 'move');
+      });
+      box.querySelectorAll('.sticker-crop-handle').forEach((el) => {
+        el.addEventListener('pointerdown', (e) => startDrag(e, el.dataset.h));
+      });
+      const onMove = (e) => {
+        if (!stickerCropDrag || stickerCropDrag.id !== e.pointerId) return;
+        applyStickerCropDrag(e.clientX, e.clientY);
+      };
+      const onEnd = (e) => {
+        if (stickerCropDrag?.id === e.pointerId) stickerCropDrag = null;
+      };
+      wrap.addEventListener('pointermove', onMove);
+      wrap.addEventListener('pointerup', onEnd);
+      wrap.addEventListener('pointercancel', onEnd);
     })();
 
     document.addEventListener('contextmenu', (e) => {
