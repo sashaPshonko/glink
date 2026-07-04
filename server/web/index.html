@@ -1059,18 +1059,14 @@
       .avatar-wrap { width: 40px; height: 40px; }
       .avatar { width: 40px; height: 40px; }
       #msgMenu .msg-menu-reactions {
-        display: flex;
-        flex-direction: row;
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        overscroll-behavior-x: contain;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
+        grid-template-columns: repeat(4, 40px);
+        grid-template-rows: repeat(2, 40px);
         gap: 5px;
-        max-width: calc(100vw - 32px);
-        justify-content: flex-start;
       }
-      #msgMenu .msg-menu-reactions::-webkit-scrollbar { display: none; }
+      #msgMenu .msg-menu-reactions button {
+        width: 40px; height: 40px; min-width: 40px; max-width: 40px;
+        font-size: 1.28rem;
+      }
     }
     .bubble {
       width: fit-content;
@@ -1479,6 +1475,7 @@
     .msg-menu-reactions {
       display: grid;
       grid-template-columns: repeat(4, 42px);
+      grid-template-rows: repeat(2, 42px);
       gap: 6px;
       justify-content: center;
       padding: 4px 4px 8px;
