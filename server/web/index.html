@@ -3498,7 +3498,11 @@
           blockMsgMenuOpen();
           clearMsgMenuDelay();
           const existing = (m.reactions || {})[user?.id];
-          if (!existing || existing === 'heart') toggleReaction(id, 'heart');
+          if (existing && REACTION_EMOJI[existing]) {
+            toggleReaction(id, existing);
+          } else {
+            toggleReaction(id, 'heart');
+          }
           return true;
         }
       }
