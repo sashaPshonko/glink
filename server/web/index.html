@@ -3688,24 +3688,30 @@
       markChatRead();
     }
 
-    function applyMessageReactions(m, box = $('messages')) {
+    function refreshMessageBubble(m, box = $('messages')) {
       const row = box.querySelector('.msg-row[data-id="' + m.id + '"]');
-      if (!row) {
-        relayoutMessages(box, { forceBottom: shouldStickToBottom() });
-        return;
-      }
-      const bubble = row.querySelector('.bubble');
-      if (!bubble) return;
+      if (!row) return false;
+      const inner = row.querySelector('.msg-row-inner');
+      if (!inner) return false;
       const preserve = !shouldStickToBottom();
       const anchor = preserve ? saveScrollAnchor(box) : null;
-      const mine = m.senderId === user.id;
-      applyMsgMetaToBubble(bubble, m, mine);
-      bubble.classList.toggle('has-reactions', hasReactions(m));
+      inner.innerHTML = renderBubbleInner(m);
+      wireVoicePlayers(inner);
+      wireVideoNotes(inner);
+      wireInlineMedia(inner);
+      scheduleVideoNoteCaps(box);
       if (anchor) {
         restoreScrollAnchor(box, anchor);
         maintainScrollAnchor(box, anchor);
       }
-      scheduleVideoNoteCaps(box);
+      return true;
+    }
+
+    function applyMessageReactions(m, box = $('messages')) {
+      if (!refreshMessageBubble(m, box)) {
+        relayoutMessages(box, { forceBottom: shouldStickToBottom() });
+        return;
+      }
       requestAnimationFrame(() => {
         const pinnedRow = pinnedVideoPlaceholder?.closest('.msg-row');
         if (pinnedRow?.dataset.id === m.id) vnotePinDragged = false;
