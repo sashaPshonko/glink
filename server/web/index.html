@@ -7753,7 +7753,7 @@
 
       $('messages').addEventListener('pointerdown', (e) => {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
-        if (!activeChat || editingMessageId || replyingToMessageId) return;
+        if (!activeChat || editingMessageId) return;
         const inner = e.target.closest('.msg-row-inner');
         if (!inner || e.target.closest('.msg-hit')) return;
         if (e.target.closest('a, button, video, audio, input, .msg-reaction-pill, .msg-voice-play, .msg-reply-quote, .msg-sticker')) return;
