@@ -940,7 +940,7 @@
       position: relative;
       display: block;
     }
-    .bubble.has-image:not(.has-caption) .msg-foot {
+    .bubble.has-image:not(.has-caption):not(.has-reactions) .msg-foot {
       position: absolute;
       right: 8px;
       bottom: 6px;
@@ -957,18 +957,18 @@
       gap: 3px;
       pointer-events: none;
     }
-    .bubble.has-image:not(.has-caption) .msg-foot .msg-time {
+    .bubble.has-image:not(.has-caption):not(.has-reactions) .msg-foot .msg-time {
       color: rgba(255, 255, 255, 0.92);
       margin-right: 0;
     }
-    .bubble.has-image:not(.has-caption) .msg-foot .edited-mark {
+    .bubble.has-image:not(.has-caption):not(.has-reactions) .msg-foot .edited-mark {
       color: rgba(255, 255, 255, 0.78);
       margin-right: 0;
     }
-    .bubble.has-image:not(.has-caption) .msg-foot .ticks {
+    .bubble.has-image:not(.has-caption):not(.has-reactions) .msg-foot .ticks {
       color: rgba(255, 255, 255, 0.88);
     }
-    .bubble.has-image:not(.has-caption) .msg-foot .ticks.read {
+    .bubble.has-image:not(.has-caption):not(.has-reactions) .msg-foot .ticks.read {
       color: #93c5fd;
     }
     .bubble.has-image.has-caption {
@@ -1276,6 +1276,19 @@
       background: rgba(255, 255, 255, 0.92) !important;
       border: 1px solid rgba(252, 231, 243, 0.95) !important;
       border-radius: 28px 28px 28px 12px;
+    }
+    .bubble.has-image.has-reactions:not(.has-caption) .msg-foot {
+      position: static;
+      pointer-events: auto;
+      background: transparent;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      padding: 0;
+      margin-top: 6px;
+    }
+    .bubble.has-image.has-reactions:not(.has-caption) img {
+      border-radius: 22px;
+      box-shadow: none;
     }
     .msg-menu {
       position: fixed; z-index: 500;
