@@ -154,12 +154,22 @@ function buildReplyPreview(replyToId, chatId) {
     const orig = findMessageById(replyToId);
     if (!orig || orig.chatId !== chatId) return null;
     const sender = findUserById(orig.senderId);
+    const kind = resolvedMessageKind(orig);
+    const file = orig.file || orig.files?.[0];
+    let thumbUrl = null;
+    let thumbKind = null;
+    if (file?.id && ['image', 'sticker', 'video_note', 'video'].includes(kind)) {
+        thumbUrl = `/files/${file.id}`;
+        thumbKind = kind;
+    }
     return {
         id: orig.id,
         senderId: orig.senderId,
         senderName: sender?.displayName || sender?.username || '?',
-        kind: resolvedMessageKind(orig),
+        kind,
         text: messagePreview(orig),
+        thumbUrl,
+        thumbKind,
     };
 }
 

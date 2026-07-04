@@ -1308,7 +1308,23 @@
       background: #db2777; flex-shrink: 0;
     }
     .reply-banner-text {
-      min-width: 0; display: flex; flex-direction: column; gap: 2px;
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .reply-banner-thumb {
+      flex-shrink: 0;
+      width: 40px; height: 40px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.06);
+    }
+    .reply-banner-thumb.hidden { display: none; }
+    .reply-banner-thumb.is-vnote { border-radius: 50%; }
+    .reply-banner-thumb img,
+    .reply-banner-thumb video {
+      width: 100%; height: 100%;
+      object-fit: cover; display: block;
+      pointer-events: none;
     }
     .reply-banner-text strong {
       font-size: 12px; color: #db2777; font-weight: 600;
@@ -1327,11 +1343,29 @@
     #replyCancelBtn:active { color: #db2777; transform: scale(0.92); }
     #composer.replying #sendBtn { background: #db2777; }
     .msg-reply-quote {
-      display: flex; flex-direction: column; gap: 2px;
+      display: flex; flex-direction: row; align-items: center; gap: 8px;
       width: 100%; margin: 0 0 6px; padding: 6px 8px 6px 10px;
       border: none; border-left: 3px solid #db2777;
       border-radius: 8px; text-align: left; cursor: pointer;
       background: rgba(255, 255, 255, 0.35);
+    }
+    .msg-reply-main {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .msg-reply-thumb {
+      flex-shrink: 0;
+      width: 36px; height: 36px;
+      border-radius: 6px;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.08);
+      pointer-events: none;
+    }
+    .msg-reply-thumb.is-vnote { border-radius: 50%; }
+    .msg-reply-thumb img,
+    .msg-reply-thumb video {
+      width: 100%; height: 100%;
+      object-fit: cover; display: block;
     }
     .bubble.mine .msg-reply-quote { background: rgba(255, 255, 255, 0.22); }
     .msg-reply-name {
@@ -1985,6 +2019,7 @@
               <strong id="replyBannerName"></strong>
               <span id="replyBannerPreview"></span>
             </div>
+            <div id="replyBannerThumb" class="reply-banner-thumb hidden" aria-hidden="true"></div>
           </div>
           <button id="replyCancelBtn" type="button" title="Отменить ответ" aria-label="Отменить ответ">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -2613,15 +2648,83 @@
       return notifyBody(m);
     }
 
+    function replyPreviewMedia(m) {
+      if (!m) return null;
+      const files = messageFiles(m);
+      const first = files[0];
+      if (!first) return null;
+      const kind = effectiveAttachmentKind(first, m);
+      const url = attachmentUrl(first);
+      if (!url) return null;
+      if (kind === 'image' || kind === 'sticker') return { kind, url };
+      if (kind === 'video_note') return { kind, url: videoNoteMediaSrc(url) };
+      if (kind === 'video') return { kind, url };
+      return null;
+    }
+
+    function replyPreviewThumbUrl(rp) {
+      if (!rp?.thumbUrl) return '';
+      const raw = rp.thumbUrl;
+      const url = raw.startsWith('/') ? fileUrl(raw) : raw;
+      if ((rp.thumbKind || rp.kind) === 'video_note') return videoNoteMediaSrc(url);
+      return url;
+    }
+
+    function renderReplyThumbInner(rp) {
+      const url = replyPreviewThumbUrl(rp);
+      if (!url) return '';
+      const kind = rp.thumbKind || rp.kind;
+      const src = escapeHtml(url);
+      if (kind === 'video_note') {
+        return `<video src="${src}" muted playsinline webkit-playsinline preload="metadata"></video>`;
+      }
+      if (kind === 'video') {
+        return `<video src="${src}" muted playsinline webkit-playsinline preload="metadata"></video>`;
+      }
+      return `<img src="${src}" alt="" draggable="false" />`;
+    }
+
+    function renderReplyThumbHtml(rp, cls = 'msg-reply-thumb') {
+      const inner = renderReplyThumbInner(rp);
+      if (!inner) return '';
+      const kind = rp.thumbKind || rp.kind;
+      const extra = kind === 'video_note' ? ' is-vnote' : (kind === 'video' ? ' is-video' : '');
+      return `<span class="${cls}${extra}" aria-hidden="true">${inner}</span>`;
+    }
+
+    function updateReplyBanner(m) {
+      const rp = buildLocalReplyPreview(m.id);
+      if (!rp) return;
+      $('replyBannerName').textContent = rp.senderName;
+      $('replyBannerPreview').textContent = rp.text;
+      const thumbHost = $('replyBannerThumb');
+      const inner = renderReplyThumbInner(rp);
+      if (inner) {
+        thumbHost.innerHTML = inner;
+        thumbHost.classList.remove('hidden');
+        thumbHost.classList.toggle('is-vnote', (rp.thumbKind || rp.kind) === 'video_note');
+        thumbHost.classList.toggle('is-video', (rp.thumbKind || rp.kind) === 'video');
+        thumbHost.removeAttribute('aria-hidden');
+      } else {
+        thumbHost.innerHTML = '';
+        thumbHost.classList.add('hidden');
+        thumbHost.setAttribute('aria-hidden', 'true');
+      }
+    }
+
     function buildLocalReplyPreview(messageId) {
       const m = getMessage(messageId);
       if (!m) return null;
+      const media = replyPreviewMedia(m);
+      const serverThumb = m.replyPreview?.thumbUrl;
       return {
         id: m.id,
         senderId: m.senderId,
         senderName: m.senderId === user?.id ? 'Вы' : (m.senderName || '?'),
-        kind: m.kind,
+        kind: media?.kind || m.kind,
         text: replyPreviewText(m),
+        thumbUrl: media?.url || serverThumb || null,
+        thumbKind: media?.kind || m.replyPreview?.thumbKind || null,
       };
     }
 
@@ -2629,8 +2732,7 @@
       if (!m || m._pending) return;
       cancelEdit();
       replyingToMessageId = m.id;
-      $('replyBannerName').textContent = m.senderId === user?.id ? 'Вы' : (m.senderName || '?');
-      $('replyBannerPreview').textContent = replyPreviewText(m);
+      updateReplyBanner(m);
       $('replyBanner').classList.remove('hidden');
       $('composer').classList.add('replying');
       $('msgInput').focus();
@@ -2640,6 +2742,8 @@
     function cancelReply() {
       replyingToMessageId = null;
       $('replyBanner').classList.add('hidden');
+      $('replyBannerThumb').innerHTML = '';
+      $('replyBannerThumb').classList.add('hidden');
       $('composer').classList.remove('replying');
     }
 
@@ -2650,12 +2754,23 @@
       return replyTo ? { replyTo, replyPreview } : null;
     }
 
+    function enrichReplyPreview(rp) {
+      if (!rp?.id || rp.thumbUrl) return rp;
+      const orig = getMessage(rp.id);
+      const media = replyPreviewMedia(orig);
+      if (!media) return rp;
+      return { ...rp, thumbUrl: media.url, thumbKind: media.kind };
+    }
+
     function renderReplyQuoteHtml(rp) {
       if (!rp?.id) return '';
-      return `<button type="button" class="msg-reply-quote" data-reply-id="${escapeHtml(rp.id)}">` +
+      rp = enrichReplyPreview(rp);
+      const thumb = renderReplyThumbHtml(rp);
+      return `<button type="button" class="msg-reply-quote${thumb ? ' has-thumb' : ''}" data-reply-id="${escapeHtml(rp.id)}">` +
+        `<span class="msg-reply-main">` +
         `<span class="msg-reply-name">${escapeHtml(rp.senderName || '?')}</span>` +
         `<span class="msg-reply-text">${escapeHtml(rp.text || '')}</span>` +
-        `</button>`;
+        `</span>${thumb}</button>`;
     }
 
     function renderMessageGroupHtml(group) {
