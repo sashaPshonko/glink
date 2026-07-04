@@ -2206,6 +2206,9 @@
     let voiceScrubResumeReview = false;
     let videoScrubbing = false;
     let videoScrubResume = null;
+    let replySwipe = null;
+    let replySwipeHandledPointer = null;
+    let videoNoteTapPending = null;
     const waveCache = new Map();
     const voicePos = new Map();
     let videoRecorder = null;
@@ -3344,7 +3347,7 @@
     }
 
     function isMsgInteractiveTarget(el) {
-      return Boolean(el.closest('.voice-play, .video-note, .msg-sticker, .file-card, video, audio, img, a'));
+      return Boolean(el.closest('.voice-play, .voice-body, .file-card, a.file-card'));
     }
 
     function findMsgRowFromHit(e) {
@@ -5527,7 +5530,12 @@
             beginVideoScrub(wrap, vid, src);
             seekVideoNote(wrap, vid, e.clientX, e.clientY);
           } else {
-            toggleVideoNote(wrap, vid, src);
+            videoNoteTapPending = {
+              wrap, vid, src,
+              pointerId: e.pointerId,
+              x: e.clientX,
+              y: e.clientY,
+            };
           }
         });
 
@@ -5545,13 +5553,28 @@
             handlePinnedVideoPointerUp(wrap, vid, src, e);
             return;
           }
-          if (wrap.dataset.seeking !== '1') return;
-          if (e?.pointerId != null && wrap.hasPointerCapture?.(e.pointerId)) {
-            wrap.releasePointerCapture(e.pointerId);
+          if (replySwipeHandledPointer === e.pointerId) {
+            replySwipeHandledPointer = null;
+            videoNoteTapPending = null;
+            return;
           }
-          finishVideoScrub(wrap);
-          wrap.dataset.seeking = '';
-          wrap.classList.remove('seeking');
+          if (wrap.dataset.seeking === '1') {
+            if (e?.pointerId != null && wrap.hasPointerCapture?.(e.pointerId)) {
+              wrap.releasePointerCapture(e.pointerId);
+            }
+            finishVideoScrub(wrap);
+            wrap.dataset.seeking = '';
+            wrap.classList.remove('seeking');
+            videoNoteTapPending = null;
+            return;
+          }
+          const pending = videoNoteTapPending;
+          if (pending && pending.wrap === wrap && pending.pointerId === e.pointerId) {
+            videoNoteTapPending = null;
+            if (Math.hypot(e.clientX - pending.x, e.clientY - pending.y) < 14) {
+              toggleVideoNote(wrap, vid, src);
+            }
+          }
         };
         wrap.addEventListener('pointerup', endSeek);
         wrap.addEventListener('pointercancel', endSeek);
@@ -7749,59 +7772,69 @@
     (function bindReplySwipe() {
       const SWIPE_THRESHOLD = 56;
       const SWIPE_MAX = 72;
-      let swipe = null;
+
+      function replySwipeFromEvent(e) {
+        if (e.target.closest('.msg-hit')) return null;
+        if (e.target.closest('a, button, input, .msg-reaction-pill, .msg-reply-quote, .voice-play, .voice-msg')) return null;
+        const row = e.target.closest('.msg-row');
+        if (!row) return null;
+        const inner = row.querySelector('.msg-row-inner');
+        if (!inner || !e.target.closest('.msg-stack')) return null;
+        return { row, inner };
+      }
+
+      function clearReplySwipeVisual() {
+        if (!replySwipe) return;
+        replySwipe.inner.style.transform = '';
+        replySwipe.row.classList.remove('reply-swipe-active');
+      }
 
       $('messages').addEventListener('pointerdown', (e) => {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         if (!activeChat || editingMessageId) return;
-        const inner = e.target.closest('.msg-row-inner');
-        if (!inner || e.target.closest('.msg-hit')) return;
-        if (e.target.closest('a, button, video, audio, input, .msg-reaction-pill, .msg-voice-play, .msg-reply-quote, .msg-sticker')) return;
-        const row = inner.closest('.msg-row');
-        if (!row) return;
-        const m = getMessage(row.dataset.id);
+        const hit = replySwipeFromEvent(e);
+        if (!hit) return;
+        const m = getMessage(hit.row.dataset.id);
         if (!m || m._pending) return;
-        swipe = {
-          row,
-          inner,
-          mine: row.classList.contains('mine'),
+        replySwipe = {
+          row: hit.row,
+          inner: hit.inner,
+          mine: hit.row.classList.contains('mine'),
           startX: e.clientX,
           startY: e.clientY,
           id: e.pointerId,
           triggered: false,
         };
-        inner.setPointerCapture?.(e.pointerId);
-      }, { passive: true });
+        hit.inner.setPointerCapture?.(e.pointerId);
+      }, { capture: true, passive: true });
 
       $('messages').addEventListener('pointermove', (e) => {
-        if (!swipe || swipe.id !== e.pointerId) return;
-        const dx = e.clientX - swipe.startX;
-        const dy = e.clientY - swipe.startY;
+        if (!replySwipe || replySwipe.id !== e.pointerId) return;
+        const dx = e.clientX - replySwipe.startX;
+        const dy = e.clientY - replySwipe.startY;
         if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 14) {
-          swipe.inner.style.transform = '';
-          swipe.row.classList.remove('reply-swipe-active');
-          swipe = null;
+          clearReplySwipeVisual();
+          replySwipe = null;
           return;
         }
-        const mag = swipe.mine
+        const mag = replySwipe.mine
           ? Math.min(SWIPE_MAX, Math.max(0, -dx))
           : Math.min(SWIPE_MAX, Math.max(0, dx));
         if (mag <= 0 && Math.abs(dx) > 10) {
-          swipe.inner.style.transform = '';
-          swipe.row.classList.remove('reply-swipe-active');
-          swipe = null;
+          clearReplySwipeVisual();
+          replySwipe = null;
           return;
         }
-        swipe.inner.style.transform = `translateX(${swipe.mine ? -mag : mag}px)`;
-        swipe.row.classList.toggle('reply-swipe-active', mag > 8);
-        if (mag >= SWIPE_THRESHOLD) swipe.triggered = true;
-      }, { passive: true });
+        if (mag > 8) videoNoteTapPending = null;
+        replySwipe.inner.style.transform = `translateX(${replySwipe.mine ? -mag : mag}px)`;
+        replySwipe.row.classList.toggle('reply-swipe-active', mag > 8);
+        if (mag >= SWIPE_THRESHOLD) replySwipe.triggered = true;
+      }, { capture: true, passive: true });
 
-      const endSwipe = (e) => {
-        if (!swipe || (e && swipe.id !== e.pointerId)) return;
-        const { row, inner, triggered } = swipe;
-        inner.style.transform = '';
-        row.classList.remove('reply-swipe-active');
+      const endReplySwipe = (e) => {
+        if (!replySwipe || (e && replySwipe.id !== e.pointerId)) return;
+        const { row, triggered, id } = replySwipe;
+        clearReplySwipeVisual();
         if (triggered) {
           const m = getMessage(row.dataset.id);
           if (m) {
@@ -7809,11 +7842,12 @@
             clearMsgPress();
             blockMsgMenuOpen(300);
           }
+          replySwipeHandledPointer = id;
         }
-        swipe = null;
+        replySwipe = null;
       };
-      $('messages').addEventListener('pointerup', endSwipe);
-      $('messages').addEventListener('pointercancel', endSwipe);
+      $('messages').addEventListener('pointerup', endReplySwipe, { capture: true });
+      $('messages').addEventListener('pointercancel', endReplySwipe, { capture: true });
     })();
 
     $('msgMenu').querySelectorAll('.msg-menu-reactions button').forEach((btn) => {
