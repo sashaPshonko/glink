@@ -593,6 +593,48 @@
     }
     .msg-menu-actions button.danger-text { color: #e11d48; }
     @keyframes pulse { 50% { opacity: 0.7; } }
+    @keyframes reactionPop {
+      0% { transform: scale(0.35); opacity: 0; }
+      55% { transform: scale(1.18); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes reactionFloat {
+      0% { transform: translate(-50%, 0) scale(0.45); opacity: 0; }
+      12% { transform: translate(-50%, -6px) scale(1.15); opacity: 1; }
+      100% { transform: translate(-50%, -76px) scale(0.9); opacity: 0; }
+    }
+    @keyframes reactionPulse {
+      0%, 100% { transform: scale(1); }
+      35% { transform: scale(0.96); }
+      65% { transform: scale(1.03); }
+    }
+    @keyframes msgEnterMine {
+      from { opacity: 0; transform: translateY(14px) translateX(10px); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes msgEnterTheirs {
+      from { opacity: 0; transform: translateY(14px) translateX(-10px); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes menuPop {
+      from { opacity: 0; transform: scale(0.86) translateY(8px); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes menuReactionTap {
+      0% { transform: scale(1); }
+      45% { transform: scale(1.38); }
+      100% { transform: scale(1); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .msg-reaction-pill.pop-in,
+      .reaction-burst,
+      .msg-row.enter .msg-row-inner,
+      .bubble.reaction-pulse,
+      .msg-menu:not(.hidden),
+      .msg-menu-reactions button.tap-pop {
+        animation: none !important;
+      }
+    }
     #login {
       flex: 1;
       display: flex;
@@ -1221,6 +1263,9 @@
       cursor: pointer; font: inherit; color: inherit;
       user-select: none; -webkit-user-select: none;
     }
+    .msg-reaction-pill.pop-in {
+      animation: reactionPop 0.38s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+    }
     .msg-reaction-pill.mine {
       background: rgba(255, 255, 255, 0.98);
       border-color: rgba(232, 121, 169, 0.35);
@@ -1297,6 +1342,8 @@
       border-radius: 14px;
       box-shadow: 0 8px 28px rgba(92, 51, 71, 0.18);
       padding: 8px; min-width: auto;
+      transform-origin: center top;
+      animation: menuPop 0.22s cubic-bezier(0.34, 1.2, 0.64, 1) both;
     }
     .msg-menu.hidden { display: none; }
     .msg-menu-reactions {
@@ -1313,6 +1360,9 @@
     }
     .msg-menu-reactions button.sel {
       background: #fbcfe8; box-shadow: 0 0 0 2px #e879a9;
+    }
+    .msg-menu-reactions button.tap-pop {
+      animation: menuReactionTap 0.32s cubic-bezier(0.34, 1.4, 0.64, 1) both;
     }
     .msg-menu-actions button {
       display: block; width: 100%; text-align: left;
@@ -1443,6 +1493,25 @@
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .msg-row-inner { position: relative; transition: transform 0.12s ease-out; }
+    .msg-row.enter.mine .msg-row-inner {
+      animation: msgEnterMine 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    .msg-row.enter.theirs .msg-row-inner {
+      animation: msgEnterTheirs 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    .bubble.reaction-pulse {
+      animation: reactionPulse 0.36s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+    }
+    .reaction-burst {
+      position: fixed;
+      pointer-events: none;
+      z-index: 600;
+      font-size: 2.5rem;
+      line-height: 1;
+      transform: translate(-50%, 0);
+      animation: reactionFloat 0.78s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      filter: drop-shadow(0 3px 10px rgba(219, 39, 119, 0.35));
+    }
     .msg-row.reply-swipe-active .msg-row-line::after {
       content: '↩';
       position: absolute;
@@ -2427,6 +2496,68 @@
     const MSG_PRESS_MS = 480;
     const DBL_TAP_MS = 320;
     const APP_ERR_MS = 4000;
+    const enterMsgIds = new Set();
+
+    function playReactionBurst(row, reactionKey) {
+      const stack = row?.querySelector('.msg-stack');
+      if (!stack) return;
+      const emoji = REACTION_EMOJI[reactionKey] || '❤️';
+      const rect = stack.getBoundingClientRect();
+      const el = document.createElement('div');
+      el.className = 'reaction-burst';
+      el.textContent = emoji;
+      el.style.left = (rect.left + rect.width / 2) + 'px';
+      el.style.top = (rect.top + rect.height * 0.42) + 'px';
+      document.body.appendChild(el);
+      el.addEventListener('animationend', () => el.remove(), { once: true });
+    }
+
+    function pulseMessageBubble(row) {
+      const bubble = row?.querySelector('.bubble');
+      if (!bubble) return;
+      bubble.classList.remove('reaction-pulse');
+      void bubble.offsetWidth;
+      bubble.classList.add('reaction-pulse');
+      bubble.addEventListener('animationend', () => bubble.classList.remove('reaction-pulse'), { once: true });
+    }
+
+    function animateReactionPills(container, reactionKeys = []) {
+      if (!container || !reactionKeys.length) return;
+      for (const key of reactionKeys) {
+        const pill = container.querySelector('.msg-reaction-pill[data-reaction="' + key + '"]');
+        if (!pill) continue;
+        pill.classList.remove('pop-in');
+        void pill.offsetWidth;
+        pill.classList.add('pop-in');
+        pill.addEventListener('animationend', () => pill.classList.remove('pop-in'), { once: true });
+      }
+    }
+
+    function markMessageEnter(id) {
+      if (id) enterMsgIds.add(id);
+    }
+
+    function applyEnterAnimations(box = $('messages')) {
+      if (!enterMsgIds.size) return;
+      for (const id of enterMsgIds) {
+        const row = box.querySelector('.msg-row[data-id="' + id + '"]');
+        if (!row) continue;
+        row.classList.add('enter');
+        const inner = row.querySelector('.msg-row-inner');
+        if (inner) {
+          inner.addEventListener('animationend', () => row.classList.remove('enter'), { once: true });
+        }
+      }
+      enterMsgIds.clear();
+    }
+
+    function popMenuReactionBtn(btn) {
+      if (!btn) return;
+      btn.classList.remove('tap-pop');
+      void btn.offsetWidth;
+      btn.classList.add('tap-pop');
+      btn.addEventListener('animationend', () => btn.classList.remove('tap-pop'), { once: true });
+    }
 
     const $ = (id) => document.getElementById(id);
 
@@ -2897,6 +3028,7 @@
       wireInlineMedia(box);
       scheduleVideoNoteCaps(box);
       if (!opts.skipRead) scheduleMarkVisibleRead();
+      applyEnterAnimations(box);
       if (opts.reveal) revealMessagesBox(box);
     }
 
@@ -3513,8 +3645,10 @@
           const existing = (m.reactions || {})[user?.id];
           if (existing && REACTION_EMOJI[existing]) {
             toggleReaction(id, existing);
+            pulseMessageBubble(row);
           } else {
-            toggleReaction(id, 'heart');
+            toggleReaction(id, 'heart', { burst: true });
+            pulseMessageBubble(row);
           }
           return true;
         }
@@ -3620,13 +3754,18 @@
       return { ...msg, reactions };
     }
 
-    async function toggleReaction(messageId, reaction) {
+    async function toggleReaction(messageId, reaction, opts = {}) {
       if (!activeChat) return;
       touchChatActivity();
       const prev = getMessage(messageId);
       if (!prev || prev._pending) return;
+      const prevMine = prev.reactions?.[user.id];
+      const adding = prevMine !== reaction;
       const optimistic = applyReactionToggle(prev, reaction);
-      replaceMessage(messageId, optimistic, { reactionsOnly: true });
+      const reactionAnim = adding
+        ? { key: reaction, adding: true, burst: Boolean(opts.burst) }
+        : null;
+      replaceMessage(messageId, optimistic, { reactionsOnly: true, reactionAnim });
       try {
         const data = await api('/chats/' + activeChat.id + '/messages/' + messageId + '/reactions', {
           method: 'POST',
@@ -3729,6 +3868,7 @@
       const box = $('messages');
       if (box.querySelector('.msg-row[data-id="' + m.id + '"]')) return;
       upsertActiveMessage(m);
+      markMessageEnter(m.id);
       relayoutMessages(box, opts);
       if (!m._pending) markChatRead();
     }
@@ -3738,7 +3878,7 @@
       if (idx >= 0) activeMessages[idx] = msg;
       else upsertActiveMessage(msg);
       if (opts.reactionsOnly) {
-        applyMessageReactions(msg);
+        applyMessageReactions(msg, $('messages'), opts.reactionAnim);
         lastMessagesSig = messagesSig(activeMessages);
         return;
       }
@@ -3765,12 +3905,17 @@
       return true;
     }
 
-    function applyMessageReactions(m, box = $('messages')) {
+    function applyMessageReactions(m, box = $('messages'), anim = null) {
       if (!refreshMessageBubble(m, box)) {
         relayoutMessages(box, { forceBottom: shouldStickToBottom() });
         return;
       }
       requestAnimationFrame(() => {
+        const row = box.querySelector('.msg-row[data-id="' + m.id + '"]');
+        if (anim?.adding && row) {
+          if (anim.burst) playReactionBurst(row, anim.key);
+          animateReactionPills(row.querySelector('.msg-reactions'), [anim.key]);
+        }
         const pinnedRow = pinnedVideoPlaceholder?.closest('.msg-row');
         if (pinnedRow?.dataset.id === m.id) vnotePinDragged = false;
         updateVideoNotePipState();
@@ -8179,6 +8324,7 @@
         const id = msgMenuTargetId;
         const reaction = btn.dataset.reaction;
         if (!id || !reaction) return;
+        popMenuReactionBtn(btn);
         closeMsgMenu();
         toggleReaction(id, reaction);
       };
