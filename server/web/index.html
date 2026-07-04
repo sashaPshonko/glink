@@ -1065,6 +1065,10 @@
       display: flex; justify-content: flex-end; flex-wrap: wrap;
       margin-top: 4px; gap: 4px; align-items: center;
     }
+    .msg-foot .msg-meta {
+      display: inline-flex; align-items: center; gap: 4px;
+      margin-left: auto; flex-shrink: 0;
+    }
     .bubble.text-only {
       padding: 0;
       border-radius: 18px;
@@ -1111,6 +1115,7 @@
     .bubble.text-only .msg-text-foot {
       padding: 0 11px 8px;
       margin-top: -4px;
+      justify-content: flex-end;
     }
     .msg-inline-meta .msg-time {
       font-size: 0.68rem;
@@ -1136,7 +1141,11 @@
     .msg-time {
       font-size: 0.68rem; color: rgba(92, 51, 71, 0.48);
       font-variant-numeric: tabular-nums; white-space: nowrap;
-      margin-right: auto;
+    }
+    .bubble.has-voice:not(.has-caption) .msg-foot,
+    .bubble:has(.file-card) .msg-foot {
+      padding: 2px 8px 6px;
+      justify-content: flex-end;
     }
     .ticks {
       font-size: 0.78rem; letter-spacing: -3px; line-height: 1;
@@ -3323,7 +3332,7 @@
       if (useInlineTextMeta(m) && meta) {
         return `<div class="msg-text-block msg-text-inline"><span class="msg-text">${text}</span><span class="msg-inline-meta">${meta}</span></div>`;
       }
-      const foot = meta ? `<div class="msg-foot msg-text-foot">${meta}</div>` : '';
+      const foot = meta ? `<div class="msg-foot msg-text-foot"><div class="msg-meta">${meta}</div></div>` : '';
       return `<div class="msg-text-block">${text}</div>${foot}`;
     }
 
@@ -3379,7 +3388,8 @@
         const metaHtml = meta ? `<div class="msg-meta">${meta}</div>` : '';
         return `<div class="msg-foot has-reactions"><div class="msg-reactions">${reactionsHtml}</div>${metaHtml}</div>`;
       }
-      return `<div class="msg-foot">${meta}</div>`;
+      if (!meta) return '';
+      return `<div class="msg-foot"><div class="msg-meta">${meta}</div></div>`;
     }
 
     function canEditMessage(m) {
@@ -3467,6 +3477,14 @@
       msgMenuDelayTimer = null;
     }
 
+    function isMsgBubbleDoubleTapTarget(el) {
+      if (!el?.closest('.msg-stack')) return false;
+      return !el.closest(
+        '.msg-hit, .msg-reaction-pill, .msg-reply-quote, .voice-play, .voice-wave, ' +
+        'a, button, video, audio, input, .file-card, .msg-sticker, .msg-photo, .msg-album-item, .video-note',
+      );
+    }
+
     function tryDoubleTapHeart(row) {
       const id = row.dataset.id;
       const now = Date.now();
@@ -3478,6 +3496,7 @@
         if (m && !m._pending) {
           closeMsgMenu();
           blockMsgMenuOpen();
+          clearMsgMenuDelay();
           const existing = (m.reactions || {})[user?.id];
           if (!existing || existing === 'heart') toggleReaction(id, 'heart');
           return true;
@@ -7100,10 +7119,19 @@
 
     function attachVoiceReview() {
       if (!voiceReviewBlob) return;
-      const type = voiceReviewBlob.type || 'audio/webm';
+      const blob = voiceReviewBlob;
+      const type = blob.type || 'audio/webm';
       const ext = voiceExt(type);
-      addDraftAttachment(new File([voiceReviewBlob], 'voice' + ext, { type }), 'voice');
+      const file = new File([blob], 'voice' + ext, { type });
+      const emptyComposer = !$('msgInput').value.trim() && !hasDraftAttachments();
       hideVoiceOverlay();
+      if (emptyComposer) {
+        sendFile(file, 'voice').catch((e) => {
+          showAppErr(e.message || 'не удалось отправить');
+        });
+        return;
+      }
+      addDraftAttachment(file, 'voice');
     }
 
     function cancelVoiceRecording() {
@@ -7994,9 +8022,19 @@
       }, MSG_PRESS_MS);
     });
     $('messages').addEventListener('pointerup', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       const hit = e.target.closest('.msg-hit');
+      const row = (hit || e.target.closest('.msg-stack'))?.closest('.msg-row');
+      if (row && isMsgBubbleDoubleTapTarget(e.target)) {
+        const m = getMessage(row.dataset.id);
+        if (m && !m._pending && tryDoubleTapHeart(row)) {
+          clearMsgPress();
+          clearMsgMenuDelay();
+          blockMsgMenuOpen(450);
+          return;
+        }
+      }
       if (!hit) return;
-      const row = hit.closest('.msg-row');
       const wasTimer = msgPressTimer;
       const sameRow = msgPressRow === row;
       clearMsgPress();
@@ -8018,23 +8056,6 @@
       if (!msgPressTimer || !msgPressRow) return;
       if (!e.target.closest('.msg-hit') || !msgPressRow.contains(e.target.closest('.msg-hit'))) {
         clearMsgPress();
-      }
-    });
-    $('messages').addEventListener('dblclick', (e) => {
-      const hit = e.target.closest('.msg-hit');
-      if (!hit) return;
-      const row = hit.closest('.msg-row');
-      if (!row) return;
-      e.preventDefault();
-      clearTextSelection();
-      lastMsgTap = { id: null, at: 0 };
-      clearMsgMenuDelay();
-      closeMsgMenu();
-      blockMsgMenuOpen();
-      const m = getMessage(row.dataset.id);
-      const existing = m && (m.reactions || {})[user?.id];
-      if (m && !m._pending && (!existing || existing === 'heart')) {
-        toggleReaction(row.dataset.id, 'heart');
       }
     });
     $('messages').addEventListener('contextmenu', (e) => {
