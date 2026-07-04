@@ -715,6 +715,26 @@
       display: flex;
       flex-direction: column;
     }
+    #chatDateFloat {
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 15;
+      pointer-events: none;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #9d174d;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid rgba(252, 231, 243, 0.95);
+      box-shadow: 0 2px 10px rgba(92, 51, 71, 0.12);
+      opacity: 0;
+      transition: opacity 0.18s ease;
+      white-space: nowrap;
+    }
+    #chatDateFloat.visible { opacity: 1; }
     #videoNotePinHost {
       position: absolute;
       inset: 0;
@@ -2028,6 +2048,7 @@
         <button type="button" id="voiceDockClose" class="voice-dock-close" aria-label="Закрыть">✕</button>
       </div>
       <div class="chat-body">
+        <div id="chatDateFloat" aria-hidden="true"></div>
         <div id="messages"></div>
         <div id="videoNotePinHost" aria-hidden="true"></div>
       </div>
@@ -2353,6 +2374,7 @@
     let userPinnedBottom = true;
     let suppressScrollTrack = false;
     let userScrollingUntil = 0;
+    let chatDateFloatTimer = null;
     const SCROLL_BOTTOM_PX = 24;
     const SCROLL_IDLE_MS = 200;
     let loadMsgGen = 0;
@@ -3337,7 +3359,7 @@
         ? `<span class="edited-mark" title="изменено">изм.</span>`
         : '';
       const when = (m.createdAt && !m._pending)
-        ? `<span class="msg-time">${escapeHtml(fmtMsgDate(m.createdAt))}</span>`
+        ? `<span class="msg-time">${escapeHtml(fmtMsgTime(m.createdAt))}</span>`
         : '';
       if (!mine || !m.status) {
         if (!when && !edited) return '';
@@ -3647,7 +3669,7 @@
       const mine = m.senderId === user.id;
       const rowCls = mine ? 'mine' : 'theirs';
       const pendingCls = m._pending ? ' pending' : '';
-      return `<div class="msg-row ${rowCls}${pendingCls}" data-id="${m.id}">` +
+      return `<div class="msg-row ${rowCls}${pendingCls}" data-id="${m.id}" data-created-at="${escapeHtml(m.createdAt || '')}">` +
         `<div class="msg-row-line">` +
         `<div class="msg-hit msg-hit-left" aria-hidden="true"></div>` +
         `<div class="msg-stack">` +
@@ -4252,22 +4274,83 @@
       return `${m}:${String(sec).padStart(2, '0')}`;
     }
 
-    function fmtMsgDate(iso) {
+    function fmtMsgTime(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '';
+      return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function fmtDayLabel(iso) {
       if (!iso) return '';
       const d = new Date(iso);
       if (Number.isNaN(d.getTime())) return '';
       const now = new Date();
       const dayStart = (dt) => new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime();
-      const hm = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
       const today = dayStart(now);
       const msgDay = dayStart(d);
-      if (msgDay === today) return hm;
-      const yesterday = today - 86400000;
-      if (msgDay === yesterday) return 'вчера ' + hm;
+      if (msgDay === today) return 'Сегодня';
+      if (msgDay === today - 86400000) return 'Вчера';
       if (d.getFullYear() === now.getFullYear()) {
-        return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) + ', ' + hm;
+        return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
       }
-      return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }) + ', ' + hm;
+      return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    function hideChatDateFloat() {
+      clearTimeout(chatDateFloatTimer);
+      chatDateFloatTimer = null;
+      const el = $('chatDateFloat');
+      if (!el) return;
+      el.classList.remove('visible');
+      el.setAttribute('aria-hidden', 'true');
+    }
+
+    function updateChatDateFloat() {
+      const el = $('chatDateFloat');
+      const box = $('messages');
+      if (!el || !box || !activeChat) return;
+      const rows = box.querySelectorAll('.msg-row[data-created-at]');
+      if (!rows.length) {
+        hideChatDateFloat();
+        return;
+      }
+      const boxRect = box.getBoundingClientRect();
+      const probeY = boxRect.top + 14;
+      let targetRow = null;
+      for (const row of rows) {
+        const r = row.getBoundingClientRect();
+        if (r.bottom >= probeY) {
+          targetRow = row;
+          break;
+        }
+      }
+      if (!targetRow) targetRow = rows[rows.length - 1];
+      const label = fmtDayLabel(targetRow.dataset.createdAt);
+      if (!label) {
+        hideChatDateFloat();
+        return;
+      }
+      if (label === 'Сегодня' && isAtBottom(box)) {
+        hideChatDateFloat();
+        return;
+      }
+      el.textContent = label;
+      el.classList.add('visible');
+      el.removeAttribute('aria-hidden');
+      clearTimeout(chatDateFloatTimer);
+      chatDateFloatTimer = setTimeout(hideChatDateFloat, 1400);
+    }
+
+    function fmtMsgDate(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '';
+      const hm = fmtMsgTime(iso);
+      const day = fmtDayLabel(iso);
+      if (day === 'Сегодня') return hm;
+      if (day === 'Вчера') return 'вчера ' + hm;
+      return day + ', ' + hm;
     }
 
     function fmtFileSize(bytes) {
@@ -6559,6 +6642,7 @@
       persistActiveChatDraft();
       cancelEdit();
       cancelReply();
+      hideChatDateFloat();
       closeMsgMenu();
       clearVideoNotePin();
       hideVoiceDock();
@@ -7841,6 +7925,7 @@
     const messagesEl = $('messages');
     messagesEl.addEventListener('scroll', () => {
       updateVideoNotePipState();
+      updateChatDateFloat();
       if (suppressScrollTrack || !activeChat) return;
       markUserScrolling();
       touchChatActivity();
