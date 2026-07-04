@@ -3916,7 +3916,6 @@
           const existing = (m.reactions || {})[user?.id];
           if (existing && REACTION_EMOJI[existing]) {
             toggleReaction(id, existing);
-            pulseMessageBubble(row);
           } else {
             toggleReaction(id, 'heart', { burst: true });
             pulseMessageBubble(row);
@@ -4160,16 +4159,50 @@
       return true;
     }
 
+    function reactionsNeedFullBubbleRefresh(m, bubble) {
+      if (!bubble) return true;
+      const shouldBePlain = isPlainTextBubble(m) && !hasReactions(m);
+      const isPlain = bubble.classList.contains('text-only');
+      return shouldBePlain !== isPlain;
+    }
+
+    function patchMessageReactions(m, bubble, mine) {
+      bubble.classList.toggle('has-reactions', hasReactions(m));
+      const footHtml = renderBubbleFoot(m, mine);
+      const foot = bubble.querySelector('.msg-foot');
+      if (footHtml) {
+        if (foot) foot.outerHTML = footHtml;
+        else bubble.insertAdjacentHTML('beforeend', footHtml);
+      } else if (foot) {
+        foot.remove();
+      }
+    }
+
     function applyMessageReactions(m, box = $('messages'), anim = null) {
-      if (!refreshMessageBubble(m, box)) {
+      const row = box.querySelector('.msg-row[data-id="' + m.id + '"]');
+      const bubble = row?.querySelector('.bubble');
+      const mine = m.senderId === user.id;
+      const preserve = !shouldStickToBottom();
+      const anchor = preserve ? saveScrollAnchor(box) : null;
+      let ok = false;
+      if (bubble && !reactionsNeedFullBubbleRefresh(m, bubble)) {
+        patchMessageReactions(m, bubble, mine);
+        ok = true;
+      } else {
+        ok = refreshMessageBubble(m, box);
+      }
+      if (!ok) {
         relayoutMessages(box, { forceBottom: shouldStickToBottom() });
         return;
       }
+      if (anchor) {
+        restoreScrollAnchor(box, anchor);
+        maintainScrollAnchor(box, anchor);
+      }
       requestAnimationFrame(() => {
-        const row = box.querySelector('.msg-row[data-id="' + m.id + '"]');
-        if (anim?.adding && row) {
+        if (anim?.adding) {
           if (anim.burst) playReactionBurst(row, anim.key);
-          animateReactionPills(row.querySelector('.msg-reactions'), [anim.key]);
+          animateReactionPills(row?.querySelector('.msg-reactions'), [anim.key]);
         }
         const pinnedRow = pinnedVideoPlaceholder?.closest('.msg-row');
         if (pinnedRow?.dataset.id === m.id) vnotePinDragged = false;
