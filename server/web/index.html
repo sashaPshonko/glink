@@ -625,15 +625,122 @@
       45% { transform: scale(1.38); }
       100% { transform: scale(1); }
     }
+    .ui-pre-show {
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+    .ui-anim-pop.ui-anim-in { animation: uiPopIn 0.24s cubic-bezier(0.34, 1.2, 0.64, 1) both; }
+    .ui-anim-pop.ui-anim-out { animation: uiPopOut 0.2s cubic-bezier(0.4, 0, 0.9, 0.6) forwards; pointer-events: none; }
+    .ui-anim-sheet.ui-anim-in { animation: uiSheetIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
+    .ui-anim-sheet.ui-anim-out { animation: uiSheetOut 0.24s cubic-bezier(0.4, 0, 0.85, 0.4) forwards; pointer-events: none; }
+    .profile-sheet.ui-anim-sheet.ui-anim-in {
+      animation: uiBackdropIn 0.3s ease both;
+    }
+    .profile-sheet.ui-anim-sheet.ui-anim-out {
+      animation: uiBackdropOut 0.24s ease forwards;
+      pointer-events: none;
+    }
+    .profile-sheet.ui-anim-sheet.ui-anim-in .profile-card,
+    .profile-sheet.ui-anim-sheet.ui-anim-in .avatar-menu-card {
+      animation: uiCardUp 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    .profile-sheet.ui-anim-sheet.ui-anim-out .profile-card,
+    .profile-sheet.ui-anim-sheet.ui-anim-out .avatar-menu-card {
+      animation: uiCardDown 0.22s cubic-bezier(0.4, 0, 0.85, 0.4) forwards;
+    }
+    .avatar-crop-sheet.ui-anim-fade.ui-anim-in { animation: uiFadeIn 0.28s ease both; }
+    .avatar-crop-sheet.ui-anim-fade.ui-anim-out { animation: uiFadeOut 0.22s ease forwards; pointer-events: none; }
+    .ui-anim-banner.ui-anim-in { animation: uiBannerIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
+    .ui-anim-banner.ui-anim-out { animation: uiBannerOut 0.2s cubic-bezier(0.4, 0, 0.85, 0.4) forwards; pointer-events: none; }
+    .ui-anim-fade.ui-anim-in { animation: uiFadeIn 0.26s ease both; }
+    .ui-anim-fade.ui-anim-out { animation: uiFadeOut 0.2s ease forwards; pointer-events: none; }
+    .ui-anim-toast.ui-anim-in { animation: uiToastIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
+    .ui-anim-toast.ui-anim-out { animation: uiToastOut 0.2s ease forwards; pointer-events: none; }
+    .msg-menu.ui-anim-in .msg-menu-reactions button {
+      animation: uiReactionBtnIn 0.34s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+    }
+    .msg-menu.ui-anim-in .msg-menu-reactions button:nth-child(1) { animation-delay: 0.02s; }
+    .msg-menu.ui-anim-in .msg-menu-reactions button:nth-child(2) { animation-delay: 0.04s; }
+    .msg-menu.ui-anim-in .msg-menu-reactions button:nth-child(3) { animation-delay: 0.06s; }
+    .msg-menu.ui-anim-in .msg-menu-reactions button:nth-child(4) { animation-delay: 0.08s; }
+    .msg-menu.ui-anim-in .msg-menu-reactions button:nth-child(5) { animation-delay: 0.1s; }
+    .msg-menu.ui-anim-in .msg-menu-reactions button:nth-child(6) { animation-delay: 0.12s; }
+    .msg-menu.ui-anim-in .msg-menu-reactions button:nth-child(7) { animation-delay: 0.14s; }
+    .msg-menu.ui-anim-in .msg-menu-reactions button:nth-child(8) { animation-delay: 0.16s; }
+    @keyframes uiPopIn {
+      from { opacity: 0; transform: scale(0.86) translateY(8px); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes uiPopOut {
+      from { opacity: 1; transform: none; }
+      to { opacity: 0; transform: scale(0.88) translateY(6px); }
+    }
+    @keyframes uiSheetIn {
+      from { transform: translateY(100%); }
+      to { transform: none; }
+    }
+    @keyframes uiSheetOut {
+      from { transform: none; }
+      to { transform: translateY(100%); }
+    }
+    @keyframes uiBackdropIn {
+      from { background-color: rgba(92, 51, 71, 0); }
+      to { background-color: rgba(92, 51, 71, 0.42); }
+    }
+    @keyframes uiBackdropOut {
+      from { background-color: rgba(92, 51, 71, 0.42); }
+      to { background-color: rgba(92, 51, 71, 0); }
+    }
+    @keyframes uiCardUp {
+      from { opacity: 0; transform: translateY(28px) scale(0.96); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes uiCardDown {
+      from { opacity: 1; transform: none; }
+      to { opacity: 0; transform: translateY(20px) scale(0.96); }
+    }
+    @keyframes uiBannerIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes uiBannerOut {
+      from { opacity: 1; transform: none; }
+      to { opacity: 0; transform: translateY(-8px); }
+    }
+    @keyframes uiFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes uiFadeOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+    @keyframes uiToastIn {
+      from { opacity: 0; transform: translateY(-100%); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes uiToastOut {
+      from { opacity: 1; transform: none; }
+      to { opacity: 0; transform: translateY(-100%); }
+    }
+    @keyframes uiReactionBtnIn {
+      from { opacity: 0; transform: scale(0.4); }
+      to { opacity: 1; transform: none; }
+    }
     @media (prefers-reduced-motion: reduce) {
       .msg-reaction-pill.pop-in,
       .reaction-burst,
       .msg-row.enter .msg-row-inner,
       .bubble.reaction-pulse,
-      .msg-menu:not(.hidden),
-      .msg-menu-reactions button.tap-pop {
+      .msg-menu-reactions button.tap-pop,
+      .ui-anim-in,
+      .ui-anim-out,
+      .msg-menu.ui-anim-in .msg-menu-reactions button,
+      .msg-row.msg-highlight .bubble,
+      .row:active {
         animation: none !important;
       }
+      .row:active { transform: none; }
     }
     #login {
       flex: 1;
@@ -709,6 +816,15 @@
       backdrop-filter: blur(6px);
       -webkit-backdrop-filter: blur(6px);
       cursor: pointer;
+      transition: transform 0.14s ease, background 0.14s ease;
+    }
+    .row:active { transform: scale(0.985); background: rgba(255, 236, 244, 0.95); }
+    .msg-row.msg-highlight .bubble {
+      animation: msgHighlight 1.15s ease;
+    }
+    @keyframes msgHighlight {
+      0%, 100% { box-shadow: none; }
+      20%, 55% { box-shadow: 0 0 0 3px rgba(232, 121, 169, 0.55); }
     }
     .row.wait { opacity: 0.5; cursor: default; }
     .avatar-wrap { position: relative; flex-shrink: 0; width: 44px; height: 44px; }
@@ -942,6 +1058,19 @@
       .row { gap: 10px; padding: 12px 12px; }
       .avatar-wrap { width: 40px; height: 40px; }
       .avatar { width: 40px; height: 40px; }
+      #msgMenu .msg-menu-reactions {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        gap: 5px;
+        max-width: calc(100vw - 32px);
+        justify-content: flex-start;
+      }
+      #msgMenu .msg-menu-reactions::-webkit-scrollbar { display: none; }
     }
     .bubble {
       width: fit-content;
@@ -1341,22 +1470,29 @@
       border: 1px solid rgba(252, 231, 243, 0.95);
       border-radius: 14px;
       box-shadow: 0 8px 28px rgba(92, 51, 71, 0.18);
-      padding: 8px; min-width: auto;
+      padding: 8px;
+      width: max-content;
+      max-width: calc(100vw - 16px);
       transform-origin: center top;
-      animation: menuPop 0.22s cubic-bezier(0.34, 1.2, 0.64, 1) both;
     }
     .msg-menu.hidden { display: none; }
     .msg-menu-reactions {
-      display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+      display: grid;
+      grid-template-columns: repeat(4, 42px);
+      gap: 6px;
+      justify-content: center;
       padding: 4px 4px 8px;
       border-bottom: 1px solid rgba(252, 231, 243, 0.85);
       margin-bottom: 4px;
-      max-width: 220px;
+      width: max-content;
     }
     .msg-menu-reactions button {
-      width: 42px; height: 42px; padding: 0; font-size: 1.35rem;
+      width: 42px; height: 42px; min-width: 42px; max-width: 42px;
+      padding: 0; font-size: 1.35rem;
       background: rgba(255, 236, 244, 0.92); border-radius: 50%;
       border: none; cursor: pointer; line-height: 1;
+      display: inline-flex; align-items: center; justify-content: center;
+      flex: 0 0 42px;
     }
     .msg-menu-reactions button.sel {
       background: #fbcfe8; box-shadow: 0 0 0 2px #e879a9;
@@ -2551,12 +2687,135 @@
       enterMsgIds.clear();
     }
 
+    function flashMessageRow(row) {
+      if (!row) return;
+      row.classList.remove('msg-highlight');
+      void row.offsetWidth;
+      row.classList.add('msg-highlight');
+      row.addEventListener('animationend', (e) => {
+        if (e.target.closest('.bubble')) row.classList.remove('msg-highlight');
+      }, { once: true });
+      setTimeout(() => row.classList.remove('msg-highlight'), 1200);
+    }
+
+    function scrollToMessageRow(id) {
+      const target = $('messages')?.querySelector('.msg-row[data-id="' + id + '"]');
+      if (!target) return;
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      flashMessageRow(target);
+    }
+
     function popMenuReactionBtn(btn) {
       if (!btn) return;
       btn.classList.remove('tap-pop');
       void btn.offsetWidth;
       btn.classList.add('tap-pop');
       btn.addEventListener('animationend', () => btn.classList.remove('tap-pop'), { once: true });
+    }
+
+    const UI_KINDS = ['pop', 'sheet', 'banner', 'fade', 'toast'];
+    const UI_DUR = { pop: 260, sheet: 340, banner: 300, fade: 280, toast: 300, popOut: 220, sheetOut: 260, bannerOut: 220, fadeOut: 220, toastOut: 220 };
+    const uiAnimClosing = new WeakSet();
+
+    function prefersReducedMotion() {
+      return window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    }
+
+    function uiClearAnim(el) {
+      if (!el) return;
+      el.classList.remove('ui-anim-in', 'ui-anim-out', 'ui-pre-show');
+      for (const k of UI_KINDS) el.classList.remove('ui-anim-' + k);
+    }
+
+    function uiWaitAnim(el, ms) {
+      return new Promise((resolve) => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          resolve();
+        };
+        el.addEventListener('animationend', finish, { once: true });
+        setTimeout(finish, ms + 50);
+      });
+    }
+
+    function uiIsClosed(el) {
+      if (!el) return true;
+      return el.classList.contains('hidden') && !uiAnimClosing.has(el);
+    }
+
+    function uiShow(el, kind = 'pop', opts = {}) {
+      if (!el) return Promise.resolve();
+      uiAnimClosing.delete(el);
+      uiClearAnim(el);
+      el.classList.remove('hidden');
+      el.classList.add('ui-anim-' + kind, 'ui-pre-show');
+      opts.beforePaint?.(el);
+      el.classList.remove('ui-pre-show');
+      void el.offsetWidth;
+      el.classList.add('ui-anim-in');
+      if (prefersReducedMotion()) return Promise.resolve();
+      return uiWaitAnim(el, UI_DUR[kind] || 240);
+    }
+
+    function uiHide(el, kind = 'pop') {
+      if (!el || el.classList.contains('hidden')) return Promise.resolve();
+      if (uiAnimClosing.has(el)) return Promise.resolve();
+      if (prefersReducedMotion()) {
+        el.classList.add('hidden');
+        uiClearAnim(el);
+        uiAnimClosing.delete(el);
+        return Promise.resolve();
+      }
+      uiAnimClosing.add(el);
+      el.classList.remove('ui-anim-in');
+      if (!el.classList.contains('ui-anim-' + kind)) {
+        for (const k of UI_KINDS) el.classList.remove('ui-anim-' + k);
+        el.classList.add('ui-anim-' + kind);
+      }
+      el.classList.add('ui-anim-out');
+      const ms = UI_DUR[kind + 'Out'] || UI_DUR[kind] || 220;
+      return uiWaitAnim(el, ms).then(() => {
+        el.classList.add('hidden');
+        uiClearAnim(el);
+        uiAnimClosing.delete(el);
+      });
+    }
+
+    function positionFixedMenu(menu, x, y) {
+      const pad = 8;
+      menu.style.left = '0px';
+      menu.style.top = '0px';
+      const rect = menu.getBoundingClientRect();
+      let left = x;
+      let top = y;
+      left = Math.max(pad, Math.min(left, window.innerWidth - rect.width - pad));
+      top = Math.max(pad, Math.min(top, window.innerHeight - rect.height - pad));
+      menu.style.left = left + 'px';
+      menu.style.top = top + 'px';
+    }
+
+    function positionMsgMenu(menu, stack) {
+      const pad = 8;
+      const gap = 6;
+      const stackRect = stack.getBoundingClientRect();
+      const composerRect = $('composer')?.getBoundingClientRect();
+      const bottomLimit = composerRect
+        ? composerRect.top - gap
+        : window.innerHeight - pad;
+      menu.style.left = '0px';
+      menu.style.top = '0px';
+      const menuRect = menu.getBoundingClientRect();
+      let left = stackRect.left + (stackRect.width - menuRect.width) / 2;
+      left = Math.max(pad, Math.min(left, window.innerWidth - menuRect.width - pad));
+      let top = stackRect.bottom + gap;
+      if (top + menuRect.height > bottomLimit) {
+        top = stackRect.top - gap - menuRect.height;
+      }
+      top = Math.max(pad, Math.min(top, bottomLimit - menuRect.height));
+      menu.style.left = left + 'px';
+      menu.style.top = top + 'px';
     }
 
     const $ = (id) => document.getElementById(id);
@@ -2936,18 +3195,26 @@
       cancelEdit();
       replyingToMessageId = m.id;
       updateReplyBanner(m);
-      $('replyBanner').classList.remove('hidden');
       $('composer').classList.add('replying');
+      uiShow($('replyBanner'), 'banner');
       $('msgInput').focus();
       resizeMsgInput();
     }
 
     function cancelReply() {
       replyingToMessageId = null;
-      $('replyBanner').classList.add('hidden');
-      $('replyBannerThumb').innerHTML = '';
-      $('replyBannerThumb').classList.add('hidden');
-      $('composer').classList.remove('replying');
+      const banner = $('replyBanner');
+      if (banner.classList.contains('hidden')) {
+        $('replyBannerThumb').innerHTML = '';
+        $('replyBannerThumb').classList.add('hidden');
+        $('composer').classList.remove('replying');
+        return;
+      }
+      uiHide(banner, 'banner').then(() => {
+        $('replyBannerThumb').innerHTML = '';
+        $('replyBannerThumb').classList.add('hidden');
+        $('composer').classList.remove('replying');
+      });
     }
 
     function consumeReplyPayload() {
@@ -3091,11 +3358,11 @@
 
     function openProfileSheet() {
       updateProfileUI();
-      $('profileSheet').classList.remove('hidden');
+      uiShow($('profileSheet'), 'sheet');
     }
 
     function closeProfileSheet() {
-      $('profileSheet').classList.add('hidden');
+      return uiHide($('profileSheet'), 'sheet');
     }
 
     function doLogout() {
@@ -3158,11 +3425,11 @@
 
     function openAvatarMenu() {
       $('avatarMenuDelete').classList.toggle('hidden', !user?.avatarUrl);
-      $('avatarMenuSheet').classList.remove('hidden');
+      uiShow($('avatarMenuSheet'), 'sheet');
     }
 
     function closeAvatarMenu() {
-      $('avatarMenuSheet').classList.add('hidden');
+      return uiHide($('avatarMenuSheet'), 'sheet');
     }
 
     function avatarCropScale() {
@@ -3207,10 +3474,17 @@
     }
 
     function closeAvatarCrop() {
-      if (avatarCrop?.blobUrl) URL.revokeObjectURL(avatarCrop.blobUrl);
-      avatarCrop = null;
-      avatarCropPan = null;
-      $('avatarCropSheet').classList.add('hidden');
+      const el = $('avatarCropSheet');
+      const finish = () => {
+        if (avatarCrop?.blobUrl) URL.revokeObjectURL(avatarCrop.blobUrl);
+        avatarCrop = null;
+        avatarCropPan = null;
+      };
+      if (el.classList.contains('hidden') && !uiAnimClosing.has(el)) {
+        finish();
+        return Promise.resolve();
+      }
+      return uiHide(el, 'fade').then(finish);
     }
 
     function openAvatarCropFromFile(file) {
@@ -3226,7 +3500,7 @@
         $('avatarCropZoom').value = '1';
         drawAvatarCrop();
         closeAvatarMenu();
-        $('avatarCropSheet').classList.remove('hidden');
+        uiShow($('avatarCropSheet'), 'fade');
       };
       img.onerror = () => {
         URL.revokeObjectURL(blobUrl);
@@ -3274,12 +3548,12 @@
       clearTimeout(appErrTimer);
       appErrTimer = null;
       if (!msg) {
+        uiHide(el, 'toast');
         textEl.textContent = '';
-        el.classList.add('hidden');
         return;
       }
       textEl.textContent = msg;
-      el.classList.remove('hidden');
+      uiShow(el, 'toast');
       appErrTimer = setTimeout(() => showAppErr(''), APP_ERR_MS);
     }
 
@@ -3571,7 +3845,7 @@
         addEditExistingAttachment(f);
       }
       $('composer').classList.add('editing');
-      $('editBanner').classList.remove('hidden');
+      uiShow($('editBanner'), 'banner');
       $('msgInput').focus();
       resizeMsgInput();
       $('msgInput').setSelectionRange($('msgInput').value.length, $('msgInput').value.length);
@@ -3659,7 +3933,7 @@
 
     function closeMsgMenu() {
       msgMenuTargetId = null;
-      $('msgMenu').classList.add('hidden');
+      return uiHide($('msgMenu'), 'pop');
     }
 
     function blockMsgMenuOpen(ms = 400) {
@@ -3667,7 +3941,7 @@
     }
 
     function canOpenMsgMenuNow() {
-      return Date.now() >= suppressMsgMenuOpenUntil && $('msgMenu').classList.contains('hidden');
+      return Date.now() >= suppressMsgMenuOpenUntil && uiIsClosed($('msgMenu'));
     }
 
     function clearTextSelection() {
@@ -3688,27 +3962,11 @@
       });
       $('msgMenuEdit').classList.toggle('hidden', !canEditMessage(m));
       $('msgMenuCopy').classList.toggle('hidden', !messageCopyText(m));
-      menu.classList.remove('hidden');
-      const pad = 8;
-      const gap = 6;
-      const stackRect = stack.getBoundingClientRect();
-      const menuRect = menu.getBoundingClientRect();
-      const composerRect = $('composer')?.getBoundingClientRect();
-      const bottomLimit = composerRect
-        ? composerRect.top - gap
-        : window.innerHeight - pad;
-
-      let left = stackRect.left + (stackRect.width - menuRect.width) / 2;
-      left = Math.max(pad, Math.min(left, window.innerWidth - menuRect.width - pad));
-
-      let top = stackRect.bottom + gap;
-      if (top + menuRect.height > bottomLimit) {
-        top = bottomLimit - menuRect.height;
-      }
-      top = Math.max(pad, Math.min(top, bottomLimit - menuRect.height));
-
-      menu.style.left = left + 'px';
-      menu.style.top = top + 'px';
+      uiShow(menu, 'pop', {
+        beforePaint() {
+          positionMsgMenu(menu, stack);
+        },
+      });
     }
 
     function isMsgInteractiveTarget(el) {
@@ -3806,7 +4064,7 @@
       $('msgInput').value = '';
       clearDraftAttachments(true);
       $('composer').classList.remove('editing');
-      $('editBanner').classList.add('hidden');
+      uiHide($('editBanner'), 'banner');
       resizeMsgInput();
     }
 
@@ -4268,8 +4526,10 @@
         touchChatActivity();
         if (firstId) {
           const row = box.querySelector('.msg-row[data-id="' + firstId + '"]');
-          if (row) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
-          else scrollToBottom(box);
+          if (row) {
+            row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            flashMessageRow(row);
+          } else scrollToBottom(box);
         } else {
           scrollToBottom(box);
         }
@@ -6408,7 +6668,11 @@
       voiceRecStage = 'review';
       $('voiceRecRecord').classList.add('hidden');
       $('voiceRecReview').classList.remove('hidden');
-      $('voiceRecOverlay').classList.remove('hidden');
+      if ($('voiceRecOverlay').classList.contains('hidden')) {
+        uiShow($('voiceRecOverlay'), 'fade');
+      } else {
+        $('voiceRecOverlay').classList.remove('hidden');
+      }
       $('mediaBtn').classList.remove('recording');
       voiceReviewAudio = new Audio(voiceReviewUrl);
       voiceReviewAudio.onended = () => {
@@ -6445,7 +6709,11 @@
       videoRecStage = 'review';
       $('videoRecRecord').classList.add('hidden');
       $('videoRecReview').classList.remove('hidden');
-      $('videoRecOverlay').classList.remove('hidden');
+      if ($('videoRecOverlay').classList.contains('hidden')) {
+        uiShow($('videoRecOverlay'), 'fade');
+      } else {
+        $('videoRecOverlay').classList.remove('hidden');
+      }
       $('mediaBtn').classList.remove('recording');
       const pb = $('videoRecPlayback');
       pb.src = videoNoteMediaSrc(videoReviewUrl);
@@ -6495,19 +6763,26 @@
     }
 
     function hideVideoOverlay() {
-      $('videoRecOverlay').classList.add('hidden');
-      cleanupVideoStream();
-      stopVideoRecTimer();
-      clearVideoReview();
-      videoRecStage = 'idle';
-      videoRecAccumPaused = 0;
-      videoRecPauseStart = 0;
-      $('videoRecTimer').textContent = '0:00';
-      $('videoRecStatus').textContent = '';
-      $('videoPauseBtn').textContent = '⏸';
-      resetRecPulseUI();
-      showVideoRecordUI();
-      $('mediaBtn').classList.remove('recording');
+      const el = $('videoRecOverlay');
+      const finish = () => {
+        cleanupVideoStream();
+        stopVideoRecTimer();
+        clearVideoReview();
+        videoRecStage = 'idle';
+        videoRecAccumPaused = 0;
+        videoRecPauseStart = 0;
+        $('videoRecTimer').textContent = '0:00';
+        $('videoRecStatus').textContent = '';
+        $('videoPauseBtn').textContent = '⏸';
+        resetRecPulseUI();
+        showVideoRecordUI();
+        $('mediaBtn').classList.remove('recording');
+      };
+      if (el.classList.contains('hidden') && !uiAnimClosing.has(el)) {
+        finish();
+        return Promise.resolve();
+      }
+      return uiHide(el, 'fade').then(finish);
     }
 
     function stopVideoRecorder() {
@@ -6629,7 +6904,7 @@
       videoRecPauseStart = 0;
       clearVideoReview();
       showVideoRecordUI();
-      $('videoRecOverlay').classList.remove('hidden');
+      uiShow($('videoRecOverlay'), 'fade');
       $('videoRecStatus').textContent = 'включаю камеру…';
       $('videoRecTimer').textContent = '0:00';
       $('videoPauseBtn').textContent = '⏸';
@@ -7056,7 +7331,7 @@
         }
         renderDraftAttachments();
         $('composer').classList.add('editing');
-        $('editBanner').classList.remove('hidden');
+        uiShow($('editBanner'), 'banner');
         resizeMsgInput();
         showAppErr(e.message || 'не удалось сохранить');
       }
@@ -7236,19 +7511,26 @@
     }
 
     function hideVoiceOverlay() {
-      $('voiceRecOverlay').classList.add('hidden');
-      cleanupVoiceStream();
-      stopVoiceRecTimer();
-      clearVoiceReview();
-      voiceRecStage = 'idle';
-      voiceRecAccumPaused = 0;
-      voiceRecPauseStart = 0;
-      $('voiceRecTimer').textContent = '0:00';
-      $('voiceRecStatus').textContent = '';
-      $('voicePauseBtn').textContent = '⏸';
-      resetRecPulseUI();
-      showVoiceRecordUI();
-      $('mediaBtn').classList.remove('recording');
+      const el = $('voiceRecOverlay');
+      const finish = () => {
+        cleanupVoiceStream();
+        stopVoiceRecTimer();
+        clearVoiceReview();
+        voiceRecStage = 'idle';
+        voiceRecAccumPaused = 0;
+        voiceRecPauseStart = 0;
+        $('voiceRecTimer').textContent = '0:00';
+        $('voiceRecStatus').textContent = '';
+        $('voicePauseBtn').textContent = '⏸';
+        resetRecPulseUI();
+        showVoiceRecordUI();
+        $('mediaBtn').classList.remove('recording');
+      };
+      if (el.classList.contains('hidden') && !uiAnimClosing.has(el)) {
+        finish();
+        return Promise.resolve();
+      }
+      return uiHide(el, 'fade').then(finish);
     }
 
     function stopVoiceRecorder() {
@@ -7332,7 +7614,7 @@
       voiceRecPauseStart = 0;
       clearVoiceReview();
       showVoiceRecordUI();
-      $('voiceRecOverlay').classList.remove('hidden');
+      uiShow($('voiceRecOverlay'), 'fade');
       $('voiceRecStatus').textContent = 'включаю микрофон…';
       $('voiceRecTimer').textContent = '0:00';
       $('voicePauseBtn').textContent = '⏸';
@@ -7609,14 +7891,21 @@
     }
 
     function closeStickerCrop() {
-      if (stickerCrop?.blobUrl) URL.revokeObjectURL(stickerCrop.blobUrl);
-      stickerCrop = null;
-      stickerCropDrag = null;
-      stickerCropReplaceId = null;
-      const wrap = $('stickerCropWrap');
-      wrap.style.width = '';
-      wrap.style.height = '';
-      $('stickerCropSheet').classList.add('hidden');
+      const el = $('stickerCropSheet');
+      const finish = () => {
+        if (stickerCrop?.blobUrl) URL.revokeObjectURL(stickerCrop.blobUrl);
+        stickerCrop = null;
+        stickerCropDrag = null;
+        stickerCropReplaceId = null;
+        const wrap = $('stickerCropWrap');
+        wrap.style.width = '';
+        wrap.style.height = '';
+      };
+      if (el.classList.contains('hidden') && !uiAnimClosing.has(el)) {
+        finish();
+        return Promise.resolve();
+      }
+      return uiHide(el, 'fade').then(finish);
     }
 
     function initStickerCropImage(img, file, replaceStickerId, blobUrl = null) {
@@ -7641,7 +7930,7 @@
       syncStickerCropUi();
       closeStickerSheet();
       closeStickerManageMenu();
-      $('stickerCropSheet').classList.remove('hidden');
+      uiShow($('stickerCropSheet'), 'fade');
     }
 
     function openStickerCropFromFile(file, replaceStickerId = null) {
@@ -7750,50 +8039,42 @@
     function openStickerSheet() {
       if (!activeChat) return;
       renderStickerGrid();
-      $('stickerSheet').classList.remove('hidden');
+      uiShow($('stickerSheet'), 'sheet');
     }
 
     function closeStickerSheet() {
-      $('stickerSheet').classList.add('hidden');
       closeStickerManageMenu();
+      return uiHide($('stickerSheet'), 'sheet');
     }
 
     function closeStickerManageMenu() {
       stickerManageTarget = null;
-      $('stickerManageMenu').classList.add('hidden');
+      return uiHide($('stickerManageMenu'), 'pop');
     }
 
     function closeStickerChatMenu() {
       stickerChatImport = null;
-      $('stickerChatMenu').classList.add('hidden');
+      return uiHide($('stickerChatMenu'), 'pop');
     }
 
     function openStickerManageMenu(sticker, x, y) {
       stickerManageTarget = sticker;
       const menu = $('stickerManageMenu');
-      menu.classList.remove('hidden');
-      const pad = 8;
-      const rect = menu.getBoundingClientRect();
-      let left = x;
-      let top = y;
-      left = Math.max(pad, Math.min(left, window.innerWidth - rect.width - pad));
-      top = Math.max(pad, Math.min(top, window.innerHeight - rect.height - pad));
-      menu.style.left = left + 'px';
-      menu.style.top = top + 'px';
+      uiShow(menu, 'pop', {
+        beforePaint() {
+          positionFixedMenu(menu, x, y);
+        },
+      });
     }
 
     function openStickerChatMenu(fileId, msgId, x, y) {
       stickerChatImport = { fileId, msgId };
       const menu = $('stickerChatMenu');
-      menu.classList.remove('hidden');
-      const pad = 8;
-      const rect = menu.getBoundingClientRect();
-      let left = x;
-      let top = y;
-      left = Math.max(pad, Math.min(left, window.innerWidth - rect.width - pad));
-      top = Math.max(pad, Math.min(top, window.innerHeight - rect.height - pad));
-      menu.style.left = left + 'px';
-      menu.style.top = top + 'px';
+      uiShow(menu, 'pop', {
+        beforePaint() {
+          positionFixedMenu(menu, x, y);
+        },
+      });
     }
 
     function wireStickerGridItem(btn) {
@@ -8142,8 +8423,7 @@
         e.preventDefault();
         e.stopPropagation();
         const id = quote.dataset.replyId;
-        const target = $('messages').querySelector('.msg-row[data-id="' + id + '"]');
-        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        scrollToMessageRow(id);
         return;
       }
       const pill = e.target.closest('.msg-reaction-pill');
