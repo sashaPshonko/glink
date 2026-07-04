@@ -14,6 +14,7 @@ const empty = () => ({
     messages: [],
     files: [],
     stickerPacks: {},
+    pushTokens: {},
 });
 
 export function readDb() {
@@ -26,6 +27,7 @@ export function readDb() {
     const db = JSON.parse(readFileSync(DB_FILE, 'utf8'));
     if (!db.files) db.files = [];
     if (!db.stickerPacks) db.stickerPacks = {};
+    if (!db.pushTokens) db.pushTokens = {};
     return db;
 }
 
@@ -227,7 +229,27 @@ export function listMessages(chatId, after = null) {
     return rows.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
 }
 
-export function addMessage({ chatId, senderId, text, kind = 'text', file = null, files = null }) {
+export function findMessageById(messageId) {
+    return db.messages.find((m) => m.id === messageId) || null;
+}
+
+export function setPushToken(userId, token, platform = 'expo') {
+    if (!db.pushTokens) db.pushTokens = {};
+    db.pushTokens[userId] = {
+        token,
+        platform,
+        updatedAt: new Date().toISOString(),
+    };
+    persist();
+}
+
+export function getPushToken(userId) {
+    return db.pushTokens?.[userId]?.token || null;
+}
+
+export function addMessage({
+    chatId, senderId, text, kind = 'text', file = null, files = null, replyTo = null,
+}) {
     const chat = db.chats.find((c) => c.id === chatId);
     if (!chat) throw new Error('chat_not_found');
 
@@ -277,6 +299,12 @@ export function addMessage({ chatId, senderId, text, kind = 'text', file = null,
 
     if (msgKind === 'text' && !msg.text) throw new Error('empty_message');
     if (msgKind !== 'text' && !entries.length) throw new Error('empty_message');
+
+    if (replyTo) {
+        const parent = findMessageById(String(replyTo));
+        if (!parent || parent.chatId !== chatId) throw new Error('invalid_reply');
+        msg.replyTo = parent.id;
+    }
 
     db.messages.push(msg);
     chat.updatedAt = msg.createdAt;

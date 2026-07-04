@@ -15,6 +15,9 @@ import {
     findUserById,
     findUserByUsername,
     findChatById,
+    findMessageById,
+    setPushToken,
+    getPushToken,
     setUserAvatar,
     getOrCreateDm,
     getOrCreateMainGroup,
@@ -98,6 +101,115 @@ app.use(express.json());
 const chatSockets = new Map();
 /** @type {Map<import('ws').WebSocket, { userId: string, chatIds: Set<string> }>} */
 const socketMeta = new Map();
+/** @type {Map<string, NodeJS.Timeout>} */
+const chatTypingTimers = new Map();
+
+function typingKey(chatId, userId) {
+    return `${chatId}:${userId}`;
+}
+
+function getOnlineUserIds() {
+    const ids = new Set();
+    for (const meta of socketMeta.values()) {
+        ids.add(meta.userId);
+    }
+    return [...ids];
+}
+
+function userHasActiveSocket(userId) {
+    for (const [ws, meta] of socketMeta) {
+        if (meta.userId === userId && ws.readyState === 1) return true;
+    }
+    return false;
+}
+
+function broadcastPresence(exceptWs = null) {
+    const payload = JSON.stringify({ type: 'presence', onlineUserIds: getOnlineUserIds() });
+    for (const [ws] of socketMeta) {
+        if (ws !== exceptWs && ws.readyState === 1) ws.send(payload);
+    }
+}
+
+function broadcastTyping(chatId, userId, active, exceptWs = null) {
+    broadcast(chatId, { type: 'typing', chatId, userId, active }, exceptWs);
+}
+
+function setUserTyping(chatId, userId, active, exceptWs = null) {
+    const key = typingKey(chatId, userId);
+    const existing = chatTypingTimers.get(key);
+    if (existing) clearTimeout(existing);
+    if (active) {
+        broadcastTyping(chatId, userId, true, exceptWs);
+        chatTypingTimers.set(key, setTimeout(() => {
+            chatTypingTimers.delete(key);
+            broadcastTyping(chatId, userId, false);
+        }, 4000));
+    } else {
+        chatTypingTimers.delete(key);
+        broadcastTyping(chatId, userId, false, exceptWs);
+    }
+}
+
+function buildReplyPreview(replyToId, chatId) {
+    const orig = findMessageById(replyToId);
+    if (!orig || orig.chatId !== chatId) return null;
+    const sender = findUserById(orig.senderId);
+    return {
+        id: orig.id,
+        senderId: orig.senderId,
+        senderName: sender?.displayName || sender?.username || '?',
+        kind: resolvedMessageKind(orig),
+        text: messagePreview(orig),
+    };
+}
+
+function parseReplyTo(body) {
+    const raw = body?.replyTo;
+    if (raw === undefined || raw === null || raw === '') return null;
+    return String(raw);
+}
+
+async function sendExpoPush(pushToken, { title, body, data }) {
+    try {
+        const res = await fetch('https://exp.host/--/api/v2/push/send', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+            },
+            body: JSON.stringify({
+                to: pushToken,
+                title,
+                body,
+                data,
+                sound: 'default',
+                priority: 'high',
+            }),
+        });
+        if (!res.ok) console.warn('push failed', await res.text());
+    } catch (e) {
+        console.warn('push error', e.message);
+    }
+}
+
+async function notifyPushOnNewMessage(chatId, message) {
+    const chat = findChatById(chatId);
+    if (!chat) return;
+    const sender = findUserById(message.senderId);
+    const title = sender?.displayName || sender?.username || 'максим';
+    const body = messagePreview(message);
+    for (const uid of chat.memberIds) {
+        if (uid === message.senderId) continue;
+        if (userHasActiveSocket(uid)) continue;
+        const pushToken = getPushToken(uid);
+        if (!pushToken) continue;
+        await sendExpoPush(pushToken, {
+            title,
+            body,
+            data: { chatId },
+        });
+    }
+}
 
 function publicUser(user) {
     if (!user) return null;
@@ -143,6 +255,9 @@ function enrichMessage(msg, viewerId = null) {
     if (viewerId && chat) {
         base.status = readStatusFor(msg, chat, viewerId);
         base.unread = isMessageUnread(msg, viewerId);
+    }
+    if (msg.replyTo) {
+        base.replyPreview = buildReplyPreview(msg.replyTo, msg.chatId);
     }
     return base;
 }
@@ -367,6 +482,16 @@ app.get('/me', authMiddleware, (req, res) => {
         return;
     }
     res.json({ user: publicUser(user) });
+});
+
+app.post('/me/push-token', authMiddleware, (req, res) => {
+    const token = String(req.body?.token || '').trim();
+    if (!token) {
+        res.status(400).json({ error: 'invalid_token' });
+        return;
+    }
+    setPushToken(req.userId, token, req.body?.platform || 'expo');
+    res.json({ ok: true });
 });
 
 app.post('/me/avatar', authMiddleware, (req, res, next) => {
@@ -666,6 +791,7 @@ app.post('/chats/:chatId/messages', authMiddleware, maybeUpload, (req, res) => {
     }
     try {
         let message;
+        const replyTo = parseReplyTo(req.body);
         const uploads = uploadedFiles(req);
         if (uploads.length) {
             const kinds = parseUploadKinds(req.body, uploads.length);
@@ -692,6 +818,7 @@ app.post('/chats/:chatId/messages', authMiddleware, maybeUpload, (req, res) => {
                     senderId: req.userId,
                     text: req.body?.text,
                     files: storedFiles,
+                    replyTo,
                 }),
                 req.userId,
             );
@@ -720,6 +847,7 @@ app.post('/chats/:chatId/messages', authMiddleware, maybeUpload, (req, res) => {
                         size: fileRec.size,
                         kind,
                     },
+                    replyTo,
                 }),
                 req.userId,
             );
@@ -730,15 +858,21 @@ app.post('/chats/:chatId/messages', authMiddleware, maybeUpload, (req, res) => {
                     senderId: req.userId,
                     text: req.body?.text,
                     kind: 'text',
+                    replyTo,
                 }),
                 req.userId,
             );
         }
         broadcast(chatId, { type: 'message', message });
+        notifyPushOnNewMessage(chatId, message).catch(() => {});
         res.json({ message });
     } catch (e) {
         if (e.message === 'empty_message') {
             res.status(400).json({ error: 'empty_message' });
+            return;
+        }
+        if (e.message === 'invalid_reply') {
+            res.status(400).json({ error: 'invalid_reply' });
             return;
         }
         throw e;
@@ -920,14 +1054,26 @@ wss.on('connection', (ws, req) => {
             chatSockets.get(chatId).add(ws);
             meta.chatIds.add(chatId);
             ws.send(JSON.stringify({ type: 'joined', chatId }));
+            return;
+        }
+        if (msg?.type === 'typing' && msg.chatId) {
+            const chatId = String(msg.chatId);
+            if (chatId.startsWith('pending:')) return;
+            if (!userInChat(userId, chatId)) return;
+            setUserTyping(chatId, userId, Boolean(msg.active), ws);
         }
     });
+
+    ws.send(JSON.stringify({ type: 'presence', onlineUserIds: getOnlineUserIds() }));
+    broadcastPresence(ws);
 
     ws.on('close', () => {
         for (const chatId of meta.chatIds) {
             chatSockets.get(chatId)?.delete(ws);
+            setUserTyping(chatId, userId, false);
         }
         socketMeta.delete(ws);
+        broadcastPresence();
     });
 });
 

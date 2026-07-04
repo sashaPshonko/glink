@@ -14,6 +14,7 @@ import * as Notifications from 'expo-notifications';
 import { theme } from './lib/theme';
 
 const SERVER_URL = Constants.expoConfig?.extra?.serverUrl || 'https://31.128.38.147:3920';
+const EAS_PROJECT_ID = Constants.expoConfig?.extra?.eas?.projectId;
 
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -31,9 +32,19 @@ const BACK_JS = `
 true;
 `;
 
+function pushTokenInjectJs(token) {
+    return `(function(){window.__glinkNativePushToken=${JSON.stringify(token)};window.glinkSetNativePushToken&&window.glinkSetNativePushToken(window.__glinkNativePushToken);})();true;`;
+}
+
 export default function App() {
     const webRef = useRef(null);
+    const pushTokenRef = useRef(null);
     const [loading, setLoading] = useState(true);
+
+    const syncPushTokenToWeb = () => {
+        if (!pushTokenRef.current || !webRef.current) return;
+        webRef.current.injectJavaScript(pushTokenInjectJs(pushTokenRef.current));
+    };
 
     useEffect(() => {
         if (Platform.OS !== 'android') return undefined;
@@ -56,6 +67,23 @@ export default function App() {
         return () => sub.remove();
     }, []);
 
+    useEffect(() => {
+        async function setupPush() {
+            try {
+                const { status } = await Notifications.getPermissionsAsync();
+                const granted = status === 'granted'
+                    || (await Notifications.requestPermissionsAsync()).status === 'granted';
+                if (!granted || !EAS_PROJECT_ID) return;
+                const pushToken = (await Notifications.getExpoPushTokenAsync({
+                    projectId: EAS_PROJECT_ID,
+                })).data;
+                pushTokenRef.current = pushToken;
+                syncPushTokenToWeb();
+            } catch (_) {}
+        }
+        setupPush();
+    }, []);
+
     const onWebMessage = async (event) => {
         const raw = event.nativeEvent.data;
         if (raw === 'glink:back:exit') {
@@ -66,6 +94,15 @@ export default function App() {
             const msg = JSON.parse(raw);
             if (msg.type === 'notify:request') {
                 await Notifications.requestPermissionsAsync();
+                if (EAS_PROJECT_ID && !pushTokenRef.current) {
+                    try {
+                        const pushToken = (await Notifications.getExpoPushTokenAsync({
+                            projectId: EAS_PROJECT_ID,
+                        })).data;
+                        pushTokenRef.current = pushToken;
+                        syncPushTokenToWeb();
+                    } catch (_) {}
+                }
                 return;
             }
             if (msg.type === 'notify') {
@@ -93,7 +130,10 @@ export default function App() {
                 ref={webRef}
                 source={{ uri: SERVER_URL }}
                 style={styles.web}
-                onLoadEnd={() => setLoading(false)}
+                onLoadEnd={() => {
+                    setLoading(false);
+                    syncPushTokenToWeb();
+                }}
                 onLoadStart={() => setLoading(true)}
                 onError={() => setLoading(false)}
                 onMessage={onWebMessage}

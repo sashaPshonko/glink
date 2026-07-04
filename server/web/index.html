@@ -1268,6 +1268,77 @@
       padding: 0 2px 4px;
     }
     #editBanner.hidden { display: none; }
+    #replyBanner {
+      flex: 1 1 100%;
+      display: flex; align-items: center; gap: 8px;
+      padding: 0 2px 4px;
+    }
+    #replyBanner.hidden { display: none; }
+    .reply-banner-body {
+      flex: 1; min-width: 0;
+      display: flex; align-items: stretch; gap: 8px;
+      padding: 6px 10px;
+      border-radius: 12px;
+      background: rgba(255, 236, 244, 0.75);
+    }
+    .reply-banner-bar {
+      width: 3px; border-radius: 2px;
+      background: #db2777; flex-shrink: 0;
+    }
+    .reply-banner-text {
+      min-width: 0; display: flex; flex-direction: column; gap: 2px;
+    }
+    .reply-banner-text strong {
+      font-size: 12px; color: #db2777; font-weight: 600;
+    }
+    .reply-banner-text span {
+      font-size: 13px; color: #7a5568;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #replyCancelBtn {
+      width: 40px; height: 40px; min-width: 40px;
+      padding: 0; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: transparent; color: #b07a94; border: none; cursor: pointer;
+    }
+    #replyCancelBtn svg { width: 22px; height: 22px; display: block; }
+    #replyCancelBtn:active { color: #db2777; transform: scale(0.92); }
+    #composer.replying #sendBtn { background: #db2777; }
+    .msg-reply-quote {
+      display: flex; flex-direction: column; gap: 2px;
+      width: 100%; margin: 0 0 6px; padding: 6px 8px 6px 10px;
+      border: none; border-left: 3px solid #db2777;
+      border-radius: 8px; text-align: left; cursor: pointer;
+      background: rgba(255, 255, 255, 0.35);
+    }
+    .bubble.mine .msg-reply-quote { background: rgba(255, 255, 255, 0.22); }
+    .msg-reply-name {
+      font-size: 12px; font-weight: 600; color: #db2777;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .msg-reply-text {
+      font-size: 13px; color: #6b4d5c; opacity: 0.92;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .msg-row-inner { position: relative; transition: transform 0.12s ease-out; }
+    .msg-row.reply-swipe-active .msg-row-line::after {
+      content: '↩';
+      position: absolute;
+      top: 50%; transform: translateY(-50%);
+      font-size: 22px; color: #db2777; opacity: 0.85;
+      pointer-events: none;
+    }
+    .msg-row.theirs.reply-swipe-active .msg-row-line::after { left: 8px; }
+    .msg-row.mine.reply-swipe-active .msg-row-line::after { right: 8px; }
+    .msg-row-line { position: relative; }
+    #chatSub.online { color: #16a34a; }
+    .chat-online-dot {
+      position: absolute; right: 2px; bottom: 2px;
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #22c55e; border: 2px solid #fff5f9;
+      box-sizing: border-box;
+    }
+    .row-avatar-wrap { position: relative; }
     #editCancelBtn {
       width: 40px; height: 40px; min-width: 40px;
       padding: 0; border-radius: 50%;
@@ -1879,6 +1950,20 @@
         <div id="draftAttach" class="hidden">
           <div id="draftAttachList" class="draft-attach-list"></div>
         </div>
+        <div id="replyBanner" class="hidden">
+          <div class="reply-banner-body">
+            <div class="reply-banner-bar"></div>
+            <div class="reply-banner-text">
+              <strong id="replyBannerName"></strong>
+              <span id="replyBannerPreview"></span>
+            </div>
+          </div>
+          <button id="replyCancelBtn" type="button" title="Отменить ответ" aria-label="Отменить ответ">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+            </svg>
+          </button>
+        </div>
         <div id="editBanner" class="hidden">
           <button id="editCancelBtn" type="button" title="Отменить редактирование" aria-label="Отменить редактирование">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -2024,6 +2109,9 @@
       <button type="button" data-reaction="hot" title="жарко">🥵</button>
     </div>
     <div class="msg-menu-actions msg-menu-icons ui-icon-row">
+      <button type="button" id="msgMenuReply" class="ui-icon-btn" data-action="reply" title="Ответить" aria-label="Ответить">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 17H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-5"/><path d="m12 15-3-3 3-3"/><path d="M9 12h12"/></svg>
+      </button>
       <button type="button" id="msgMenuCopy" class="ui-icon-btn" data-action="copy" title="Копировать" aria-label="Копировать">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
       </button>
@@ -2180,6 +2268,10 @@
     let selectedUsername = localStorage.getItem('glink_last_user') || '';
     let activeMessages = [];
     let editingMessageId = null;
+    let replyingToMessageId = null;
+    let onlineUserIds = new Set();
+    let typingByChat = new Map();
+    let lastTypingSent = 0;
     let msgMenuTargetId = null;
     let msgPressTimer = null;
     let msgPressRow = null;
@@ -2217,6 +2309,7 @@
       duplicate_sticker: 'этот стикер уже в наборе',
       sticker_pack_full: 'набор переполнен',
       not_sticker: 'не подходит как стикер',
+      invalid_reply: 'не удалось ответить на сообщение',
     };
 
     function errText(code) {
@@ -2408,7 +2501,7 @@
     function updateChatHeader(chat = activeChat) {
       if (!chat) return;
       $('chatTitle').textContent = chatTitle(chat);
-      $('chatSub').textContent = chat.type === 'group' ? 'группа ♡' : 'личный чат';
+      updateChatSubStatus(chat);
       const top = $('chatHeaderTop');
       const avEl = $('chatHeaderAvatar');
       if (chat.type === 'dm' && chat.peer) {
@@ -2425,6 +2518,112 @@
         avEl.innerHTML = '';
         avEl.removeAttribute('title');
       }
+    }
+
+    function updateChatSubStatus(chat = activeChat) {
+      const sub = $('chatSub');
+      if (!chat) return;
+      sub.classList.remove('online');
+      const typing = typingByChat.get(chat.id);
+      if (typing?.size) {
+        const others = [...typing].filter((id) => id !== user?.id);
+        if (others.length) {
+          if (chat.type === 'dm') {
+            sub.textContent = 'печатает…';
+          } else {
+            sub.textContent = others.length === 1 ? 'кто-то печатает…' : `${others.length} печатают…`;
+          }
+          return;
+        }
+      }
+      if (chat.type === 'group') {
+        sub.textContent = 'группа ♡';
+        return;
+      }
+      if (chat.type === 'dm' && chat.peer?.id && onlineUserIds.has(chat.peer.id)) {
+        sub.textContent = 'в сети';
+        sub.classList.add('online');
+        return;
+      }
+      sub.textContent = 'личный чат';
+    }
+
+    function setTypingUser(chatId, userId, active) {
+      if (!chatId || !userId) return;
+      let set = typingByChat.get(chatId);
+      if (!set) {
+        set = new Set();
+        typingByChat.set(chatId, set);
+      }
+      if (active) set.add(userId);
+      else set.delete(userId);
+      if (!set.size) typingByChat.delete(chatId);
+      if (activeChat?.id === chatId) updateChatSubStatus(activeChat);
+    }
+
+    function handlePresenceUpdate(ids) {
+      onlineUserIds = new Set(Array.isArray(ids) ? ids : []);
+      if (activeChat) updateChatSubStatus(activeChat);
+      refreshChatList();
+    }
+
+    function sendTypingPing() {
+      if (!activeChat || !ws || ws.readyState !== 1) return;
+      const now = Date.now();
+      if (now - lastTypingSent < 1800) return;
+      lastTypingSent = now;
+      ws.send(JSON.stringify({ type: 'typing', chatId: activeChat.id, active: true }));
+    }
+
+    function replyPreviewText(m) {
+      if (!m) return '';
+      if (m.replyPreview?.text) return m.replyPreview.text;
+      return notifyBody(m);
+    }
+
+    function buildLocalReplyPreview(messageId) {
+      const m = getMessage(messageId);
+      if (!m) return null;
+      return {
+        id: m.id,
+        senderId: m.senderId,
+        senderName: m.senderId === user?.id ? 'Вы' : (m.senderName || '?'),
+        kind: m.kind,
+        text: replyPreviewText(m),
+      };
+    }
+
+    function startReplyMessage(m) {
+      if (!m || m._pending) return;
+      cancelEdit();
+      replyingToMessageId = m.id;
+      $('replyBannerName').textContent = m.senderId === user?.id ? 'Вы' : (m.senderName || '?');
+      $('replyBannerPreview').textContent = replyPreviewText(m);
+      $('replyBanner').classList.remove('hidden');
+      $('composer').classList.add('replying');
+      $('msgInput').focus();
+      resizeMsgInput();
+    }
+
+    function cancelReply() {
+      replyingToMessageId = null;
+      $('replyBanner').classList.add('hidden');
+      $('composer').classList.remove('replying');
+    }
+
+    function consumeReplyPayload() {
+      const replyTo = replyingToMessageId;
+      const replyPreview = replyTo ? buildLocalReplyPreview(replyTo) : null;
+      cancelReply();
+      return replyTo ? { replyTo, replyPreview } : null;
+    }
+
+    function renderReplyQuoteHtml(rp) {
+      if (!rp?.id) return '';
+      return `<button type="button" class="msg-reply-quote" data-reply-id="${escapeHtml(rp.id)}">` +
+        `<span class="msg-reply-name">${escapeHtml(rp.senderName || '?')}</span>` +
+        `<span class="msg-reply-text">${escapeHtml(rp.text || '')}</span>` +
+        `</button>`;
     }
 
     function renderMessageGroupHtml(group) {
@@ -3010,6 +3209,7 @@
 
     function startEditMessage(m) {
       if (!canEditMessage(m)) return;
+      cancelReply();
       persistActiveChatDraft();
       clearDraftAttachments(true);
       editingMessageId = m.id;
@@ -3260,10 +3460,11 @@
                   : (sk === 'image' ? (' has-image' + cap) : cap))))));
       const pendingCls = m._pending ? ' pending' : '';
       const reactCls = hasReactions(m) ? ' has-reactions' : '';
+      const replyHtml = m.replyPreview ? renderReplyQuoteHtml(m.replyPreview) : '';
       const body = plainText
         ? renderPlainTextBlock(m, mine)
         : (renderMessageBody(m) + renderBubbleFoot(m, mine));
-      return `<div class="bubble ${mine ? 'mine' : 'theirs'}${extraCls}${textOnlyCls}${reactCls}${pendingCls}">${sender}${body}</div>`;
+      return `<div class="bubble ${mine ? 'mine' : 'theirs'}${extraCls}${textOnlyCls}${reactCls}${pendingCls}">${replyHtml}${sender}${body}</div>`;
     }
 
     function renderMessageRowHtml(m, opts = {}) {
@@ -3372,13 +3573,17 @@
             : (draftPrev?.text || truncatePreview(c.lastMessage?.text || 'Напиши первым ♡'));
           const previewCls = draftPrev?.draft ? 'preview draft' : 'preview';
           const avData = chatAvatarHtml(c);
+          const onlineDot = (!c.waiting && c.type === 'dm' && c.peer?.id && onlineUserIds.has(c.peer.id))
+            ? '<span class="chat-online-dot" aria-label="в сети"></span>'
+            : '';
           const unread = c.unreadCount || 0;
           const badge = unread > 0
             ? `<span class="unread-badge">${unreadBadgeText(unread)}</span>`
             : '';
           return `<div class="row${wait}" data-id="${c.id}" data-wait="${c.waiting ? '1' : ''}">
-            <div class="avatar-wrap">
+            <div class="avatar-wrap row-avatar-wrap">
               <div class="${avData.cls}">${avData.inner}</div>
+              ${onlineDot}
               ${badge}
             </div>
             <div class="row-body">
@@ -3772,6 +3977,17 @@
       notifySeen.add(message.id);
       const title = message.senderName || chatTitle(chats.find((c) => c.id === message.chatId) || {});
       showNotification(title || 'максим', notifyBody(message), message.chatId);
+    }
+
+    async function registerPushToken(pushToken) {
+      if (!token || !pushToken) return;
+      window.__glinkNativePushToken = pushToken;
+      try {
+        await api('/me/push-token', {
+          method: 'POST',
+          body: JSON.stringify({ token: pushToken, platform: 'expo' }),
+        });
+      } catch (_) {}
     }
 
     async function ensureNotifyPermission() {
@@ -6079,6 +6295,12 @@
               updateInChatUnreadBadge();
             }
           }
+          if (msg.type === 'presence' && Array.isArray(msg.onlineUserIds)) {
+            handlePresenceUpdate(msg.onlineUserIds);
+          }
+          if (msg.type === 'typing' && msg.chatId && msg.userId) {
+            setTypingUser(msg.chatId, msg.userId, Boolean(msg.active));
+          }
         } catch (_) {}
       };
     }
@@ -6088,6 +6310,7 @@
       if (switchingChat) {
         persistActiveChatDraft();
         cancelEdit();
+        cancelReply();
       }
       activeChat = chat;
       touchChatActivity();
@@ -6133,6 +6356,7 @@
     function closeChatUI() {
       persistActiveChatDraft();
       cancelEdit();
+      cancelReply();
       closeMsgMenu();
       clearVideoNotePin();
       hideVoiceDock();
@@ -6195,6 +6419,10 @@
       }
       if (editingMessageId) {
         cancelEdit();
+        return true;
+      }
+      if (replyingToMessageId) {
+        cancelReply();
         return true;
       }
       return false;
@@ -6273,6 +6501,8 @@
       connectWs();
       ensureNotifyPermission();
       bindChatActivity();
+      window.glinkSetNativePushToken = registerPushToken;
+      if (window.__glinkNativePushToken) registerPushToken(window.__glinkNativePushToken);
       try {
         await loadChats();
         await loadMyStickers();
@@ -6396,21 +6626,34 @@
       resizeMsgInput();
       userPinnedBottom = true;
       clearActiveChatDraft();
+      const reply = consumeReplyPayload();
       const pendingId = 'pending-' + Date.now();
       appendMessage({
         id: pendingId,
         senderId: user.id,
         kind: 'text',
         text,
+        replyTo: reply?.replyTo,
+        replyPreview: reply?.replyPreview,
         status: 'sent',
         _pending: true,
       }, { forceBottom: true });
-      upsertActiveMessage({ id: pendingId, senderId: user.id, kind: 'text', text, _pending: true });
+      upsertActiveMessage({
+        id: pendingId,
+        senderId: user.id,
+        kind: 'text',
+        text,
+        replyTo: reply?.replyTo,
+        replyPreview: reply?.replyPreview,
+        _pending: true,
+      });
 
       try {
+        const body = { text };
+        if (reply?.replyTo) body.replyTo = reply.replyTo;
         const data = await api('/chats/' + activeChat.id + '/messages', {
           method: 'POST',
-          body: JSON.stringify({ text }),
+          body: JSON.stringify(body),
         });
         replaceMessage(pendingId, data.message);
         upsertActiveMessage(data.message);
@@ -6426,6 +6669,7 @@
     async function sendFiles(items, caption) {
       if (!activeChat || !items?.length) return;
       userPinnedBottom = true;
+      const reply = consumeReplyPayload();
       const pendingId = 'pending-' + Date.now();
       const multi = items.length > 1;
       const msgKind = multi ? 'album' : (items[0].kind || 'file');
@@ -6434,6 +6678,8 @@
         senderId: user.id,
         kind: msgKind,
         text: caption || '',
+        replyTo: reply?.replyTo,
+        replyPreview: reply?.replyPreview,
         files: items.map((x) => ({ name: x.file.name || 'файл', kind: x.kind })),
         file: items[0] ? { name: items[0].file.name || 'файл' } : null,
         status: 'sent',
@@ -6446,6 +6692,7 @@
         fd.append('kinds', item.kind || uploadKind(item.file));
       }
       if (caption) fd.append('text', caption);
+      if (reply?.replyTo) fd.append('replyTo', reply.replyTo);
       try {
         const data = await api('/chats/' + activeChat.id + '/messages', { method: 'POST', body: fd });
         replaceMessage(pendingId, data.message);
@@ -6752,6 +6999,7 @@
     };
     $('backBtn').onclick = (e) => { e.preventDefault(); userGoBack(); };
     $('editCancelBtn').onclick = (e) => { e.preventDefault(); cancelEdit(); };
+    $('replyCancelBtn').onclick = (e) => { e.preventDefault(); cancelReply(); };
     $('sendBtn').onclick = sendText;
     $('msgInput').onkeydown = (e) => {
       if (e.key === 'ArrowUp' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
@@ -6775,6 +7023,7 @@
       showAppErr('');
       resizeMsgInput();
       syncActiveChatDraftState();
+      sendTypingPing();
     });
     $('fileInput').onchange = onFilePicked;
     document.addEventListener('paste', onPasteImage);
@@ -7112,12 +7361,15 @@
     async function sendStickerMessage(sticker) {
       if (!activeChat || !sticker?.fileId) return;
       userPinnedBottom = true;
+      const reply = consumeReplyPayload();
       const pendingId = 'pending-' + Date.now();
       appendMessage({
         id: pendingId,
         senderId: user.id,
         kind: 'sticker',
         text: '',
+        replyTo: reply?.replyTo,
+        replyPreview: reply?.replyPreview,
         file: { id: sticker.fileId, name: 'sticker.png' },
         files: [{ id: sticker.fileId, kind: 'sticker', fileUrl: sticker.fileUrl }],
         fileUrl: sticker.fileUrl,
@@ -7126,9 +7378,11 @@
       }, { forceBottom: true });
       closeStickerSheet();
       try {
+        const body = { fileId: sticker.fileId, kind: 'sticker' };
+        if (reply?.replyTo) body.replyTo = reply.replyTo;
         const data = await api('/chats/' + activeChat.id + '/messages', {
           method: 'POST',
-          body: JSON.stringify({ fileId: sticker.fileId, kind: 'sticker' }),
+          body: JSON.stringify(body),
         });
         replaceMessage(pendingId, data.message);
         upsertActiveMessage(data.message);
@@ -7401,6 +7655,15 @@
     });
 
     $('messages').addEventListener('click', (e) => {
+      const quote = e.target.closest('.msg-reply-quote');
+      if (quote) {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = quote.dataset.replyId;
+        const target = $('messages').querySelector('.msg-row[data-id="' + id + '"]');
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
       const pill = e.target.closest('.msg-reaction-pill');
       if (!pill) return;
       e.preventDefault();
@@ -7483,6 +7746,76 @@
       if (m) openMsgMenu(m, row);
     });
 
+    (function bindReplySwipe() {
+      const SWIPE_THRESHOLD = 56;
+      const SWIPE_MAX = 72;
+      let swipe = null;
+
+      $('messages').addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        if (!activeChat || editingMessageId || replyingToMessageId) return;
+        const inner = e.target.closest('.msg-row-inner');
+        if (!inner || e.target.closest('.msg-hit')) return;
+        if (e.target.closest('a, button, video, audio, input, .msg-reaction-pill, .msg-voice-play, .msg-reply-quote, .msg-sticker')) return;
+        const row = inner.closest('.msg-row');
+        if (!row) return;
+        const m = getMessage(row.dataset.id);
+        if (!m || m._pending) return;
+        swipe = {
+          row,
+          inner,
+          mine: row.classList.contains('mine'),
+          startX: e.clientX,
+          startY: e.clientY,
+          id: e.pointerId,
+          triggered: false,
+        };
+        inner.setPointerCapture?.(e.pointerId);
+      }, { passive: true });
+
+      $('messages').addEventListener('pointermove', (e) => {
+        if (!swipe || swipe.id !== e.pointerId) return;
+        const dx = e.clientX - swipe.startX;
+        const dy = e.clientY - swipe.startY;
+        if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 14) {
+          swipe.inner.style.transform = '';
+          swipe.row.classList.remove('reply-swipe-active');
+          swipe = null;
+          return;
+        }
+        const mag = swipe.mine
+          ? Math.min(SWIPE_MAX, Math.max(0, -dx))
+          : Math.min(SWIPE_MAX, Math.max(0, dx));
+        if (mag <= 0 && Math.abs(dx) > 10) {
+          swipe.inner.style.transform = '';
+          swipe.row.classList.remove('reply-swipe-active');
+          swipe = null;
+          return;
+        }
+        swipe.inner.style.transform = `translateX(${swipe.mine ? -mag : mag}px)`;
+        swipe.row.classList.toggle('reply-swipe-active', mag > 8);
+        if (mag >= SWIPE_THRESHOLD) swipe.triggered = true;
+      }, { passive: true });
+
+      const endSwipe = (e) => {
+        if (!swipe || (e && swipe.id !== e.pointerId)) return;
+        const { row, inner, triggered } = swipe;
+        inner.style.transform = '';
+        row.classList.remove('reply-swipe-active');
+        if (triggered) {
+          const m = getMessage(row.dataset.id);
+          if (m) {
+            startReplyMessage(m);
+            clearMsgPress();
+            blockMsgMenuOpen(300);
+          }
+        }
+        swipe = null;
+      };
+      $('messages').addEventListener('pointerup', endSwipe);
+      $('messages').addEventListener('pointercancel', endSwipe);
+    })();
+
     $('msgMenu').querySelectorAll('.msg-menu-reactions button').forEach((btn) => {
       btn.onclick = (e) => {
         e.stopPropagation();
@@ -7498,6 +7831,12 @@
       const m = getMessage(msgMenuTargetId);
       closeMsgMenu();
       if (m) await copyMessageText(m);
+    };
+    $('msgMenuReply').onclick = (e) => {
+      e.stopPropagation();
+      const m = getMessage(msgMenuTargetId);
+      closeMsgMenu();
+      if (m) startReplyMessage(m);
     };
     $('msgMenuEdit').onclick = (e) => {
       e.stopPropagation();
