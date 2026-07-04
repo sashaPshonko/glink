@@ -2236,6 +2236,7 @@
     let videoScrubResume = null;
     let replySwipe = null;
     let replySwipeHandledPointer = null;
+    let suppressPhotoClickUntil = 0;
     let videoNoteTapPending = null;
     const waveCache = new Map();
     const voicePos = new Map();
@@ -3025,7 +3026,7 @@
       const url = attachmentUrl(f);
       if (kind === 'image' && url && !pending) {
         return `<div class="msg-photo">` +
-          `<img src="${url}" alt="фото" draggable="false" onclick="window.open(this.src,'_blank')" /></div>`;
+          `<img src="${url}" alt="фото" draggable="false" /></div>`;
       }
       if (kind === 'sticker' && url) {
         const fid = escapeHtml(f.id || '');
@@ -7722,12 +7723,24 @@
         return;
       }
       const pill = e.target.closest('.msg-reaction-pill');
-      if (!pill) return;
+      if (pill) {
+        e.preventDefault();
+        e.stopPropagation();
+        const row = pill.closest('.msg-row');
+        const reaction = pill.dataset.reaction;
+        if (row && reaction) toggleReaction(row.dataset.id, reaction);
+        return;
+      }
+      const photo = e.target.closest('.msg-photo img, .msg-album-item img');
+      if (!photo) return;
+      if (Date.now() < suppressPhotoClickUntil) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       e.preventDefault();
       e.stopPropagation();
-      const row = pill.closest('.msg-row');
-      const reaction = pill.dataset.reaction;
-      if (row && reaction) toggleReaction(row.dataset.id, reaction);
+      window.open(photo.src, '_blank');
     });
 
     $('messages').addEventListener('pointerdown', (e) => {
@@ -7867,7 +7880,8 @@
 
       const endReplySwipe = (e) => {
         if (!replySwipe || (e && replySwipe.id !== e.pointerId)) return;
-        const { row, triggered, id } = replySwipe;
+        const { row, triggered, id, startX, startY } = replySwipe;
+        const moved = Math.hypot(e.clientX - startX, e.clientY - startY);
         clearReplySwipeVisual();
         if (triggered) {
           const m = getMessage(row.dataset.id);
@@ -7877,6 +7891,9 @@
             blockMsgMenuOpen(300);
           }
           replySwipeHandledPointer = id;
+        }
+        if (triggered || moved > 10) {
+          suppressPhotoClickUntil = Date.now() + 500;
         }
         replySwipe = null;
       };
