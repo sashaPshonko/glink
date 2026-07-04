@@ -600,13 +600,13 @@
     }
     @keyframes reactionFloat {
       0% { transform: translate(-50%, 0) scale(0.45); opacity: 0; }
-      12% { transform: translate(-50%, -6px) scale(1.15); opacity: 1; }
-      100% { transform: translate(-50%, -76px) scale(0.9); opacity: 0; }
+      18% { transform: translate(-50%, -8px) scale(1.12); opacity: 1; }
+      100% { transform: translate(-50%, -52px) scale(0.88); opacity: 0; }
     }
     @keyframes reactionPulse {
       0%, 100% { transform: scale(1); }
-      35% { transform: scale(0.96); }
-      65% { transform: scale(1.03); }
+      40% { transform: scale(0.97); }
+      70% { transform: scale(1.02); }
     }
     @keyframes msgEnterMine {
       from { opacity: 0; transform: translateY(14px) translateX(10px); }
@@ -1389,7 +1389,7 @@
       user-select: none; -webkit-user-select: none;
     }
     .msg-reaction-pill.pop-in {
-      animation: reactionPop 0.38s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+      animation: reactionPop 0.24s cubic-bezier(0.34, 1.4, 0.64, 1) both;
     }
     .msg-reaction-pill.mine {
       background: rgba(255, 255, 255, 0.98);
@@ -1633,16 +1633,16 @@
       animation: msgEnterTheirs 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
     }
     .bubble.reaction-pulse {
-      animation: reactionPulse 0.36s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+      animation: reactionPulse 0.22s cubic-bezier(0.34, 1.2, 0.64, 1) both;
     }
     .reaction-burst {
       position: fixed;
       pointer-events: none;
       z-index: 600;
-      font-size: 2.5rem;
+      font-size: 2.2rem;
       line-height: 1;
       transform: translate(-50%, 0);
-      animation: reactionFloat 0.78s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      animation: reactionFloat 0.48s cubic-bezier(0.22, 1, 0.36, 1) forwards;
       filter: drop-shadow(0 3px 10px rgba(219, 39, 119, 0.35));
     }
     .msg-row.reply-swipe-active .msg-row-line::after {
@@ -3918,7 +3918,6 @@
             toggleReaction(id, existing);
           } else {
             toggleReaction(id, 'heart', { burst: true });
-            pulseMessageBubble(row);
           }
           return true;
         }
@@ -4161,9 +4160,11 @@
 
     function reactionsNeedFullBubbleRefresh(m, bubble) {
       if (!bubble) return true;
-      const shouldBePlain = isPlainTextBubble(m) && !hasReactions(m);
-      const isPlain = bubble.classList.contains('text-only');
-      return shouldBePlain !== isPlain;
+      if (isPlainTextBubble(m)) return true;
+      if (bubble.classList.contains('text-only')) return true;
+      if (bubble.querySelector('.msg-text-inline, .msg-text-block')) return true;
+      if (hasReactions(m) !== bubble.classList.contains('has-reactions')) return true;
+      return false;
     }
 
     function patchMessageReactions(m, bubble, mine) {
@@ -4181,12 +4182,11 @@
     function applyMessageReactions(m, box = $('messages'), anim = null) {
       const row = box.querySelector('.msg-row[data-id="' + m.id + '"]');
       const bubble = row?.querySelector('.bubble');
-      const mine = m.senderId === user.id;
       const preserve = !shouldStickToBottom();
       const anchor = preserve ? saveScrollAnchor(box) : null;
       let ok = false;
       if (bubble && !reactionsNeedFullBubbleRefresh(m, bubble)) {
-        patchMessageReactions(m, bubble, mine);
+        patchMessageReactions(m, bubble, m.senderId === user.id);
         ok = true;
       } else {
         ok = refreshMessageBubble(m, box);
@@ -4201,8 +4201,11 @@
       }
       requestAnimationFrame(() => {
         if (anim?.adding) {
-          if (anim.burst) playReactionBurst(row, anim.key);
-          animateReactionPills(row?.querySelector('.msg-reactions'), [anim.key]);
+          if (anim.burst) {
+            playReactionBurst(row, anim.key);
+          } else {
+            animateReactionPills(row?.querySelector('.msg-reactions'), [anim.key]);
+          }
         }
         const pinnedRow = pinnedVideoPlaceholder?.closest('.msg-row');
         if (pinnedRow?.dataset.id === m.id) vnotePinDragged = false;
